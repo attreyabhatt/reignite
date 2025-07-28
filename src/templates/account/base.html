@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-center bg-white">
+    <div class="col-md-5 col-lg-4">
+        <div class="border p-4">
+            <h4 class="text-center mb-4 fw-normal">{% block head_title %}{% endblock %}</h4>
+            {% block accountcontent %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}

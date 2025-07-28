@@ -1,0 +1,98 @@
+{% extends "account/base.html" %}
+{% load i18n %}
+
+{% block head_title %}{% trans "Email Addresses" %}{% endblock %}
+
+{% block accountcontent %}
+<div class="text-center mb-4">
+    <i class="fas fa-envelope fa-3x text-primary mb-3"></i>
+    <p class="text-muted">You can add or remove email addresses and set your primary email.</p>
+</div>
+
+{% if user.emailaddress_set.all %}
+<div class="mb-4">
+    <h6>Current Email Addresses:</h6>
+    <form method="post" action="{% url 'account_email' %}">
+        {% csrf_token %}
+        <div class="list-group">
+            {% for emailaddress in user.emailaddress_set.all %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="email" value="{{ emailaddress.email }}" 
+                                   {% if emailaddress.primary %}checked{% endif %}>
+                            <label class="form-check-label">
+                                {{ emailaddress.email }}
+                                {% if emailaddress.primary %}
+                                    <span class="badge bg-primary ms-2">Primary</span>
+                                {% endif %}
+                                {% if not emailaddress.verified %}
+                                    <span class="badge bg-warning ms-2">Unverified</span>
+                                {% endif %}
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        {% if not emailaddress.verified %}
+                            <button type="submit" name="action_send" value="{{ emailaddress.email }}" 
+                                    class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-paper-plane"></i> Send Verification
+                            </button>
+                        {% endif %}
+                        {% if not emailaddress.primary %}
+                            <button type="submit" name="action_remove" value="{{ emailaddress.email }}" 
+                                    class="btn btn-sm btn-outline-danger">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <div class="mt-3">
+            <button type="submit" name="action_primary" class="btn btn-dark w-100">
+                <i class="fas fa-star"></i> Make Primary
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h6 class="mb-0">Add New Email Address</h6>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'account_email' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="{{ form.email.id_for_label }}" class="form-label">
+                    <i class="fas fa-envelope"></i> {{ form.email.label }}
+                </label>
+                <input type="email" 
+                       class="form-control {% if form.email.errors %}is-invalid{% endif %}"
+                       id="{{ form.email.id_for_label }}"
+                       name="{{ form.email.name }}"
+                       value="{{ form.email.value|default:'' }}"
+                       placeholder="Enter new email address">
+                {% if form.email.errors %}
+                    <div class="invalid-feedback">
+                        {{ form.email.errors }}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <button type="submit" name="action_add" class="btn btn-dark w-100">
+                <i class="fas fa-plus"></i> Add Email
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="text-center mt-4">
+    <a href="{% url 'home' %}" class="text-decoration-none">
+        <i class="fas fa-arrow-left"></i> Back to Home
+    </a>
+</div>
+{% endblock %}

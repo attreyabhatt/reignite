@@ -1,0 +1,7 @@
+Django==5.2.4
+gunicorn
+python-decouple
+psycopg[binary]
+dj-database-url
+requests
+django-allauth

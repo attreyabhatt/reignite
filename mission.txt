@@ -1,0 +1,14 @@
+I am building a django app that helps male users reignite dead conversations.
+
+Example: She left you on read. You sent “cool lol”. It’s not over yet. Paste your conversation and let our AI wingman craft your comeback.
+
+You: We should grab a drink sometime  
+Her: Haha maybe  
+You: Thursday work?  
+Her:
+
+You: I feel like this convo aged like fine wine. Or did it just expire? 😅  
+Her:
+
+You: Just gonna say it — you have top-tier taste in music  
+Her:
