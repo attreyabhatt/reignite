@@ -123,7 +123,7 @@
         <!-- Text Pitch -->
         <div class="col-md-6 mb-4 mb-md-0">
             <h1 class="display-5 fw-bold">Dead Chat? We'll Revive It. 💬</h1>
-            <p class="lead text-muted">She left you on read. You sent “cool lol”. It’s not over yet. Paste your 
+            <p class="lead text-muted">She left you on read. You sent “cool lol”. It’s not over yet. Paste your
                 conversation and let our AI wingman craft your comeback.</p>
         </div>
 
@@ -135,33 +135,28 @@
                     <div class="mb-3">
                         <div class="">
                             <div class="row mb-3">
-                                <div class="col-6">
-                                    <div id="her-reply">
-                                        <textarea name="her_reply" id="her_reply" class="form-control"
-                                            placeholder="Her Text" rows="2"></textarea>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3 justify-content-end">
-                                <div class="col-6">
-                                    <div id="my-reply">
-                                        <textarea name="my_reply" id="my_reply" class="form-control"
-                                            placeholder="My Reply" rows="2"></textarea>
+                                <div class="col-12">
+                                    <div id="last-reply">
+                                        <label for="lastmessage" class="form-label">Paste your conversation</label>
+                                        <textarea name="last-reply" id="last-reply" class="form-control"
+                                            placeholder="you: free on thursday?&#10;her:&#10;(seen, no reply)"
+                                            rows="4"></textarea>
+                                        <!-- <textarea name="last-reply" id="last-reply" class="form-control"
+                                            placeholder="Last message. &#10;Example - You: Free on friday?"
+                                            rows="4"></textarea> -->
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <button type="submit" class="btn btn-dark btn-sm">Generate Reply</button>
-                        <div class="mt-3 small">
-                            Chat Credit: 5
+                        <div class="d-flex justify-content-between align-items-center row">
+                            <button type="submit" class="btn btn-dark btn-sm">Generate Reply</button>
+                            <div class="mt-3 small">
+                                Chat Credit: 5
+                            </div>
                         </div>
-                    </div>
-                    
+
+
+
                 </form>
 
                 <div class="align-items-start mt-2" id="responseArea">
@@ -246,6 +241,7 @@
             now.</span></p>
 </div>
 
+
 <!-- JS -->
 <script>
     const csrfToken = '{{ csrf_token }}';
@@ -253,10 +249,8 @@
     document.getElementById('chatForm').addEventListener('submit', function (e) {
         e.preventDefault();
 
-        let her_reply = "her: " + document.getElementById('her_reply').value;
-        let my_reply = "you: " + document.getElementById('my_reply').value;
-
-        const lastText = her_reply + " " + my_reply + " " + "her: [no reply]";
+        let last_reply = document.getElementById('last-reply').value;
+        const lastText = last_reply;
 
         fetch("{% url 'ajax_reply' %}", {
             method: 'POST',
@@ -269,20 +263,7 @@
             .then(response => response.json())
             .then(data => {
                 document.getElementById('responseArea').style.display = 'block';
-                document.getElementById('suggestedReply').innerHTML = `<span>${data.todd}</span>`;
-                const sourceDiv = document.getElementById('suggestedReply');
-
-                const julienDiv = sourceDiv.cloneNode(true); // Deep clone
-                julienDiv.id = 'myJulienDiv'; // Change the ID to avoid duplicates
-                julienDiv.innerHTML = `<span>${data.julien}</span>`;
-                const parentElement = document.getElementById('responseArea');
-                parentElement.appendChild(julienDiv);
-
-                const neilDiv = sourceDiv.cloneNode(true); // Deep clone
-                neilDiv.id = 'myNeilDiv'; // Change the ID to avoid duplicates
-                neilDiv.innerHTML = `<span>${data.neil}</span>`;
-                parentElement.appendChild(neilDiv);
-
+                document.getElementById('suggestedReply').innerHTML = `<span>${data.alex}</span>`;
             })
             .catch(error => {
                 alert("Error generating reply.");

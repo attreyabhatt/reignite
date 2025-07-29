@@ -9,13 +9,11 @@ def home(request):
 def ajax_reply(request):
     if request.method == 'POST':
         data = json.loads(request.body)
-        last_text = data.get('last_text', '')
+        last_text = data.get('last-reply', '').strip()
+        
         comebacks = generate_comebacks(last_text)
-        print(f"Generated comebacks: {comebacks}")
         return JsonResponse({
-            'todd': comebacks.get("Todd Valentine", ""),
-            'julien': comebacks.get("Julien Blanc", ""),
-            'neil': comebacks.get("Neil Strauss", "")
+            'alex': comebacks.get("AlexTextGameCoach", ""),
         })
 
     return JsonResponse({'error': 'Invalid request'}, status=400)
