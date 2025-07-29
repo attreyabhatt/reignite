@@ -24,3 +24,5 @@ Thumbs.db
 .coverage
 .tox/
 .eggs/
+
+missiom.txt
