@@ -17,13 +17,15 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from conversation import views
-from reignitehome.views import ajax_reply,home
+from reignitehome.views import ajax_reply_home,home
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
-    path('ajax-reply/', ajax_reply, name='ajax_reply'),
+    path('conversations/',include('conversation.urls')), 
+    path('ajax-reply-home/', ajax_reply_home, name='ajax_reply_home'),
     path('accounts/', include('allauth.urls')),  
+    path('pricing/', include('pricing.urls')), 
     
 ]

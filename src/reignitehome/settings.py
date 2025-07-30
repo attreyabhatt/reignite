@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'allauth.account',
     
     'conversation',
+    'pricing',
 ]
 
 MIDDLEWARE = [
@@ -129,7 +130,6 @@ AUTHENTICATION_BACKENDS = [
 # AllAuth settings
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_EMAIL_VERIFICATION = "none"
-ACCOUNT_EMAIL_REQUIRED = False
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
@@ -138,7 +138,7 @@ ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_ON_GET = True
 
 # Redirect URLs
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/conversations'
 LOGOUT_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/'
 
