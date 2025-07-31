@@ -30,12 +30,6 @@
         /* (Your existing footer styles go here) */
     }
 
-    .form-container {
-        background: white;
-        padding: 2rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
 
     textarea,
     select,
@@ -135,124 +129,181 @@
 
 {% block content %}
 <div class="site-content">
-<!-- HERO WITH FORM -->
-<div class="container py-5">
-    <div class="row align-items-center pb-5">
-        <!-- Text Pitch -->
-        <div class="col-md-6 mb-4 mb-md-0">
-            <h1 class="display-5 fw-bold">Dead Chat? We'll Revive It. 💬</h1>
-            <p class="lead text-muted">She left you on read. You sent “cool lol”. It’s not over yet. Paste your
-                conversation and let our AI wingman craft your comeback.</p>
-        </div>
+    <!-- HERO WITH FORM -->
+    <div class="container py-5">
+        <div class="row pb-5">
+            <!-- Text Pitch -->
+            <div class="col-md-6 mb-4 mb-md-0">
+                <div class="row">
+                    <div class="col-12">
+                        <h1 class="display-5 fw-bold">Dead Chat? We'll Revive It. 💬</h1>
+                        <p class="lead text-muted">She left you on read. You sent “cool lol”. It’s not over yet. Paste your
+                            conversation and let our AI wingman craft your comeback.</p>
+                    </div>
+                </div>
+                <div class="row">
+                        <div class="align-items-start mt-2 col-12" id="responseArea">
+                            <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2" style="display: none;">
+                                No response has been generated yet
+                            </div>
+                            <div id="suggestedReply2" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2" style="display: none;">
+                                No response has been generated yet
+                            </div>
+                            <div id="suggestedReply3" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2" style="display: none;">
+                                No response has been generated yet
+                            </div>
+                        </div>
+                </div>
+                
+            </div>
 
-        <!-- Form -->
-        <div class="col-md-6">
-            <div class="form-container">
-                <form id="chatForm">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <div class="">
-                            <div class="row mb-3">
-                                <div class="col-12">
-                                    <div id="last-reply">
-                                        <label for="lastmessage" class="form-label">Paste your conversation</label>
-                                        <textarea name="last-reply" id="last-reply" class="form-control"
-                                            placeholder="you: free on thursday?&#10;her:&#10;(seen, no reply)"
-                                            rows="4"></textarea>
-                                        <!-- <textarea name="last-reply" id="last-reply" class="form-control"
-                                            placeholder="Last message. &#10;Example - You: Free on friday?"
-                                            rows="4"></textarea> -->
-                                    </div>
+            <!-- Form -->
+            <div class="col-6">
+                <div class="form-container">
+                    <form id="chatForm" class="rounded-4 shadow-lg bg-white p-4" style="min-width:350px;">
+                        {% csrf_token %}
+                        <!-- Step 1: Context Quick Pick -->
+                        <div class="mb-4">
+                            <div class="row g-2">
+                                <div class="col-12 col-md-6">
+                                    <label for="platform" class="form-label fw-semibold">
+                                        <i class="fa fa-hashtag me-1 text-primary"></i> Platform
+                                    </label>
+                                    <select class="form-select rounded-pill" id="platform" name="platform">
+                                        <option value="Instagram DM">Instagram DM</option>
+                                        <option value="Tinder">Tinder</option>
+                                        <option value="Bumble">Bumble</option>
+                                        <option value="Hinge">Hinge</option>
+                                        <option value="WhatsApp">WhatsApp</option>
+                                        <option value="iMessage/SMS">iMessage/SMS</option>
+                                        <option value="Snapchat">Snapchat</option>
+                                        <option value="Telegram">Telegram</option>
+                                        <option value="Facebook Messenger">Facebook Messenger</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="what-happened" class="form-label fw-semibold">
+                                        <i class="fa fa-question-circle me-1 text-info"></i> What happened?
+                                    </label>
+                                    <select class="form-select rounded-pill" id="what-happened" name="what-happened">
+                                        <option value="She left me on read">Left on read</option>
+                                        <option value="She didn’t reply after my question">No reply to my question
+                                        </option>
+                                        <option value="She ghosted after I asked her out">Ghosted after invite</option>
+                                        <option value="Conversation just fizzled">Just fizzled out</option>
+                                        <option value="She didn’t reply after my joke">No reply to my joke</option>
+                                        <option value="She ignored my compliment">Ignored my compliment</option>
+                                        <option value="She stopped replying suddenly">Suddenly stopped replying</option>
+                                        <option value="I sent something awkward">Sent something awkward</option>
+                                        <option value="Not sure / Just stopped">Not sure/just stopped</option>
+                                        <option value="Other">Other</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center row">
-                            <button type="submit" class="btn btn-dark btn-sm">Generate Reply</button>
-                            <div class="mt-3 small">
-                                Chat Credit: <span id="chatCredits">{{ chat_credits }}</span>
-                            </div>
+                        <!-- Step 2: Main Details (Title and Screenshot, Collapsible for optional note) -->
+                        <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;">
+                            
+                            <label for="formFile" class="form-label mt-2 fw-semibold">
+                                <i class="me-1 text-success"></i> Upload Screenshot
+                                <span class="small text-muted">(optional – for instant extracting messages)</span>
+                            </label>
+                            <input class="form-control rounded-pill mb-2" type="file" id="formFile">
 
+                            <div class="form-text mb-2">
+                                Drag & drop a chat screenshot, or paste your convo below.
+                            </div>
+                            <div id="ocr-status" class="mt-2" style="display:none;">
+                                <span class="spinner-border spinner-border-sm align-middle text-primary"
+                                    role="status"></span>
+                                <span class="ms-2 text-muted">Analyzing screenshot...</span>
+                            </div>
+                        </div>
+                        <!-- Step 3: Conversation Paste -->
+                        <div class="mb-3">
+                            <label for="last-reply" class="form-label fw-semibold">
+                                <i class="me-1 text-warning"></i> Conversation
+                            </label>
+                            <textarea name="last-reply" id="last-reply" class="form-control" style="min-height:120px"
+                                placeholder="you: hey, free thursday?&#10;her: (seen, no reply)"></textarea>
                         </div>
 
+                        <!-- Step 5: Action Row -->
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button type="submit" class="btn btn-dark btn-lg px-4 rounded-pill shadow-sm"
+                                id="generate-btn">
+                                <i class="fa fa-fire me-2"></i>Generate Reply
+                            </button>
 
+                            <div class="mt-2 small text-muted">
+                                Chat Credits: <span id="chatCredits">{{ chat_credits }}</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                </form>
-
-                <div class="align-items-start mt-2" id="responseArea">
-                    <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2">
-                        No response has been generated yet
+    <!-- HOW IT WORKS -->
+    <div class="py-5" style="background-color: #f0f2f5;">
+        <div class="container">
+            <h2 class="text-center fw-bold mb-5">Here’s the Game Plan</h2>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 text-center">
+                        <div style="font-size: 2rem;">📌</div>
+                        <h5 class="mt-3 fw-semibold">Drop the last conversation</h5>
+                        <p class="text-muted">Paste the last thing you or she said — we’ll take it from there.</p>
                     </div>
                 </div>
-                <div class="mt-3 small">
-                    To upload screenshots or add full conversations
-                    <a href="{% url 'account_signup' %}" class="text-decoration-none">
-                        Sign up
-                    </a>
+                <div class="col-md-4">
+                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 text-center">
+                        <div style="font-size: 2rem;">🧠</div>
+                        <h5 class="mt-3 fw-semibold">We craft your comeback</h5>
+                        <p class="text-muted">Witty, playful, sincere — we shape it to match the vibe.</p>
+                    </div>
                 </div>
-
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- HOW IT WORKS -->
-<div class="py-5" style="background-color: #f0f2f5;">
-    <div class="container">
-        <h2 class="text-center fw-bold mb-5">Here’s the Game Plan</h2>
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="p-4 bg-white rounded-4 shadow-sm h-100 text-center">
-                    <div style="font-size: 2rem;">📌</div>
-                    <h5 class="mt-3 fw-semibold">Drop the last message</h5>
-                    <p class="text-muted">Paste the last thing you or she said — we’ll take it from there.</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="p-4 bg-white rounded-4 shadow-sm h-100 text-center">
-                    <div style="font-size: 2rem;">🧠</div>
-                    <h5 class="mt-3 fw-semibold">We craft your comeback</h5>
-                    <p class="text-muted">Witty, playful, sincere — we shape it to match the vibe.</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="p-4 bg-white rounded-4 shadow-sm h-100 text-center">
-                    <div style="font-size: 2rem;">🚀</div>
-                    <h5 class="mt-3 fw-semibold">Send it & watch it work</h5>
-                    <p class="text-muted">Slide back into the convo like you never left. Smooth.</p>
+                <div class="col-md-4">
+                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 text-center">
+                        <div style="font-size: 2rem;">🚀</div>
+                        <h5 class="mt-3 fw-semibold">Send it & watch it work</h5>
+                        <p class="text-muted">Slide back into the convo like you never left. Smooth.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- WHY SECTION -->
-<div class="py-5" style="background-color: #ffffff;">
-    <div class="container">
-        <h3 class="text-center fw-bold mb-4">Let’s Be Real — You’ve Been Here:</h3>
-        <div class="row justify-content-center g-4">
-            <div class="col-md-5">
-                <div class="p-4 bg-light rounded-4 shadow-sm">
-                    💬 You don’t know what to say after “lol yeah”
+    <!-- WHY SECTION -->
+    <div class="py-5" style="background-color: #ffffff;">
+        <div class="container">
+            <h3 class="text-center fw-bold mb-4">Let’s Be Real — You’ve Been Here:</h3>
+            <div class="row justify-content-center g-4">
+                <div class="col-md-5">
+                    <div class="p-4 bg-light rounded-4 shadow-sm">
+                        💬 You don’t know what to say after “lol yeah”
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-5">
-                <div class="p-4 bg-light rounded-4 shadow-sm">
-                    💬 You’re new to dating apps and feel a little lost
+                <div class="col-md-5">
+                    <div class="p-4 bg-light rounded-4 shadow-sm">
+                        💬 You’re new to dating apps and feel a little lost
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-5">
-                <div class="p-4 bg-light rounded-4 shadow-sm">
-                    💬 Your humor doesn’t always land over text
+                <div class="col-md-5">
+                    <div class="p-4 bg-light rounded-4 shadow-sm">
+                        💬 Your humor doesn’t always land over text
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-5">
-                <div class="p-4 bg-light rounded-4 shadow-sm">
-                    💬 You froze mid-convo and now it’s been 3 days
+                <div class="col-md-5">
+                    <div class="p-4 bg-light rounded-4 shadow-sm">
+                        💬 You froze mid-convo and now it’s been 3 days
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 </div>
 <!-- CTA FOOTER -->
 <div class="footer-cta" style="background: linear-gradient(to right, #212529, #343a40);">
@@ -268,8 +319,15 @@
     document.getElementById('chatForm').addEventListener('submit', function (e) {
         e.preventDefault();
 
+        document.getElementById('suggestedReply').innerHTML = `
+            <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
+            <span class="ms-2 text-muted">Generating your comeback…</span>
+        `;
+        var suggestedReply = document.getElementById("suggestedReply");
+        suggestedReply.style.display = "block"
         let last_reply = document.getElementById('last-reply').value;
-        const lastText = last_reply;
+        let platform = document.getElementById('platform').value;
+        let what_happened = document.getElementById('what-happened').value;
 
         fetch("{% url 'ajax_reply_home' %}", {
             method: 'POST',
@@ -277,7 +335,11 @@
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
             },
-            body: JSON.stringify({ last_text: lastText })
+            body: JSON.stringify({
+                last_text: last_reply,
+                platform: platform,
+                what_happened: what_happened
+            })
         })
             .then(response => response.json())
             .then(data => {
@@ -287,13 +349,67 @@
                 }
                 document.getElementById('responseArea').style.display = 'block';
                 document.getElementById('suggestedReply').innerHTML = `<span>${data.alex}</span>`;
+                document.getElementById('suggestedReply2').innerHTML = `<span>${data.toddv}</span>`;
+                document.getElementById('suggestedReply3').innerHTML = `<span>${data.custom}</span>`;
+
+                
+                var suggestedReply2 = document.getElementById("suggestedReply2");
+                suggestedReply2.style.display = "block"
+                var suggestedReply3 = document.getElementById("suggestedReply3");
+                suggestedReply3.style.display = "block"
                 document.getElementById('chatCredits').innerText = data.credits_left;
+
             })
             .catch(error => {
                 alert("Error generating reply.");
                 console.error(error);
             });
     });
+</script>
+
+<!-- Screenshot ocr -->
+<script>
+    const fileInput = document.getElementById('formFile').addEventListener('change', function (e) {
+        const fileInput = e.target;
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        // Show spinner/status
+        document.getElementById('ocr-status').style.display = 'inline-flex';
+
+        const formData = new FormData();
+        formData.append('screenshot', file);
+
+        fetch("/conversations/ocr-screenshot/", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
+                if (data.ocr_text) {
+                    const lastReply = document.getElementById('last-reply');
+                    if (lastReply.value.trim()) {
+                        lastReply.value = lastReply.value.trim() + "\n\n" + data.ocr_text;
+                    } else {
+                        lastReply.value = data.ocr_text;
+                    }
+                } else {
+                    alert(data.error || "Failed to extract text from image.");
+                }
+                fileInput.value = '';
+            })
+            .catch(() => {
+                document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
+                alert("Failed to OCR the screenshot.");
+                fileInput.value = '';
+            });
+    });
+
+
 </script>
 
 {% endblock %}

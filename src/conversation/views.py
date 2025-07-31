@@ -69,7 +69,7 @@ def ajax_reply(request):
         comebacks = generate_comebacks(last_text)
         custom_comeback = generate_custom_comeback(last_text,platform,what_happened)
         todd_comeback = generate_toddv_comeback(last_text,platform,what_happened)
-        print(todd_comeback)
+        
         response_data = {
             'alex': comebacks.get("AlexTextGameCoach", ""),
             'custom': custom_comeback,
@@ -106,9 +106,18 @@ from django.views.decorators.csrf import csrf_exempt  # Or use @csrf_protect if 
 
 @csrf_exempt  # Remove this and use CSRF token if your AJAX includes it
 def ocr_screenshot(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Unauthorized'}, status=401)
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            if 'screenshot_credits' not in request.session:
+                    request.session['screenshot_credits'] = 5
+            
+            # Deduct one screenshot credit session
+            request.session['screenshot_credits'] = request.session['screenshot_credits'] - 1
+            screenshot_credits_credits_left = request.session['screenshot_credits']
+            print(screenshot_credits_credits_left)
+            if screenshot_credits_credits_left <= 0:
+                return JsonResponse({'error': 'Limit reached. Please signup to upload more screenshots'}, status=401)
+            
         screenshot_file = request.FILES.get('screenshot')
         if not screenshot_file:
             return JsonResponse({'error': 'No file uploaded'}, status=400)

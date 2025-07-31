@@ -2,6 +2,8 @@ from django.shortcuts import render,redirect
 from django.http import JsonResponse
 import json
 from conversation.utils.gpt import generate_comebacks
+from conversation.utils.custom_gpt import generate_custom_comeback
+from conversation.utils.todd_gpt import generate_toddv_comeback
 from django.urls import reverse
 from conversation.models import ChatCredit
 
@@ -9,9 +11,14 @@ def home(request):
     if 'chat_credits' not in request.session:
         request.session['chat_credits'] = 5
         
+    if 'screenshot_credits' not in request.session:
+        request.session['screenshot_credits'] = 5
+        
     current_chat_credits = request.session['chat_credits']
+    current_screenshot_credits = request.session['screenshot_credits']
     context = {
         'chat_credits':current_chat_credits,
+        'screenshot_credits':current_screenshot_credits
     }
     
     if request.user.is_authenticated:
@@ -29,17 +36,26 @@ def ajax_reply_home(request):
                 'redirect_url': signup_url
             }, status=403)
         
+        data = json.loads(request.body)
+        last_text = data.get('last_text', '').strip()
+        platform = data.get('platform', '').strip()
+        what_happened = data.get('what_happened', '').strip()
+        
         # Deduct one credit and update session
         request.session['chat_credits'] = credits - 1
         credits_left = request.session['chat_credits']
-
-        data = json.loads(request.body)
-        last_text = data.get('last-reply', '').strip()
         
+        # Generate your AI response (dummy below)
         comebacks = generate_comebacks(last_text)
-        return JsonResponse({
+        custom_comeback = generate_custom_comeback(last_text,platform,what_happened)
+        todd_comeback = generate_toddv_comeback(last_text,platform,what_happened)
+        
+        response_data = {
             'alex': comebacks.get("AlexTextGameCoach", ""),
-            'credits_left':credits_left,
-        })
+            'custom': custom_comeback,
+            'toddv' : todd_comeback,
+            'credits_left': credits_left,
+        }
+        return JsonResponse(response_data)
 
     return JsonResponse({'error': 'Invalid request'}, status=400)
