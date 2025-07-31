@@ -59,3 +59,12 @@ def ajax_reply_home(request):
         return JsonResponse(response_data)
 
     return JsonResponse({'error': 'Invalid request'}, status=400)
+
+def privacy_policy(request):
+    return render(request, "policy/privacy_policy.html")
+
+def terms_and_conditions(request):
+    return render(request, "policy/terms_and_conditions.html")
+
+def refund_policy(request):
+    return render(request, "policy/refund_policy.html")

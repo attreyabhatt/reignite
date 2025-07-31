@@ -114,7 +114,6 @@ def ocr_screenshot(request):
             # Deduct one screenshot credit session
             request.session['screenshot_credits'] = request.session['screenshot_credits'] - 1
             screenshot_credits_credits_left = request.session['screenshot_credits']
-            print(screenshot_credits_credits_left)
             if screenshot_credits_credits_left <= 0:
                 return JsonResponse({'error': 'Limit reached. Please signup to upload more screenshots'}, status=401)
             

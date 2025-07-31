@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block head_title %}Terms & Conditions | TryAgainText{% endblock %}
+{% block content %}
+
+<div class="container py-5" style="max-width: 750px;">
+    <h1 class="mb-4">Terms &amp; Conditions</h1>
+    <p>Effective date: July 31, 2025</p>
+
+    <h5 class="mt-4">1. Introduction</h5>
+    <p>
+        Welcome to <strong>TryAgainText</strong> (“we”, “our”, “us”). By using our website or app, you (“user”, “you”)
+        agree to these Terms &amp; Conditions. If you do not agree, please do not use our service.
+    </p>
+
+    <h5 class="mt-4">2. Use of Service</h5>
+    <ul>
+        <li>You must be at least 18 years old to use TryAgainText.</li>
+        <li>You agree to use our service only for lawful purposes.</li>
+        <li>You are responsible for all activity under your account.</li>
+        <li>You must not use TryAgainText to send spam, harass others, or violate any laws.</li>
+    </ul>
+
+    <h5 class="mt-4">3. User Content</h5>
+    <ul>
+        <li>You retain ownership of any conversations or text you submit.</li>
+        <li>By submitting content, you grant us a license to process it for generating responses.</li>
+        <li>We do not claim ownership of your chats, but we may use aggregated, anonymous data to improve our service.
+        </li>
+    </ul>
+
+    <h5 class="mt-4">4. AI-Generated Content</h5>
+    <ul>
+        <li>TryAgainText provides AI-generated suggestions for entertainment and informational purposes only.</li>
+        <li>We do not guarantee accuracy, suitability, or results from using our responses.</li>
+        <li>You are responsible for any messages you choose to send using our suggestions.</li>
+    </ul>
+
+    <h5 class="mt-4">5. Payments &amp; Refunds</h5>
+    <ul>
+        <li>Some features may require payment. All payments are processed securely by third-party providers.</li>
+        <li>Refunds, if offered, will be subject to our <a href="{% url 'refund_policy' %}">Refund Policy</a>.</li>
+    </ul>
+
+    <h5 class="mt-4">6. Intellectual Property</h5>
+    <ul>
+        <li>All website/app content, branding, logos, and code are the property of TryAgainText or its licensors.</li>
+        <li>You may not copy, modify, or distribute our content without permission.</li>
+    </ul>
+
+    <h5 class="mt-4">7. Limitation of Liability</h5>
+    <ul>
+        <li>TryAgainText is provided “as is” and we make no warranties regarding functionality or availability.</li>
+        <li>We are not liable for any damages arising from your use of our service.</li>
+    </ul>
+
+    <h5 class="mt-4">8. Account Termination</h5>
+    <ul>
+        <li>We reserve the right to suspend or terminate accounts that violate these terms.</li>
+        <li>You may close your account at any time by contacting us.</li>
+    </ul>
+
+    <h5 class="mt-4">9. Changes to Terms</h5>
+    <p>
+        We may update these Terms &amp; Conditions from time to time. We will notify users of significant changes via
+        email or website notice.
+    </p>
+
+    <h5 class="mt-4">10. Governing Law</h5>
+    <p>
+        These Terms are governed by the laws of India (or your local jurisdiction if you prefer; update as needed).
+    </p>
+
+    <h5 class="mt-4">11. Contact Us</h5>
+    <p>
+        For questions about these Terms, contact us at <a
+            href="mailto:support@tryagaintext.com">support@tryagaintext.com</a>.
+    </p>
+</div>
+{% endblock %}

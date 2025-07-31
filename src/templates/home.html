@@ -18,18 +18,11 @@
         min-height: 100vh;
         display: flex;
         flex-direction: column;
-
     }
 
     .site-content {
         flex: 1 0 auto;
     }
-
-    .footer-cta {
-        flex-shrink: 0;
-        /* (Your existing footer styles go here) */
-    }
-
 
     textarea,
     select,
@@ -92,6 +85,11 @@
     }
 
     .footer-cta {
+        flex-shrink: 0;
+        /* (Your existing footer styles go here) */
+    }
+
+    .footer-cta {
         text-align: center;
         padding: 3rem 2rem;
         font-size: 1.25rem;
@@ -131,7 +129,7 @@
 <div class="site-content">
     <!-- HERO WITH FORM -->
     <div class="container py-5">
-        <div class="row pb-5">
+        <div class="row">
             <!-- Text Pitch -->
             <div class="col-md-6 mb-4 mb-md-0">
                 <div class="row">
@@ -277,7 +275,7 @@
     </div>
 
     <!-- WHY SECTION -->
-    <div class="py-5" style="background-color: #ffffff;">
+    <div class="pt-5" style="background-color: #ffffff;">
         <div class="container">
             <h3 class="text-center fw-bold mb-4">Let’s Be Real — You’ve Been Here:</h3>
             <div class="row justify-content-center g-4">
@@ -305,11 +303,7 @@
         </div>
     </div>
 </div>
-<!-- CTA FOOTER -->
-<div class="footer-cta" style="background: linear-gradient(to right, #212529, #343a40);">
-    <p class="m-0 fw-semibold text-white">🔥 Don’t let a match go to waste. <span style="color: #ffc107;">Reignite it
-            now.</span></p>
-</div>
+
 
 
 <!-- JS -->

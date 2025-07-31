@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from conversation import views
-from reignitehome.views import ajax_reply_home,home
+from reignitehome.views import ajax_reply_home,home,privacy_policy,terms_and_conditions,refund_policy
 
 
 urlpatterns = [
@@ -27,5 +27,9 @@ urlpatterns = [
     path('ajax-reply-home/', ajax_reply_home, name='ajax_reply_home'),
     path('accounts/', include('allauth.urls')),  
     path('pricing/', include('pricing.urls')), 
+    
+    path('privacy-policy/', privacy_policy, name='privacy_policy'),
+    path('terms/', terms_and_conditions, name='terms_and_conditions'),
+    path('refund-policy/', refund_policy, name='refund_policy'),
     
 ]

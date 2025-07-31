@@ -1,0 +1,47 @@
+<style>
+    .footer-cta {
+        flex-shrink: 0;
+        /* (Your existing footer styles go here) */
+    }
+
+    .footer-cta {
+        text-align: center;
+        padding: 3rem 2rem;
+        font-size: 1.25rem;
+        background: #212529;
+        color: #fff;
+    }
+</style>
+<div class="footer-cta mt-5" style="background: linear-gradient(to right, #212529, #343a40);">
+    <div class="container-fluid">
+        <div class="row align-items-center justify-content-center">
+            <div class="col-6 text-center mb-2">
+                <p class="m-0 fw-semibold text-white" style="font-size:1.25rem;">
+                    <span style="font-size:1.4rem;">🔥</span> Don’t let a match go to waste.
+                    <span style="color: #ffc107;">Reignite it now.</span>
+                </p>
+            </div>
+            <div class="col-3 text-center mb-2">
+                <div class="d-flex flex-column align-items-center gap-1">
+                    <a href="{% url 'privacy_policy' %}" class="text-light text-decoration-none"
+                        style="font-size: 0.8rem;" target="_blank">Privacy Policy</a>
+                    <a href="{% url 'terms_and_conditions' %}" class="text-light text-decoration-none"
+                        style="font-size: 0.8rem;" target="_blank">Terms &amp; Conditions</a>
+                    <a href="{% url 'refund_policy' %}" class="text-light text-decoration-none"
+                        style="font-size: 0.8rem;" target="_blank">Refund Policy</a>
+                </div>
+            </div>
+            <div class="col-3 text-center">
+
+                <p class="mb-0" style="font-size: 0.8rem;">
+                    <span class="text-light">Questions or feedback?</span>
+                    <a href="mailto:support@tryagaintext.com"
+                        class="text-warning text-decoration-none fw-semibold ms-1">
+                        <i class="bi bi-envelope-fill me-1"></i>Contact us
+                    </a>
+                </p>
+                <hr class="bg-secondary opacity-50" style="width: 60px; margin: 0.7rem auto 0.7rem auto;">
+            </div>
+        </div>
+    </div>
+</div>
