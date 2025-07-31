@@ -6,6 +6,7 @@ import json
 from conversation.utils.gpt import generate_comebacks
 from conversation.utils.image_gpt import extract_conversation_from_image
 from conversation.utils.custom_gpt import generate_custom_comeback
+from conversation.utils.todd_gpt import generate_toddv_comeback
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -67,10 +68,12 @@ def ajax_reply(request):
         # Generate your AI response (dummy below)
         comebacks = generate_comebacks(last_text)
         custom_comeback = generate_custom_comeback(last_text,platform,what_happened)
-        print(custom_comeback)
+        todd_comeback = generate_toddv_comeback(last_text,platform,what_happened)
+        print(todd_comeback)
         response_data = {
             'alex': comebacks.get("AlexTextGameCoach", ""),
             'custom': custom_comeback,
+            'toddv' : todd_comeback,
             'credits_left': chat_credit.balance,
         }
         

@@ -34,13 +34,15 @@
                 </a>
 
                 {% endfor %}
+                
+                {% else %}
+                
+                {% endif %}
                 <div class="mt-3">
                     <a href="{% url 'conversation_home'%}" class="btn btn-outline-dark w-100" role="button">
                         <i class="fa fa-plus me-1"></i>Add a new conversation
                     </a>
                 </div>
-                {% else %}
-                {% endif %}
         </div>
 
         <div class="col-6">
@@ -106,7 +108,15 @@
                         <div class="form-text mb-2">
                             Drag & drop a chat screenshot, or paste your convo below.
                         </div>
+                        <div id="ocr-status" class="mt-2" style="display:none;">
+                            <span class="spinner-border spinner-border-sm align-middle text-primary"
+                                role="status"></span>
+                            <span class="ms-2 text-muted">Analyzing screenshot...</span>
+                        </div>
                     </div>
+
+
+
 
                     <!-- Step 3: Conversation Paste -->
                     <div class="mb-3">
@@ -119,9 +129,10 @@
 
                     <!-- Step 5: Action Row -->
                     <div class="d-flex justify-content-between align-items-center">
-                        <button type="submit" class="btn btn-dark btn-lg px-4 rounded-pill shadow-sm">
+                        <button type="submit" class="btn btn-dark btn-lg px-4 rounded-pill shadow-sm" id="generate-btn">
                             <i class="fa fa-fire me-2"></i>Generate Reply
                         </button>
+                        
                         <div class="mt-2 small text-muted">
                             Chat Credits: <span id="chatCredits">{{ chat_credits }}</span>
                         </div>
@@ -137,6 +148,9 @@
             <div id="suggestedReply2" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2" style="display: none;">
                 No response has been generated yet
             </div>
+            <div id="suggestedReply3" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2" style="display: none;">
+                No response has been generated yet
+            </div>
         </div>
     </div>
 </div>
@@ -149,6 +163,12 @@
     // Handle form submission for generating a reply
     document.getElementById('chatForm').addEventListener('submit', function (e) {
         e.preventDefault();
+
+        document.getElementById('suggestedReply').innerHTML = `
+            <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
+            <span class="ms-2 text-muted">Generating your comeback…</span>
+        `;
+
 
         let girl_title = document.getElementById('girl-title').value;
         let last_reply = document.getElementById('last-reply').value;
@@ -176,24 +196,39 @@
                 }
                 document.getElementById('responseArea').style.display = 'block';
                 document.getElementById('suggestedReply').innerHTML = `<span>${data.alex}</span>`;
-                document.getElementById('suggestedReply2').innerHTML = `<span>${data.custom}</span>`;
+                document.getElementById('suggestedReply2').innerHTML = `<span>${data.toddv}</span>`;
+                document.getElementById('suggestedReply3').innerHTML = `<span>${data.custom}</span>`;
                 var suggestedReply2 = document.getElementById("suggestedReply2");
                 suggestedReply2.style.display = "block"
-
+                var suggestedReply3 = document.getElementById("suggestedReply3");
+                suggestedReply3.style.display = "block"
                 document.getElementById('chatCredits').innerText = data.credits_left;
 
                 // If a new conversation was created, add it to the sidebar instantly
                 if (data.new_conversation) {
                     const ul = document.querySelector('.list-group');
                     if (ul) {
+                        // Create a new <a> element with inner HTML (matches Django template)
                         const a = document.createElement('a');
                         a.href = "#";
                         a.className = "list-group-item list-group-item-action list-group-item-light convo-link";
                         a.setAttribute('data-id', data.new_conversation.id);
-                        a.innerText = data.new_conversation.girl_title;
 
-                        // Attach click event so user can click on the new sidebar link
+                        // Inner HTML with delete button
+                        a.innerHTML = `
+                            <div class="d-flex w-100 justify-content-between align-items-center">
+                                <span>${data.new_conversation.girl_title}</span>
+                                <button class="btn btn-sm btn-link text-danger delete-convo-btn" data-id="${data.new_conversation.id}" title="Delete">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                        `;
+
+                        // Add click handler for loading the conversation
                         a.addEventListener('click', function (e) {
+                            // Prevent delete button from triggering this event!
+                            if (e.target.closest('.delete-convo-btn')) return;
+
                             e.preventDefault();
                             const convoId = this.getAttribute('data-id');
                             fetch(`/conversations/detail/${convoId}/`, {
@@ -209,6 +244,12 @@
                                     }
                                     document.getElementById('girl-title').value = data.girl_title;
                                     document.getElementById('last-reply').value = data.content;
+                                    document.getElementById('platform').value = data.platform || 'Instagram DM';
+                                    document.getElementById('what-happened').value = data.what_happened || 'Not sure / Just stopped';
+                                    document.getElementById('suggestedReply').innerHTML = 'No response has been generated yet';
+                                    document.getElementById("suggestedReply2").style.display = "none";
+
+                                    
                                 })
                                 .catch(() => alert('Failed to load conversation.'));
                         });
@@ -217,6 +258,9 @@
                         ul.insertBefore(a, ul.firstChild);
                     }
                 }
+
+                
+
             })
             .catch(error => {
                 alert("Error generating reply.");
@@ -247,6 +291,8 @@
                     document.getElementById('suggestedReply').innerHTML = 'No response has been generated yet';
                     var suggestedReply2 = document.getElementById("suggestedReply2");
                     suggestedReply2.style.display = "none"
+                    var suggestedReply3 = document.getElementById("suggestedReply3");
+                    suggestedReply3.style.display = "none"
 
                 })
                 .catch(() => alert('Failed to load conversation.'));
@@ -256,10 +302,13 @@
 
 <!-- Screenshot ocr -->
 <script>
-    document.getElementById('formFile').addEventListener('change', function (e) {
+    const fileInput = document.getElementById('formFile').addEventListener('change', function (e) {
         const fileInput = e.target;
         const file = fileInput.files[0];
         if (!file) return;
+
+        // Show spinner/status
+        document.getElementById('ocr-status').style.display = 'inline-flex';
 
         const formData = new FormData();
         formData.append('screenshot', file);
@@ -273,6 +322,7 @@
         })
             .then(response => response.json())
             .then(data => {
+                document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
                 if (data.ocr_text) {
                     const lastReply = document.getElementById('last-reply');
                     if (lastReply.value.trim()) {
@@ -283,11 +333,15 @@
                 } else {
                     alert(data.error || "Failed to extract text from image.");
                 }
+                fileInput.value = '';
             })
             .catch(() => {
+                document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
                 alert("Failed to OCR the screenshot.");
+                fileInput.value = '';
             });
     });
+
 
 </script>
 
