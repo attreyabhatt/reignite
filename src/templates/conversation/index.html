@@ -4,6 +4,13 @@
 {% block title %}Dead Chat? We Got You. | Reignite{% endblock %}
 
 {% block extra_head %}
+<style>
+    .list-group-item.active,
+    .list-group-item:hover {
+        background: #e7f3ff !important;
+    }
+</style>
+
 {% endblock extra_head %}
 
 {% block content %}
@@ -12,74 +19,123 @@
         <!-- Choose the girl -->
         <div class="col-3">
             {% if conversations %}
-            <div class="mt-3">
-                <p>List of conversations</p>
-            </div>
             <ul class="list-group">
                 {% for conversation in conversations %}
                 <a href="#" class="list-group-item list-group-item-action list-group-item-light convo-link"
                     data-id="{{ conversation.id }}">
-                    
-                    <div class="d-flex w-100 justify-content-between">
+
+                    <div class="d-flex w-100 justify-content-between align-items-center">
                         <span>{{ conversation.girl_title }}</span>
-                        <button class="btn btn-sm btn-link text-danger delete-convo-btn" data-id="{{ conversation.id }}" title="Delete">
+                        <button class="btn btn-sm btn-link text-danger delete-convo-btn" data-id="{{ conversation.id }}"
+                            title="Delete">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
                 </a>
-                
+
                 {% endfor %}
                 <div class="mt-3">
-                    <a href="{% url 'conversation_home'%}" class="btn btn-outline-dark" role="button">Add a new
-                        conversation</a>
+                    <a href="{% url 'conversation_home'%}" class="btn btn-outline-dark w-100" role="button">
+                        <i class="fa fa-plus me-1"></i>Add a new conversation
+                    </a>
                 </div>
                 {% else %}
                 {% endif %}
         </div>
 
-        <div class="offset-1 col-6">
+        <div class="col-6">
             <div class="form-container">
-                <form id="chatForm">
+                <form id="chatForm" class="rounded-4 shadow-lg bg-white p-4" style="min-width:350px;">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <div class="">
-                            <div class="row mb-3">
-                                <div class="col-12">
-                                    <div id="last-reply-div">
-                                        <div class="mb-3">
-                                            <label for="title" class="form-label">Title</label>
-                                            <input type="text" class="form-control" id="girl-title" name="girl-title"
-                                                placeholder="Example- Girl with nice teeth">
-                                        </div>
-                                        <div class="row mb-3 d-flex justify-content-between align-items-center">
-                                            <div class="col">
-                                                <label for="formFile" class="form-label">Upload screenshot</label>
-                                                <input class="form-control" type="file" id="formFile">
-                                            </div>
-                                        </div>
-                                        <label for="lastmessage" class="form-label">
-                                            <span class="fs-6">Paste your conversation</span>
-                                        </label>
-                                        <textarea name="last-reply" id="last-reply" class="form-control"
-                                            placeholder="you: free on thursday?&#10;her:&#10;(seen, no reply)"
-                                            rows="8"></textarea>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center row">
-                            <button type="submit" class="btn btn-dark btn-sm">Generate Reply</button>
-                            <div class="mt-3 small">
-                                Chat Credit: <span id="chatCredits">{{ chat_credits }}</span>
-                            </div>
-                        </div>
-                </form>
 
-                <div class="align-items-start mt-2" id="responseArea">
-                    <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2">
-                        No response has been generated yet
+                    <!-- Step 1: Context Quick Pick -->
+                    <div class="mb-4">
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <label for="platform" class="form-label fw-semibold">
+                                    <i class="fa fa-hashtag me-1 text-primary"></i> Platform
+                                </label>
+                                <select class="form-select rounded-pill" id="platform" name="platform">
+                                    <option value="Instagram DM">Instagram DM</option>
+                                    <option value="Tinder">Tinder</option>
+                                    <option value="Bumble">Bumble</option>
+                                    <option value="Hinge">Hinge</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                    <option value="iMessage/SMS">iMessage/SMS</option>
+                                    <option value="Snapchat">Snapchat</option>
+                                    <option value="Telegram">Telegram</option>
+                                    <option value="Facebook Messenger">Facebook Messenger</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="what-happened" class="form-label fw-semibold">
+                                    <i class="fa fa-question-circle me-1 text-info"></i> What happened?
+                                </label>
+                                <select class="form-select rounded-pill" id="what-happened" name="what-happened">
+                                    <option value="She left me on read">Left on read</option>
+                                    <option value="She didn’t reply after my question">No reply to my question</option>
+                                    <option value="She ghosted after I asked her out">Ghosted after invite</option>
+                                    <option value="Conversation just fizzled">Just fizzled out</option>
+                                    <option value="She didn’t reply after my joke">No reply to my joke</option>
+                                    <option value="She ignored my compliment">Ignored my compliment</option>
+                                    <option value="She stopped replying suddenly">Suddenly stopped replying</option>
+                                    <option value="I sent something awkward">Sent something awkward</option>
+                                    <option value="Not sure / Just stopped">Not sure/just stopped</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                </div>
+
+                    <!-- Step 2: Main Details (Title and Screenshot, Collapsible for optional note) -->
+                    <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;">
+                        <label for="girl-title" class="form-label fw-semibold">
+                            <i class="fa fa-tag me-1 text-secondary"></i> Conversation Title
+                            <span class="small text-muted ms-1">(only you see this)</span>
+                        </label>
+                        <input type="text" class="form-control rounded-pill mb-2" id="girl-title" name="girl-title"
+                            placeholder="E.g. Girl with nice teeth">
+
+                        <label for="formFile" class="form-label mt-2 fw-semibold">
+                            <i class="me-1 text-success"></i> Upload Screenshot
+                            <span class="small text-muted">(optional – for instant extracting messages)</span>
+                        </label>
+                        <input class="form-control rounded-pill mb-2" type="file" id="formFile">
+
+                        <div class="form-text mb-2">
+                            Drag & drop a chat screenshot, or paste your convo below.
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Conversation Paste -->
+                    <div class="mb-3">
+                        <label for="last-reply" class="form-label fw-semibold">
+                            <i class="me-1 text-warning"></i> Conversation
+                        </label>
+                        <textarea name="last-reply" id="last-reply" class="form-control" style="min-height:120px"
+                            placeholder="you: hey, free thursday?&#10;her: (seen, no reply)"></textarea>
+                    </div>
+
+                    <!-- Step 5: Action Row -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button type="submit" class="btn btn-dark btn-lg px-4 rounded-pill shadow-sm">
+                            <i class="fa fa-fire me-2"></i>Generate Reply
+                        </button>
+                        <div class="mt-2 small text-muted">
+                            Chat Credits: <span id="chatCredits">{{ chat_credits }}</span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="align-items-start mt-2 col-3 text-center" id="responseArea">
+            <p>Suggested Responses</p>
+            <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2">
+                No response has been generated yet
+            </div>
+            <div id="suggestedReply2" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2" style="display: none;">
+                No response has been generated yet
             </div>
         </div>
     </div>
@@ -96,6 +152,8 @@
 
         let girl_title = document.getElementById('girl-title').value;
         let last_reply = document.getElementById('last-reply').value;
+        let platform = document.getElementById('platform').value;
+        let what_happened = document.getElementById('what-happened').value;
 
         fetch("{% url 'ajax_reply' %}", {
             method: 'POST',
@@ -105,7 +163,9 @@
             },
             body: JSON.stringify({
                 last_text: last_reply,
-                girl_title: girl_title
+                girl_title: girl_title,
+                platform: platform,
+                what_happened: what_happened
             })
         })
             .then(response => response.json())
@@ -116,6 +176,10 @@
                 }
                 document.getElementById('responseArea').style.display = 'block';
                 document.getElementById('suggestedReply').innerHTML = `<span>${data.alex}</span>`;
+                document.getElementById('suggestedReply2').innerHTML = `<span>${data.custom}</span>`;
+                var suggestedReply2 = document.getElementById("suggestedReply2");
+                suggestedReply2.style.display = "block"
+
                 document.getElementById('chatCredits').innerText = data.credits_left;
 
                 // If a new conversation was created, add it to the sidebar instantly
@@ -178,6 +242,12 @@
                     }
                     document.getElementById('girl-title').value = data.girl_title;
                     document.getElementById('last-reply').value = data.content;
+                    document.getElementById('platform').value = data.platform || 'Instagram DM';
+                    document.getElementById('what-happened').value = data.what_happened || 'Not sure / Just stopped';
+                    document.getElementById('suggestedReply').innerHTML = 'No response has been generated yet';
+                    var suggestedReply2 = document.getElementById("suggestedReply2");
+                    suggestedReply2.style.display = "none"
+
                 })
                 .catch(() => alert('Failed to load conversation.'));
         });
@@ -223,32 +293,32 @@
 
 <script>
     // Event delegation for delete buttons (works for future elements too)
-        document.querySelector('.list-group').addEventListener('click', function (e) {
-            if (e.target.closest('.delete-convo-btn')) {
-                e.preventDefault();
-                const btn = e.target.closest('.delete-convo-btn');
-                const convoId = btn.getAttribute('data-id');
-                if (!confirm("Are you sure you want to delete this conversation?")) return;
+    document.querySelector('.list-group').addEventListener('click', function (e) {
+        if (e.target.closest('.delete-convo-btn')) {
+            e.preventDefault();
+            const btn = e.target.closest('.delete-convo-btn');
+            const convoId = btn.getAttribute('data-id');
+            if (!confirm("Are you sure you want to delete this conversation?")) return;
 
-                const formData = new FormData();
-                formData.append('id', convoId);
+            const formData = new FormData();
+            formData.append('id', convoId);
 
-                fetch('/conversations/delete/', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken },
-                    body: formData
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Remove the <a> parent of the button
-                            btn.closest('a').remove();
-                        } else {
-                            alert(data.error || "Failed to delete conversation.");
-                        }
-                    });
-            }
-        });
+            fetch('/conversations/delete/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove the <a> parent of the button
+                        btn.closest('a').remove();
+                    } else {
+                        alert(data.error || "Failed to delete conversation.");
+                    }
+                });
+        }
+    });
 
 </script>
 

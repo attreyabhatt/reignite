@@ -5,6 +5,7 @@ from django.http import JsonResponse
 import json
 from conversation.utils.gpt import generate_comebacks
 from conversation.utils.image_gpt import extract_conversation_from_image
+from conversation.utils.custom_gpt import generate_custom_comeback
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -39,15 +40,23 @@ def ajax_reply(request):
         data = json.loads(request.body)
         girl_title = data.get('girl_title', '').strip()
         last_text = data.get('last_text', '').strip()
-
+        platform = data.get('platform', '').strip()
+        what_happened = data.get('what_happened', '').strip()
+        
         # Save the conversation for the user
         conversation, created = Conversation.objects.get_or_create(
             user=request.user,
             girl_title=girl_title,
-            defaults={'content': last_text}
+            defaults={
+                'content': last_text,
+                'platform': platform,
+                'what_happened': what_happened,
+            }
         )
         if not created:
-            conversation.content = last_text  # or append to existing content
+            conversation.content = last_text
+            conversation.platform = platform
+            conversation.what_happened = what_happened
             conversation.save()
 
 
@@ -57,9 +66,11 @@ def ajax_reply(request):
 
         # Generate your AI response (dummy below)
         comebacks = generate_comebacks(last_text)
-        
+        custom_comeback = generate_custom_comeback(last_text,platform,what_happened)
+        print(custom_comeback)
         response_data = {
             'alex': comebacks.get("AlexTextGameCoach", ""),
+            'custom': custom_comeback,
             'credits_left': chat_credit.balance,
         }
         
@@ -80,10 +91,13 @@ def conversation_detail(request, pk):
         convo = Conversation.objects.get(pk=pk, user=request.user)
         return JsonResponse({
             'girl_title': convo.girl_title,
-            'content': convo.content
+            'content': convo.content,
+            'platform': convo.platform,
+            'what_happened': convo.what_happened,
         })
     except Conversation.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
+
     
 from django.views.decorators.csrf import csrf_exempt  # Or use @csrf_protect if you use AJAX CSRF header
 

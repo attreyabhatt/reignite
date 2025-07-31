@@ -1,1 +1,83 @@
-pricing
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Wingman Pricing | Reignite Chat{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="text-center mb-4">
+        <h1 class="fw-bold display-5">Get More Chat Credits</h1>
+        <p class="lead text-muted mt-3 mb-4">
+            Power up your AI wingman and never get left on read again. Each analysis gives you <b>3 unique comeback
+                styles</b>—choose your vibe, spark the conversation!
+        </p>
+    </div>
+
+    <div class="row justify-content-center g-4">
+        <!-- Free Plan -->
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100 pricing-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title mb-2">Starter</h5>
+                    <div class="display-6 mb-2 fw-bold">FREE</div>
+                    <div class="mb-3 text-success">10 chat credits</div>
+                    <ul class="list-unstyled mb-3">
+                        <li><i class="fa fa-check text-success me-2"></i>3 AI comebacks per credit</li>
+                        <li><i class="fa fa-check text-success me-2"></i>No credit card needed</li>
+                        <li><i class="fa fa-check text-success me-2"></i>Test all features</li>
+                    </ul>
+                    <a href="{% url 'signup' %}" class="btn btn-outline-dark w-100 mt-2">Sign Up Free</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Credits Bundle -->
+        <div class="col-12 col-md-4">
+            <div class="card border-primary shadow-lg h-100 pricing-card position-relative">
+                <div class="card-body text-center">
+                    <div class="badge bg-primary position-absolute top-0 end-0 m-3">Most Popular</div>
+                    <h5 class="card-title mb-2">Wingman Bundle</h5>
+                    <div class="display-6 mb-2 fw-bold">$3</div>
+                    <div class="mb-3 text-primary">20 chat credits</div>
+                    <ul class="list-unstyled mb-3">
+                        <li><i class="fa fa-check text-primary me-2"></i>3 unique replies per use</li>
+                        <li><i class="fa fa-check text-primary me-2"></i>No expiry</li>
+                        <li><i class="fa fa-check text-primary me-2"></i>Best for casual daters</li>
+                    </ul>
+                    <a href="{% url 'buy_credits' %}?amount=20" class="btn btn-primary w-100 mt-2">Buy Now</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unlimited Plan -->
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100 pricing-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title mb-2">Unlimited</h5>
+                    <div class="display-6 mb-2 fw-bold">$15/mo</div>
+                    <div class="mb-3 text-warning">Unlimited credits*</div>
+                    <ul class="list-unstyled mb-3">
+                        <li><i class="fa fa-check text-warning me-2"></i>Never run out of comebacks</li>
+                        <li><i class="fa fa-check text-warning me-2"></i>Early access to new features</li>
+                        <li><i class="fa fa-check text-warning me-2"></i>Priority support</li>
+                    </ul>
+                    <a href="{% url 'subscribe' %}" class="btn btn-dark w-100 mt-2">Go Unlimited</a>
+                    <div class="small text-muted mt-2">*Fair use: 100 analyses/day</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5 justify-content-center">
+        <div class="col-10 text-center text-muted small">
+            <i class="fa fa-shield-alt me-1"></i>
+            Powered by GPT-4o. Credits never expire on paid bundles. Unlimited plans are for individual use and subject
+            to fair use policy.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<!-- FontAwesome CDN for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% endblock %}
