@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ChatCredit, Conversation, CreditPurchase
+from .models import ChatCredit, Conversation
 
 @admin.register(ChatCredit)
 class ChatCreditAdmin(admin.ModelAdmin):
@@ -14,9 +14,3 @@ class ConversationAdmin(admin.ModelAdmin):
     list_filter = ('last_updated',)
     list_select_related = ('user',)
 
-@admin.register(CreditPurchase)
-class CreditPurchaseAdmin(admin.ModelAdmin):
-    list_display = ('user', 'credits_purchased', 'amount_paid', 'timestamp', 'transaction_id')
-    search_fields = ('user__username', 'transaction_id')
-    list_filter = ('timestamp',)
-    list_select_related = ('user',)

@@ -129,10 +129,6 @@
                         <button type="submit" class="btn btn-dark btn-lg px-4 rounded-pill shadow-sm" id="generate-btn">
                             <i class="fa fa-fire me-2"></i>Generate Reply
                         </button>
-
-                        <div class="mt-2 small text-muted">
-                            Chat Credits: <span id="chatCredits">{{ chat_credits }}</span>
-                        </div>
                     </div>
                 </form>
             </div>
@@ -194,12 +190,12 @@
                 document.getElementById('suggestedReply').innerHTML = `<span>${data.alex}</span>`;
                 document.getElementById('suggestedReply2').innerHTML = `<span>${data.toddv}</span>`;
                 document.getElementById('suggestedReply3').innerHTML = `<span>${data.custom}</span>`;
-                
+
                 var suggestedReply2 = document.getElementById("suggestedReply2");
                 suggestedReply2.style.display = "block"
                 var suggestedReply3 = document.getElementById("suggestedReply3");
                 suggestedReply3.style.display = "block"
-                document.getElementById('chatCredits').innerText = data.credits_left;
+                document.getElementById('chatCredits').innerText = "Chat Credits: " + data.credits_left;
 
                 // If a new conversation was created, add it to the sidebar instantly
                 if (data.new_conversation) {

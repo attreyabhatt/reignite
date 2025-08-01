@@ -69,7 +69,7 @@ def ajax_reply(request):
         comebacks = generate_comebacks(last_text)
         custom_comeback = generate_custom_comeback(last_text,platform,what_happened)
         todd_comeback = generate_toddv_comeback(last_text,platform,what_happened)
-        
+        print(custom_comeback)
         response_data = {
             'alex': comebacks.get("AlexTextGameCoach", ""),
             'custom': custom_comeback,

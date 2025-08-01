@@ -1,6 +1,8 @@
 1) Add analytics
 2) Api abuse
 3) screenshot api abuse
-4) Privacy policy
-5) Terms and conditions
-6) refund policy
+4) migrate to postgresql
+5) Add copy btn to generated reponses
+6) Make everything responsive
+7) Work on the pricing pages make sure they are responsive
+8) host the site on digital ocean

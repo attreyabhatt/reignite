@@ -1,6 +1,9 @@
-from django.urls import include, path
-from .views import pricing_home
+from django.urls import path
+from . import views
 
-urlpatterns = [ 
-    path('', pricing_home, name='pricing_home'),
+app_name = 'pricing'
+
+urlpatterns = [
+    path('', views.pricing, name='pricing'),
+    path('purchase/<int:amount>/', views.purchase_credits, name='purchase'),
 ]

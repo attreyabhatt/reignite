@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block head_title %}
+Pricing | Chat Credits
+{% endblock head_title %}
+
+{% block content %}
+<div class="container py-5">
+    <h2 class="text-center mb-4 fw-bold">Get More Chat Credits</h2>
+    <p class="text-center mb-5 text-muted">Unlock more AI wingman responses anytime.</p>
+        <div class="row justify-content-center g-4">
+
+
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100 bg-light">
+                    <div class="card-body text-center">
+                        <h5 class="card-title fw-bold mb-2">10 Credits</h5>
+                        <div class="display-6 mb-3">$2.99</div>
+                        <ul class="list-unstyled mb-4">
+                            <li>One-time purchase</li>
+                            <li>Instant delivery</li>
+                            <li>Perfect for quick help</li>
+                        </ul>
+                        <a href="{% url 'pricing:purchase' 10 %}" class="btn btn-outline-dark w-100" type="submit">Buy
+                            10 Credits</a>
+                    </div>
+                </div>
+            </div>
+            <!-- 25 credits -->
+            <div class="col-md-4">
+                <div class="card shadow border-dark border-2 h-100 bg-dark">
+                    <div class="card-body text-center">
+                        <h5 class="card-title fw-bold mb-2 text-light">25 Credits</h5>
+                        <div class="display-6 mb-3 text-light">$5.99</div>
+                        <ul class="list-unstyled mb-4 text-light">
+                            <li>One-time purchase</li>
+                            <li>Best for active users</li>
+                            <li>Save 20%</li>
+                        </ul>
+                        <a href="{% url 'pricing:purchase' 25 %}" class="btn btn-light w-100" type="submit">Buy 25
+                            Credits</a>
+                    </div>
+                </div>
+            </div>
+            <!-- 50 credits -->
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100 bg-light">
+                    <div class="card-body text-center">
+                        <h5 class="card-title fw-bold mb-2">50 Credits</h5>
+                        <div class="display-6 mb-3">$9.99</div>
+                        <ul class="list-unstyled mb-4">
+                            <li>One-time purchase</li>
+                            <li>Best value</li>
+                            <li>Save 33%</li>
+                        </ul>
+                        <a href="{% url 'pricing:purchase' 50 %}" class="btn btn-outline-dark w-100" type="submit">Buy
+                            50 Credits</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    <div class="text-center mt-5 text-muted">
+        <small>No subscription required. Secure payment coming soon.</small>
+    </div>
+</div>
+{% endblock %}
