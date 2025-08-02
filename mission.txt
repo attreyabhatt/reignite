@@ -1,6 +1,11 @@
 I am building a django app that helps male users reignite dead conversations.
 
-Example: She left you on read. You sent “cool lol”. It’s not over yet. Paste your conversation and let our AI wingman craft your comeback.
+Example: She left you on read. You sent “cool lol”. It’s not over yet. Paste your conversation 
+and let our AI wingman craft your comeback.
+
+This is based on the basis of chat credits. I am giving 5 chat credits. We store the the balance of chat credits in a session so the user can try out the app without signing up. And when the user has used up all 5 credit then we ask him to sign up. 
+
+It's working fine. But I am worried that user can just delete his cookies and use the free trial again
 
 You: We should grab a drink sometime  
 Her: Haha maybe  
@@ -19,3 +24,8 @@ Her: Hey!
 you: Hey bio-pro, hope you are not cheap on laughs :p
 her: I laugh at absolutely nothing. That's my weakness 😂
 you: I bet you've got a killer poker face then. I can see us getting kicked out of a movie because you cracked up at a love making scene :p
+
+Her: What do you do for work?
+You: Marketing, kinda boring but pays the bills
+
+You are an AI agent that is an online dating expert. You are tasked with creating one short, natural-sounding message to revive the conversation based on the user's input. 

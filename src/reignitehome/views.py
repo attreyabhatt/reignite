@@ -46,16 +46,22 @@ def ajax_reply_home(request):
         credits_left = request.session['chat_credits']
         
         # Generate your AI response (dummy below)
-        comebacks = generate_comebacks(last_text)
-        custom_comeback = generate_custom_comeback(last_text,platform,what_happened)
-        todd_comeback = generate_toddv_comeback(last_text,platform,what_happened)
-        
+        # comebacks = generate_comebacks(last_text)
+        # todd_comeback = generate_toddv_comeback(last_text,platform,what_happened)
+        custom_response = generate_custom_comeback(last_text,platform,what_happened)
+        print(last_text)
         response_data = {
-            'alex': comebacks.get("AlexTextGameCoach", ""),
-            'custom': custom_comeback,
-            'toddv' : todd_comeback,
-            'credits_left': credits_left,
+        'custom': custom_response,
+        'credits_left': credits_left,
         }
+        
+        
+        # response_data = {
+        #     'alex': comebacks.get("AlexTextGameCoach", ""),
+        #     'custom': custom_comeback,
+        #     'toddv' : todd_comeback,
+        #     'credits_left': credits_left,
+        # }
         return JsonResponse(response_data)
 
     return JsonResponse({'error': 'Invalid request'}, status=400)

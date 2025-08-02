@@ -55,10 +55,10 @@
                                     <i class="fa fa-hashtag me-1 text-primary"></i> Platform
                                 </label>
                                 <select class="form-select rounded-pill" id="platform" name="platform">
-                                    <option value="Instagram DM">Instagram DM</option>
                                     <option value="Tinder">Tinder</option>
                                     <option value="Bumble">Bumble</option>
                                     <option value="Hinge">Hinge</option>
+                                    <option value="Instagram DM">Instagram DM</option>
                                     <option value="WhatsApp">WhatsApp</option>
                                     <option value="iMessage/SMS">iMessage/SMS</option>
                                     <option value="Snapchat">Snapchat</option>
@@ -73,13 +73,17 @@
                                 </label>
                                 <select class="form-select rounded-pill" id="what-happened" name="what-happened">
                                     <option value="She left me on read">Left on read</option>
+                                    <option value="She replied, but I need help with my next message">She replied, but I
+                                        need help with my next message</option>
+                                    <option value="She replied with one word, then nothing">She replied with one
+                                        word/emoticon, then nothing</option>
                                     <option value="She didn’t reply after my question">No reply to my question</option>
                                     <option value="She ghosted after I asked her out">Ghosted after invite</option>
                                     <option value="Conversation just fizzled">Just fizzled out</option>
                                     <option value="She didn’t reply after my joke">No reply to my joke</option>
                                     <option value="She ignored my compliment">Ignored my compliment</option>
-                                    <option value="She stopped replying suddenly">Suddenly stopped replying</option>
                                     <option value="I sent something awkward">Sent something awkward</option>
+                                    <option value="No reply to my flirty message">No reply to my flirty message</option>
                                     <option value="Not sure / Just stopped">Not sure/just stopped</option>
                                     <option value="Other">Other</option>
                                 </select>
@@ -135,15 +139,44 @@
         </div>
         <div class="align-items-start mt-2 col-3 text-center" id="responseArea">
             <p>Suggested Responses</p>
-            <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2">
-                No response has been generated yet
+            <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative">
+                <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2"
+                    onclick="copyToClipboard('suggestedReplyMsg', this)" title="Copy to clipboard">
+                    <i class="fa fa-copy"></i>
+                    <span class="copied-tooltip"
+                        style="display: none; position: absolute; top: 120%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 2px 8px; border-radius: 8px; font-size: 12px; z-index: 2;">Copied!</span>
+                </button>
+                <span id="suggestedReplyMsg">No response has been generated yet</span>
+                <br>
+                <span class="small text-muted" id="suggestedReplyScore"></span>
             </div>
-            <div id="suggestedReply2" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2" style="display: none;">
-                No response has been generated yet
+
+            <div id="suggestedReply2" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative"
+                style="display: none;">
+                <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2"
+                    onclick="copyToClipboard('suggestedReplyMsg2', this)" title="Copy to clipboard">
+                    <i class="fa fa-copy"></i>
+                    <span class="copied-tooltip"
+                        style="display: none; position: absolute; top: 120%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 2px 8px; border-radius: 8px; font-size: 12px; z-index: 2;">Copied!</span>
+                </button>
+                <span id="suggestedReplyMsg2">No response has been generated yet</span>
+                <br>
+                <span class="small text-muted" id="suggestedReplyScore2"></span>
             </div>
-            <div id="suggestedReply3" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2" style="display: none;">
-                No response has been generated yet
+
+            <div id="suggestedReply3" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative"
+                style="display: none;">
+                <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2"
+                    onclick="copyToClipboard('suggestedReplyMsg3', this)" title="Copy to clipboard">
+                    <i class="fa fa-copy"></i>
+                    <span class="copied-tooltip"
+                        style="display: none; position: absolute; top: 120%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 2px 8px; border-radius: 8px; font-size: 12px; z-index: 2;">Copied!</span>
+                </button>
+                <span id="suggestedReplyMsg3">No response has been generated yet</span>
+                <br>
+                <span class="small text-muted" id="suggestedReplyScore3"></span>
             </div>
+
         </div>
     </div>
 </div>
@@ -157,7 +190,7 @@
     document.getElementById('chatForm').addEventListener('submit', function (e) {
         e.preventDefault();
 
-        document.getElementById('suggestedReply').innerHTML = `
+        document.getElementById('suggestedReplyMsg').innerHTML = `
             <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
             <span class="ms-2 text-muted">Generating your comeback…</span>
         `;
@@ -187,14 +220,74 @@
                     return;
                 }
                 document.getElementById('responseArea').style.display = 'block';
-                document.getElementById('suggestedReply').innerHTML = `<span>${data.alex}</span>`;
-                document.getElementById('suggestedReply2').innerHTML = `<span>${data.toddv}</span>`;
-                document.getElementById('suggestedReply3').innerHTML = `<span>${data.custom}</span>`;
 
-                var suggestedReply2 = document.getElementById("suggestedReply2");
-                suggestedReply2.style.display = "block"
-                var suggestedReply3 = document.getElementById("suggestedReply3");
-                suggestedReply3.style.display = "block"
+                // --- CUSTOM AI RESPONSE HANDLING ---
+                let customResponse = data.custom;
+
+                // Remove "json" prefix (case-insensitive), and trim
+                customResponse = customResponse.replace(/^json\s*/i, '').trim();
+
+                // Now, customResponse should start with '[' and end with ']'
+                if (!customResponse.startsWith('[')) {
+                    // Try to extract JSON array with regex as fallback
+                    const match = customResponse.match(/\[.*\]/s);
+                    if (match) {
+                        customResponse = match[0];
+                    }
+                }
+
+                // Try to parse, and handle any errors
+                let suggestions;
+                try {
+                    suggestions = JSON.parse(customResponse);
+                    // Now you can safely use the array
+                } catch (e) {
+                    alert('Parse error: ' + e.message);
+                    console.error('Could not parse:', customResponse, e);
+                    // Fallback: Show the raw string
+                    document.getElementById('suggestedReply').innerHTML = `<span>${customResponse}</span>`;
+                    document.getElementById('suggestedReply2').style.display = "none";
+                    document.getElementById('suggestedReply3').style.display = "none";
+                    return;
+                }
+
+
+                if (Array.isArray(suggestions) && suggestions.length > 0) {
+                    // First
+                    const msg1 = document.getElementById('suggestedReplyMsg');
+                    const score1 = document.getElementById('suggestedReplyScore');
+                    if (msg1) msg1.innerText = suggestions[0].message;
+                    if (score1) score1.innerText = `Confidence: ${Math.round(suggestions[0].confidence_score * 100)}%`;
+
+                    // Second
+                    if (suggestions[1]) {
+                        document.getElementById('suggestedReply2').style.display = "block";
+                        const msg2 = document.getElementById('suggestedReplyMsg2');
+                        const score2 = document.getElementById('suggestedReplyScore2');
+                        if (msg2) msg2.innerText = suggestions[1].message;
+                        if (score2) score2.innerText = `Confidence: ${Math.round(suggestions[1].confidence_score * 100)}%`;
+                    } else {
+                        document.getElementById('suggestedReply2').style.display = "none";
+                    }
+
+                    // Third
+                    if (suggestions[2]) {
+                        document.getElementById('suggestedReply3').style.display = "block";
+                        const msg3 = document.getElementById('suggestedReplyMsg3');
+                        const score3 = document.getElementById('suggestedReplyScore3');
+                        if (msg3) msg3.innerText = suggestions[2].message;
+                        if (score3) score3.innerText = `Confidence: ${Math.round(suggestions[2].confidence_score * 100)}%`;
+                    } else {
+                        document.getElementById('suggestedReply3').style.display = "none";
+                    }
+                }
+                else {
+                    document.getElementById('suggestedReplyMsg').innerText = "No suggestions available.";
+                    document.getElementById('suggestedReplyScore').innerText = "";
+                    document.getElementById('suggestedReply2').style.display = "none";
+                    document.getElementById('suggestedReply3').style.display = "none";
+                }
+
                 document.getElementById('chatCredits').innerText = "Chat Credits: " + data.credits_left;
 
                 // If a new conversation was created, add it to the sidebar instantly
@@ -366,6 +459,23 @@
                 });
         }
     });
+
+</script>
+
+<script>
+    function copyToClipboard(elementId, btn) {
+        const text = document.getElementById(elementId).innerText;
+        navigator.clipboard.writeText(text).then(function () {
+            // Show tooltip
+            const tooltip = btn.querySelector('.copied-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'inline-block';
+                setTimeout(() => {
+                    tooltip.style.display = 'none';
+                }, 1200);
+            }
+        });
+    }
 
 </script>
 

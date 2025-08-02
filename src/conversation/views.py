@@ -36,7 +36,7 @@ def ajax_reply(request):
     if request.method == 'POST':
         chat_credit = request.user.chat_credit
         if chat_credit.balance < 1:
-            return JsonResponse({'redirect_url': reverse('pricing_home')})
+            return JsonResponse({'redirect_url': reverse('pricing:pricing')})
 
         data = json.loads(request.body)
         girl_title = data.get('girl_title', '').strip()
@@ -66,16 +66,19 @@ def ajax_reply(request):
         chat_credit.save()  # last_updated auto-updates
 
         # Generate your AI response (dummy below)
-        comebacks = generate_comebacks(last_text)
-        custom_comeback = generate_custom_comeback(last_text,platform,what_happened)
-        todd_comeback = generate_toddv_comeback(last_text,platform,what_happened)
-        print(custom_comeback)
+        # comebacks = generate_comebacks(last_text)
+        # todd_comeback = generate_toddv_comeback(last_text,platform,what_happened).strip('"')
+        custom_response = generate_custom_comeback(last_text,platform,what_happened)
         response_data = {
-            'alex': comebacks.get("AlexTextGameCoach", ""),
-            'custom': custom_comeback,
-            'toddv' : todd_comeback,
-            'credits_left': chat_credit.balance,
+        'custom': custom_response,
+        'credits_left': chat_credit.balance,
         }
+        # response_data = {
+        #     'alex': comebacks.get("AlexTextGameCoach", ""),
+        #     'custom': custom_comeback,
+        #     'toddv' : todd_comeback,
+        #     'credits_left': chat_credit.balance,
+        # }
         
         # If it was just created, send back ID and title
         if created:
