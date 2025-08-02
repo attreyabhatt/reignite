@@ -8,9 +8,9 @@ from conversation.models import ChatCredit
 @login_required
 def pricing(request):
     credit_packs = [
-        {'amount': 10, 'price': 2.99},
-        {'amount': 25, 'price': 5.99},
-        {'amount': 50, 'price': 9.99},
+        {'amount': 10, 'price': 1.99},
+        {'amount': 50, 'price': 6.99},
+        {'amount': 200, 'price': 19.99},
     ]
     context = {'credit_packs': credit_packs}
     return render(request, 'pricing/pricing.html', context)
@@ -21,7 +21,7 @@ def purchase_credits(request, amount):
         # amount = number of credits
         # Find price based on selected pack
         
-        prices = {10: 2.99, 25: 5.99, 50: 9.99}
+        prices = {10: 1.99, 50: 6.99, 200: 19.99}
         price = prices.get(amount)
         
         if not price:
