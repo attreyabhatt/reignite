@@ -1,13 +1,11 @@
 from django.shortcuts import render,redirect
 from .models import Conversation, ChatCredit
+from reignitehome.models import TrialIP
 from django.urls import reverse
 from django.http import JsonResponse
 import json
-from conversation.utils.gpt import generate_comebacks
 from conversation.utils.image_gpt import extract_conversation_from_image
 from conversation.utils.custom_gpt import generate_custom_comeback
-from conversation.utils.todd_gpt import generate_toddv_comeback
-from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 # Create your views here.
@@ -118,7 +116,11 @@ def ocr_screenshot(request):
             request.session['screenshot_credits'] = request.session['screenshot_credits'] - 1
             screenshot_credits_credits_left = request.session['screenshot_credits']
             if screenshot_credits_credits_left <= 0:
-                return JsonResponse({'error': 'Limit reached. Please signup to upload more screenshots'}, status=401)
+                signup_url = reverse('account_signup')
+                return JsonResponse({
+                    'error': 'Screenshot upload limit Reached. Sign up to unlock unlimited uploads.',
+                    'redirect_url': signup_url
+                }, status=403)
             
         screenshot_file = request.FILES.get('screenshot')
         if not screenshot_file:

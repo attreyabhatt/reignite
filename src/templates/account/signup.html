@@ -7,7 +7,7 @@
 <div class="container">
     <div class="row justify-content-center align-items-start">
         <!-- Signup Form -->
-        <div class="col-12 col-lg-4 order-1 order-lg-1 mt-4">
+        <div class="col-12 col-lg-4 order-1 order-lg-1">
             <div class="border p-4 shadow-sm rounded">
                 <form method="post" action="{% url 'account_signup' %}">
                     {% csrf_token %}
@@ -19,6 +19,11 @@
                         {% if request.GET.message == "out_of_credits" %}
                         <div class="alert alert-warning text-center mb-3 small">
                             You're out of chat credits. <br>Sign up to unlock unlimited replies!
+                        </div>
+                        {% endif %}
+                        {% if request.GET.message == "out_of_screenshots" %}
+                        <div class="alert alert-warning text-center mb-3 small">
+                            Screenshot upload limit Reached.<br>Sign up to unlock unlimited uploads!
                         </div>
                         {% endif %}
                         <input type="email" class="form-control {% if form.email.errors %}is-invalid{% endif %}"

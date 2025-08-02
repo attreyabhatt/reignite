@@ -1,24 +1,20 @@
 from django.shortcuts import render,redirect
 from django.http import JsonResponse
 import json
-from conversation.utils.gpt import generate_comebacks
 from conversation.utils.custom_gpt import generate_custom_comeback
-from conversation.utils.todd_gpt import generate_toddv_comeback
+from reignitehome.utils.ip_check import get_client_ip
 from django.urls import reverse
 from conversation.models import ChatCredit
+from reignitehome.models import TrialIP
+
 
 def home(request):
     if 'chat_credits' not in request.session:
         request.session['chat_credits'] = 5
         
-    if 'screenshot_credits' not in request.session:
-        request.session['screenshot_credits'] = 5
-        
     current_chat_credits = request.session['chat_credits']
-    current_screenshot_credits = request.session['screenshot_credits']
     context = {
         'chat_credits':current_chat_credits,
-        'screenshot_credits':current_screenshot_credits
     }
     
     if request.user.is_authenticated:
@@ -27,12 +23,25 @@ def home(request):
 
 def ajax_reply_home(request):
     if request.method == 'POST':
+        
+        ip = get_client_ip(request)
+        trial_record, created = TrialIP.objects.get_or_create(ip_address=ip)
+        
+        if not created and trial_record.trial_used:
+            signup_url = reverse('account_signup')
+            return JsonResponse({
+                'error': 'Screenshot upload limit reached. Sign up to unlock unlimited uploads.',
+                'redirect_url': signup_url
+            }, status=403)
+
         # Check credits
         credits = request.session.get('chat_credits', 0)
         if credits <= 0:
+            trial_record.trial_used = True
+            trial_record.save()
             signup_url = reverse('account_signup')
             return JsonResponse({
-                'error': 'You’re out of chat credits. Sign up to unlock unlimited replies.',
+                'error': 'Screenshot upload limit reached. Sign up to unlock unlimited uploads.',
                 'redirect_url': signup_url
             }, status=403)
         

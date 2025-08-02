@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     
+    'reignitehome',
     'conversation',
     'pricing',
 ]
