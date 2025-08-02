@@ -5,7 +5,6 @@ import json
 client = OpenAI(api_key=config('GPT-API-KEY'))
 
 def generate_custom_comeback(last_text,platform,what_happened):
-    print(what_happened)
     system_prompt = f"""
             You are a bold, emotionally intelligent, and wickedly charming assistant built to reignite dead or ghosted dating conversations — with minimal words and maximum impact.
 

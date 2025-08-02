@@ -43,7 +43,7 @@ def ajax_reply(request):
         last_text = data.get('last_text', '').strip()
         platform = data.get('platform', '').strip()
         what_happened = data.get('what_happened', '').strip()
-        
+        print(last_text)
         # Save the conversation for the user
         conversation, created = Conversation.objects.get_or_create(
             user=request.user,
