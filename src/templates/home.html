@@ -131,7 +131,7 @@
     <div class="container py-5">
         <div class="row">
             <!-- Text Pitch -->
-            <div class="col-md-6 mb-4 mb-md-0">
+            <div class="col-md-6 col-sm-12 mb-4 mb-md-0">
                 <div class="row">
                     <div class="col-12">
                         <h1 class="display-5 fw-bold">Dead Chat? We'll Revive It. 💬</h1>
@@ -140,9 +140,11 @@
                             conversation and let our AI wingman craft your comeback.</p>
                     </div>
                 </div>
-                <div class="mt-2 text-center row align-items-center d-flex mt-2 text-center row justify-content-center" id="responseArea" style="display:none;">
-                    <div class="col-md-4">
-                        <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative" style="display: none;">
+                <div class="mt-2 text-center row align-items-center d-flex mt-2 text-center row justify-content-center"
+                    id="responseArea" style="display:none;">
+                    <div class="col-md-4 col-sm-12">
+                        <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative"
+                            style="display: none;">
                             <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2"
                                 onclick="copyToClipboard('suggestedReplyMsg', this)" title="Copy to clipboard">
                                 <i class="fa fa-copy"></i>
@@ -155,10 +157,10 @@
                             <span class="small text-muted" id="suggestedReplyScore"></span>
                         </div>
                     </div>
-                    <!-- Repeat similarly for suggestedReply2 and suggestedReply3, updating IDs -->
-
-                    <div class="col-md-4">
-                        <div id="suggestedReply2" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative" style="display: none;">
+                    <div class="col-md-4 col-sm-12">
+                        <div id="suggestedReply2"
+                            class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative"
+                            style="display: none;">
                             <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2"
                                 onclick="copyToClipboard('suggestedReplyMsg2', this)" title="Copy to clipboard">
                                 <i class="fa fa-copy"></i>
@@ -171,10 +173,10 @@
                             <span class="small text-muted" id="suggestedReplyScore2"></span>
                         </div>
                     </div>
-                    <!-- Repeat similarly for suggestedReply2 and suggestedReply3, updating IDs -->
-
-                    <div class="col-md-4">
-                        <div id="suggestedReply3" class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative" style="display: none;">
+                    <div class="col-md-4 col-sm-12">
+                        <div id="suggestedReply3"
+                            class="p-4 bg-light rounded-4 shadow mb-2 w-100 me-2 position-relative"
+                            style="display: none;">
                             <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2"
                                 onclick="copyToClipboard('suggestedReplyMsg3', this)" title="Copy to clipboard">
                                 <i class="fa fa-copy"></i>
@@ -187,17 +189,12 @@
                             <span class="small text-muted" id="suggestedReplyScore3"></span>
                         </div>
                     </div>
-                    <!-- Repeat similarly for suggestedReply2 and suggestedReply3, updating IDs -->
 
                 </div>
-
-                
-
-
             </div>
 
             <!-- Form -->
-            <div class="col-6">
+            <div class="col-md-6 col-sm-12">
                 <div class="form-container">
                     <form id="chatForm" class="rounded-4 shadow-lg bg-white p-4" style="min-width:350px;">
                         {% csrf_token %}
@@ -376,7 +373,7 @@
             top: 0,
             behavior: 'smooth'
         });
-        
+
         fetch("{% url 'ajax_reply_home' %}", {
             method: 'POST',
             headers: {
@@ -431,7 +428,7 @@
 
                 if (Array.isArray(suggestions) && suggestions.length > 0) {
                     // Reply 1
-                    
+
                     const msg1 = document.getElementById('suggestedReplyMsg');
                     const score1 = document.getElementById('suggestedReplyScore');
                     if (msg1) msg1.innerText = suggestions[0].message;
@@ -524,18 +521,18 @@
 <!-- copied -->
 <script>
     function copyToClipboard(elementId, btn) {
-            const text = document.getElementById(elementId).innerText;
-            navigator.clipboard.writeText(text).then(function () {
-                // Show the "Copied!" tooltip
-                const tooltip = btn.querySelector('.copied-tooltip');
-                if (tooltip) {
-                    tooltip.style.display = 'inline-block';
-                    setTimeout(() => {
-                        tooltip.style.display = 'none';
-                    }, 1000); // 1 second
-                }
-            });
-        }
+        const text = document.getElementById(elementId).innerText;
+        navigator.clipboard.writeText(text).then(function () {
+            // Show the "Copied!" tooltip
+            const tooltip = btn.querySelector('.copied-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'inline-block';
+                setTimeout(() => {
+                    tooltip.style.display = 'none';
+                }, 1000); // 1 second
+            }
+        });
+    }
 
 
 </script>
