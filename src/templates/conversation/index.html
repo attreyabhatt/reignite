@@ -51,44 +51,36 @@
                     <div class="mb-4">
                         <div class="row g-2">
                             <div class="col-12 col-md-6">
-                                <label for="platform" class="form-label fw-semibold">
-                                    <i class="fa fa-hashtag me-1 text-primary"></i> Platform
+                                <label for="tone" class="form-label fw-semibold">
+                                    <i class="fa fa-magic me-1 text-primary"></i> Tone
                                 </label>
-                                <select class="form-select rounded-pill" id="platform" name="platform">
-                                    <option value="Tinder">Tinder</option>
-                                    <option value="Bumble">Bumble</option>
-                                    <option value="Hinge">Hinge</option>
-                                    <option value="Instagram DM">Instagram DM</option>
-                                    <option value="WhatsApp">WhatsApp</option>
-                                    <option value="iMessage/SMS">iMessage/SMS</option>
-                                    <option value="Snapchat">Snapchat</option>
-                                    <option value="Telegram">Telegram</option>
-                                    <option value="Facebook Messenger">Facebook Messenger</option>
-                                    <option value="Other">Other</option>
+                                <select class="form-select rounded-pill" id="tone" name="tone">
+                                    <option value="playful">Playful</option>
+                                    <option value="flirty">Flirty</option>
+                                    <option value="sincere">Sincere</option>
+                                    <option value="confident">Confident</option> <!-- Replaces "cocky" -->
+                                    <option value="mysterious">Mysterious</option>
+                                    <option value="funny">Funny</option>
                                 </select>
                             </div>
+                        
                             <div class="col-12 col-md-6">
-                                <label for="what-happened" class="form-label fw-semibold">
-                                    <i class="fa fa-question-circle me-1 text-info"></i> What happened?
+                                <label for="goal" class="form-label fw-semibold">
+                                    <i class="fa fa-bullseye me-1 text-info"></i> Conversation Goal
                                 </label>
-                                <select class="form-select rounded-pill" id="what-happened" name="what-happened">
-                                    <option value="She left me on read">Left on read</option>
-                                    <option value="She replied, but I need help with my next message">She replied, but I
-                                        need help with my next message</option>
-                                    <option value="She replied with one word, then nothing">She replied with one
-                                        word/emoticon, then nothing</option>
-                                    <option value="She didn’t reply after my question">No reply to my question</option>
-                                    <option value="She ghosted after I asked her out">Ghosted after invite</option>
-                                    <option value="Conversation just fizzled">Just fizzled out</option>
-                                    <option value="She didn’t reply after my joke">No reply to my joke</option>
-                                    <option value="She ignored my compliment">Ignored my compliment</option>
-                                    <option value="I sent something awkward">Sent something awkward</option>
-                                    <option value="No reply to my flirty message">No reply to my flirty message</option>
-                                    <option value="Not sure / Just stopped">Not sure/just stopped</option>
-                                    <option value="Other">Other</option>
+                                <select class="form-select rounded-pill" id="goal" name="goal">
+                                    <option value="keep it going">Keep It Going</option>
+                                    <option value="increase flirtation">Flirt a Little More</option> <!-- Replaces "escalate" -->
+                                    <option value="build emotional connection">Build Emotional Connection</option>
+                                    <option value="suggest casual meetup">Ask Her Out</option> <!-- Safer phrasing -->
+                                    <option value="recover from bad message">Recover from a Dry/Bad Reply</option>
+                                    <option value="playfully test her interest">Playfully Test Her Interest</option>
+                                    <!-- Replaces "test her" -->
                                 </select>
                             </div>
                         </div>
+
+
                     </div>
 
                     <!-- Title and Screenshot Upload -->
@@ -195,8 +187,9 @@
 
         let girl_title = document.getElementById('girl-title').value;
         let last_reply = document.getElementById('last-reply').value;
-        let platform = document.getElementById('platform').value;
-        let what_happened = document.getElementById('what-happened').value;
+        let tone = document.getElementById('tone').value;
+        let goal = document.getElementById('goal').value;
+
 
         window.scrollTo({
             top: 0,
@@ -212,8 +205,8 @@
             body: JSON.stringify({
                 last_text: last_reply,
                 girl_title: girl_title,
-                platform: platform,
-                what_happened: what_happened
+                tone: tone,
+                goal: goal
             })
         })
             .then(response => response.json())
@@ -377,8 +370,8 @@
                     }
                     document.getElementById('girl-title').value = data.girl_title;
                     document.getElementById('last-reply').value = data.content;
-                    document.getElementById('platform').value = data.platform || 'Tinder';
-                    document.getElementById('what-happened').value = data.what_happened || 'Not sure / Just stopped';
+                    document.getElementById('tone').value = data.tone || 'playful';
+                    document.getElementById('goal').value = data.goal || 'keep it going';
                     document.getElementById('suggestedReplyMsg').innerHTML = 'No response has been generated yet';
                     var suggestedReply2 = document.getElementById("suggestedReply2");
                     suggestedReply2.style.display = "none"
@@ -401,7 +394,6 @@
 
         // Show spinner/status
         document.getElementById('ocr-status').style.display = 'inline-flex';
-
         const formData = new FormData();
         formData.append('screenshot', file);
 
@@ -414,6 +406,12 @@
         })
             .then(response => response.json())
             .then(data => {
+
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                    return;
+                }
+
                 document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
                 if (data.ocr_text) {
                     const lastReply = document.getElementById('last-reply');

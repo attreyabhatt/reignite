@@ -7,6 +7,7 @@ import json
 from conversation.utils.image_gpt import extract_conversation_from_image
 from conversation.utils.custom_gpt import generate_custom_comeback
 from django.views.decorators.http import require_POST
+from django_ratelimit.decorators import ratelimit
 
 # Create your views here.
 def conversation_home(request):
@@ -39,44 +40,36 @@ def ajax_reply(request):
         data = json.loads(request.body)
         girl_title = data.get('girl_title', '').strip()
         last_text = data.get('last_text', '').strip()
-        platform = data.get('platform', '').strip()
-        what_happened = data.get('what_happened', '').strip()
-        print(last_text)
+        tone = data.get('tone', '').strip()
+        goal = data.get('goal', '').strip()
+        
         # Save the conversation for the user
         conversation, created = Conversation.objects.get_or_create(
             user=request.user,
             girl_title=girl_title,
             defaults={
                 'content': last_text,
-                'platform': platform,
-                'what_happened': what_happened,
+                'tone': tone,
+                'goal': goal,
             }
         )
         if not created:
             conversation.content = last_text
-            conversation.platform = platform
-            conversation.what_happened = what_happened
+            conversation.tone = tone
+            conversation.goal = goal
             conversation.save()
 
 
         # Deduct one credit
         chat_credit.balance -= 1
-        chat_credit.save()  # last_updated auto-updates
+        chat_credit.save() 
 
-        # Generate your AI response (dummy below)
-        # comebacks = generate_comebacks(last_text)
-        # todd_comeback = generate_toddv_comeback(last_text,platform,what_happened).strip('"')
-        custom_response = generate_custom_comeback(last_text,platform,what_happened)
+        # Generate AI response
+        custom_response = generate_custom_comeback(last_text,tone,goal)
         response_data = {
         'custom': custom_response,
         'credits_left': chat_credit.balance,
         }
-        # response_data = {
-        #     'alex': comebacks.get("AlexTextGameCoach", ""),
-        #     'custom': custom_comeback,
-        #     'toddv' : todd_comeback,
-        #     'credits_left': chat_credit.balance,
-        # }
         
         # If it was just created, send back ID and title
         if created:
@@ -96,31 +89,45 @@ def conversation_detail(request, pk):
         return JsonResponse({
             'girl_title': convo.girl_title,
             'content': convo.content,
-            'platform': convo.platform,
-            'what_happened': convo.what_happened,
+            'tone': convo.tone,
+            'goal': convo.goal,
         })
     except Conversation.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
 
-    
-from django.views.decorators.csrf import csrf_exempt  # Or use @csrf_protect if you use AJAX CSRF header
-
-@csrf_exempt  # Remove this and use CSRF token if your AJAX includes it
+@ratelimit(key='ip', rate='50/d', block=True)
 def ocr_screenshot(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
+            if 'chat_credits' not in request.session:
+                    request.session['chat_credits'] = 5
             if 'screenshot_credits' not in request.session:
                     request.session['screenshot_credits'] = 5
             
             # Deduct one screenshot credit session
             request.session['screenshot_credits'] = request.session['screenshot_credits'] - 1
             screenshot_credits_credits_left = request.session['screenshot_credits']
+            
             if screenshot_credits_credits_left <= 0:
                 signup_url = reverse('account_signup')
                 return JsonResponse({
                     'error': 'Screenshot upload limit Reached. Sign up to unlock unlimited uploads.',
                     'redirect_url': signup_url
                 }, status=403)
+                
+            # Check credits
+            credits = request.session.get('chat_credits', 0)
+            if credits <= 0:
+                signup_url = reverse('account_signup')
+                return JsonResponse({
+                    'error': 'You’re out of chat credits. Sign up to unlock unlimited replies.',
+                    'redirect_url': signup_url
+                }, status=403)
+                
+        else:    
+            chat_credit = request.user.chat_credit
+            if chat_credit.balance < 1:
+                return JsonResponse({'redirect_url': reverse('pricing:pricing')})        
             
         screenshot_file = request.FILES.get('screenshot')
         if not screenshot_file:

@@ -1,26 +1,35 @@
 from django.shortcuts import render,redirect
 from django.http import JsonResponse
 import json
-from conversation.utils.custom_gpt import generate_custom_comeback
+from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.utils.ip_check import get_client_ip
 from django.urls import reverse
-from conversation.models import ChatCredit
 from reignitehome.models import TrialIP
-
+from django_ratelimit.decorators import ratelimit
 
 def home(request):
     if 'chat_credits' not in request.session:
         request.session['chat_credits'] = 5
         
     current_chat_credits = request.session['chat_credits']
+    
+    
+    ip = get_client_ip(request)
+    trial_record, created = TrialIP.objects.get_or_create(ip_address=ip)
+        
+    if not created and trial_record.trial_used:
+        current_chat_credits = 0
+        
     context = {
         'chat_credits':current_chat_credits,
     }
+        
     
     if request.user.is_authenticated:
         return redirect('conversation_home')
     return render(request, 'home.html',context)
 
+@ratelimit(key='ip', rate='10/d', block=True)
 def ajax_reply_home(request):
     if request.method == 'POST':
         
@@ -30,7 +39,7 @@ def ajax_reply_home(request):
         if not created and trial_record.trial_used:
             signup_url = reverse('account_signup')
             return JsonResponse({
-                'error': 'Screenshot upload limit reached. Sign up to unlock unlimited uploads.',
+                'error': 'You’re out of chat credits. Sign up to unlock unlimited replies.',
                 'redirect_url': signup_url
             }, status=403)
 
@@ -41,7 +50,7 @@ def ajax_reply_home(request):
             trial_record.save()
             signup_url = reverse('account_signup')
             return JsonResponse({
-                'error': 'Screenshot upload limit reached. Sign up to unlock unlimited uploads.',
+                'error': 'You’re out of chat credits. Sign up to unlock unlimited replies.',
                 'redirect_url': signup_url
             }, status=403)
         
@@ -54,23 +63,12 @@ def ajax_reply_home(request):
         request.session['chat_credits'] = credits - 1
         credits_left = request.session['chat_credits']
         
-        # Generate your AI response (dummy below)
-        # comebacks = generate_comebacks(last_text)
-        # todd_comeback = generate_toddv_comeback(last_text,platform,what_happened)
-        custom_response = generate_custom_comeback(last_text,platform,what_happened)
+        custom_response = generate_reignite_comeback(last_text,platform,what_happened)
         print(last_text)
         response_data = {
         'custom': custom_response,
         'credits_left': credits_left,
         }
-        
-        
-        # response_data = {
-        #     'alex': comebacks.get("AlexTextGameCoach", ""),
-        #     'custom': custom_comeback,
-        #     'toddv' : todd_comeback,
-        #     'credits_left': credits_left,
-        # }
         return JsonResponse(response_data)
 
     return JsonResponse({'error': 'Invalid request'}, status=400)

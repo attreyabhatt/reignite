@@ -10,8 +10,10 @@ def extract_conversation_from_image(screenshot_file):
     data_url = f"data:{mime};base64,{b64}"
 
     prompt = (
-        "Extract the conversation from this screenshot in a clear structured text format, "
+        "This is a screenshot of a conversation from a messaging/dating app."
+        "Extract the conversation from this screenshot in a clear structured text format,"
         "labeling each message with 'you:' or 'her:' per sender. "
+        "If it's ambiguous who said what, infer the speaker based on the layout (e.g., left/right message bubbles or usernames)."
         "Example:\n"
         "you: hi\nher: hello\nyou: how are you?\n"
     )
@@ -26,5 +28,12 @@ def extract_conversation_from_image(screenshot_file):
             ]
         }],
     )
+    
+    output = resp.output_text.strip()
 
-    return resp.output_text.strip()
+    # Basic failsafe: check if it contains at least one labeled message
+    if not any(label in output.lower() for label in ["you:", "her:", "them:", "me:", "hi", "hello"]):
+        return "Failed to extract the conversation. Please try uploading the screenshot again. If it keeps happening, upload a cleaner screenshot."
+
+    return output
+

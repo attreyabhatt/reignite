@@ -351,6 +351,7 @@
 
 
 <!-- JS -->
+
 <script>
     const csrfToken = '{{ csrf_token }}';
 
@@ -393,7 +394,7 @@
                     return;
                 }
 
-
+                
 
                 // --- CUSTOM AI RESPONSE HANDLING ---
                 let customResponse = data.custom;
@@ -495,10 +496,6 @@
         })
             .then(response => response.json())
             .then(data => {
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url + '?next=/&message=out_of_screenshots';
-                    return;
-                }
                 document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
                 if (data.ocr_text) {
                     const lastReply = document.getElementById('last-reply');
