@@ -1,6 +1,6 @@
 from openai import OpenAI
 from decouple import config
-client = OpenAI(api_key=config('GPT-API-KEY'))
+client = OpenAI(api_key=config('GPT_API_KEY'))
 
 def generate_toddv_comeback(conversation_text, platform, what_happened):
     

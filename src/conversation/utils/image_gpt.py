@@ -1,7 +1,7 @@
 import base64
 from openai import OpenAI
 from decouple import config
-client = OpenAI(api_key=config('GPT-API-KEY'))
+client = OpenAI(api_key=config('GPT_API_KEY'))
 
 def extract_conversation_from_image(screenshot_file):
     img_bytes = screenshot_file.read()

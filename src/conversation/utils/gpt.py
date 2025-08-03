@@ -1,7 +1,7 @@
 from openai import OpenAI
 from decouple import config
 
-client = OpenAI(api_key=config('GPT-API-KEY'))
+client = OpenAI(api_key=config('GPT_API_KEY'))
 
 PERSONAS = {
     "alex": {
