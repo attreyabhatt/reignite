@@ -20,7 +20,11 @@ Pricing | Chat Credits
                         <li>Instant delivery</li>
                         <li>Great for testing</li>
                     </ul>
+                    {% if user.is_authenticated %}
                     <a href="{% url 'pricing:purchase' 10 %}" class="btn btn-outline-dark w-100">Buy 10 Credits</a>
+                    {% else %}
+                    <a href="#" class="btn btn-outline-dark w-100">Buy 10 Credits</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -36,7 +40,11 @@ Pricing | Chat Credits
                         <li>Best for active users</li>
                         <li>Save 30%</li>
                     </ul>
+                    {% if user.is_authenticated %}
                     <a href="{% url 'pricing:purchase' 50 %}" class="btn btn-light w-100">Buy 50 Credits</a>
+                    {% else %}
+                    <a href="#" class="btn btn-light w-100">Buy 50 Credits</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -52,7 +60,11 @@ Pricing | Chat Credits
                         <li>Most value for money</li>
                         <li>Save 50%</li>
                     </ul>
+                    {% if user.is_authenticated %}
                     <a href="{% url 'pricing:purchase' 200 %}" class="btn btn-outline-dark w-100">Buy 200 Credits</a>
+                    {% else %}
+                    <a href="#" class="btn btn-outline-dark w-100">Buy 200 Credits</a>
+                    {% endif %}
                 </div>
             </div>
         </div>

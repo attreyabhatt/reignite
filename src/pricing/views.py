@@ -4,8 +4,6 @@ from django.contrib import messages
 from .models import CreditPurchase
 from conversation.models import ChatCredit
 
-# 1. Pricing page
-@login_required
 def pricing(request):
     credit_packs = [
         {'amount': 10, 'price': 1.99},
