@@ -61,8 +61,17 @@ def ajax_reply(request):
 
 
         # Deduct one credit
-        chat_credit.balance -= 1
-        chat_credit.save() 
+        # Validate custom_response before deducting credit
+        try:
+            parsed_response = json.loads(custom_response)
+            if isinstance(parsed_response, list) and parsed_response and parsed_response[0].get("confidence_score", 0) > 0:
+                # Deduct one credit only for valid responses
+                chat_credit.balance -= 1
+                chat_credit.save()
+            else:
+                return JsonResponse({'error': 'AI failed to generate a proper response. Try again. No credit deducted.'}, status=500)
+        except Exception as e:
+            return JsonResponse({'error': 'AI response parsing failed. Try again. No credit deducted.'}, status=500)
 
         # Generate AI response
         custom_response = generate_custom_comeback(last_text,tone,goal)
