@@ -12,12 +12,12 @@ def generate_custom_comeback(last_text, tone, goal):
         ])
     
     TONE_MAP = {
-    "playful": "playful and upbeat",
-    "flirty": "lightly flirtatious and fun",
-    "sincere": "genuine and thoughtful",
-    "confident": "calm and self-assured",
-    "mysterious": "a little reserved, intriguing",
-    "funny": "humorous and clever"
+        "playful": "playful and upbeat",
+        "flirty": "lightly flirtatious and fun",
+        "sincere": "genuine and thoughtful",
+        "confident": "calm and self-assured",
+        "mysterious": "a little reserved, intriguing",
+        "funny": "humorous and clever"
     }
 
     GOAL_MAP = {
@@ -51,7 +51,7 @@ def generate_custom_comeback(last_text, tone, goal):
                 - Create emotionally engaging, clever, or witty responses that feel natural — not robotic
 
                 Style Rules:
-                - Keep replies concise (1 line if possible, 3 max)
+                - Be concise and focused—but when the moment calls for depth or sincerity, go a little longer
                 - Don’t ask basic questions — say things that resonate
                 - Be captivating, not inappropriate. Confident, not awkward
                 - Assume the user wants to keep it flirty, unless otherwise stated
@@ -61,6 +61,31 @@ def generate_custom_comeback(last_text, tone, goal):
                     - User’ desired Tone: {tone_safe}
                     - User’s goal for this reply: {goal_safe}
                 """
+                
+    alex_prompt = f"""
+            You are a bold, charismatic online dating expert modeled after Alex from *Playing With Fire*. You specialize in crafting high-impact, short-form conversations for dating apps like Tinder, Bumble, and Hinge. Your tone is cocky-funny, masculine, flirtatious, and emotionally untouchable.
+
+            You keep messages short and punchy — minimal text, maximum tension. You never ask boring questions, never validate excessively, and never chase. You lead the interaction, tease confidently, and move things toward a date quickly while keeping things playful and polarizing.
+
+            You re-engage with charm if she flakes or goes cold, always unfazed and witty. Your style thrives on bold assumptions, flirty banter, and playful tension — not logical conversations or small talk.
+
+            Examples of your voice:
+            - “You seem like trouble. I like that.”
+            - “You strike me as the type who says ‘maybe’ and then joins a cult.”
+            - “Guessing you’re either busy or in jail. Should I send bail money?”
+            - “You’re giving off ‘reads horoscopes unironically’ energy.”
+
+            Rules:
+            - No generic questions like “How was your day?” or “What do you do?”
+            - No over-explaining or apologizing.
+            - No needy behavior.
+            - Always be slightly unpredictable and in control.
+
+            Your goal: build chemistry fast, escalate tension, and convert matches into real-life dates — all without trying too hard.
+            Full conversation so far: 
+            {last_text}
+    """
+
                 
     user_prompt = '''
                 Respond ONLY with a JSON array of 3 objects.
@@ -78,13 +103,13 @@ def generate_custom_comeback(last_text, tone, goal):
     '''
 
     # Compose OpenAI API call
-    safe_system_prompt = make_prompt_safe_with_gpt(system_prompt)
-    print(safe_system_prompt)
+    # safe_system_prompt = make_prompt_safe_with_gpt(system_prompt)
+    # print(safe_system_prompt)
     try:
         response = client.chat.completions.create(
             model="gpt-4o",  # Or "gpt-4" if preferred
             messages=[
-                {"role": "system", "content": safe_system_prompt},
+                {"role": "system", "content": alex_prompt},
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0.90,  # Adjustable: higher = more playful

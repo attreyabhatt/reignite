@@ -23,13 +23,22 @@ PERSONAS = {
             },
 }
 
+user_prompt = '''
+                Respond ONLY with a JSON array of 3 objects.
+                Each object must have:
+                - "message": the message
+                - "confidence_score": a number between 0 and 1 indicating confidence
+
+                Example output:
+                [
+                {"message": "Did I just break your texting app or are you this mysterious?", "confidence_score": 0.95},
+                {"message": "You ghost better than I flirt. Is it a competition?", "confidence_score": 0.90},
+                {"message": "I see you like to keep me on my toes.", "confidence_score": 0.88}
+                ]
+                Do not add any explanation, commentary, or text outside of this JSON array.
+'''
 
 def generate_comebacks(conversation: str) -> str:
-    """
-    Generate a short, natural-sounding comeback message based on the conversation,
-    written in the style of Alex from Playing With Fire.
-    """
-    
     messages = {}
     
     for key, persona in PERSONAS.items():
