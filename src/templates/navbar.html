@@ -15,6 +15,12 @@
 
         <div class="collapse navbar-collapse" id="navbarMinimal">
             <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'contact' %}">Contact</a>
+                </li>
+                <li class="nav-item d-flex align-items-center">
+                    <span class="mx-2 text-muted">|</span>
+                </li>
                 {% if user.is_authenticated %}
                 <!-- Pricing Link -->
                 <li class="nav-item">
@@ -45,8 +51,9 @@
                     </ul>
                 </li>
                 {% else %}
+                
                 <li class="nav-item">
-                    <a class="btn btn-outline-dark" href="{% url 'account_login' %}">Login/Signup</a>
+                    <a class="btn btn-outline-dark ms-2" href="{% url 'account_login' %}">Login/Signup</a>
                 </li>
                 {% endif %}
             </ul>

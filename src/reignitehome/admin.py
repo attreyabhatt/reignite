@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import TrialIP
+from .models import TrialIP,ContactMessage
+
+admin.site.register(ContactMessage)
 
 @admin.register(TrialIP)
 class TrialIPAdmin(admin.ModelAdmin):

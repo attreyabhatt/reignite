@@ -4,7 +4,7 @@ import json
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.utils.ip_check import get_client_ip
 from django.urls import reverse
-from reignitehome.models import TrialIP
+from reignitehome.models import TrialIP,ContactMessage
 from django_ratelimit.decorators import ratelimit
 
 def home(request):
@@ -72,6 +72,26 @@ def ajax_reply_home(request):
         return JsonResponse(response_data)
 
     return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+def contact_view(request):
+    submitted = False
+    if request.method == 'POST':
+        reason = request.POST.get('reason')
+        title = request.POST.get('title')
+        subject = request.POST.get('subject')
+        email = request.POST.get('email')
+
+        ContactMessage.objects.create(
+            reason=reason,
+            title=title,
+            subject=subject,
+            email=email
+        )
+        submitted = True  # Flag for thank you message
+
+    return render(request, 'contact.html', {'submitted': submitted})
+
 
 def privacy_policy(request):
     return render(request, "policy/privacy_policy.html")

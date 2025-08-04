@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <h2 class="mb-4">Contact Us</h2>
+            {% if submitted %}
+            <div class="alert alert-success text-center" role="alert">
+                <h4 class="alert-heading">Thank you!</h4>
+                <p>Your message has been sent. We appreciate your feedback and will get back to you on your email soon.</p>
+            </div>
+            {% else %}
+            <form method="post" class="card p-4 shadow-sm">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="reason" class="form-label">Reason</label>
+                    <select class="form-select" id="reason" name="reason" required>
+                        <option value="">Select reason</option>
+                        <option value="bug">Bug Report</option>
+                        <option value="payment">Payments</option>
+                        <option value="feedback">Feedback</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" class="form-control" id="title" name="title" maxlength="100" required>
+                </div>
+                <div class="mb-3">
+                    <label for="subject" class="form-label">Subject</label>
+                    <textarea class="form-control" id="subject" name="subject" rows="4" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email address</label>
+                    <input type="email" class="form-control" id="email" name="email" required>
+                </div>
+                <button type="submit" class="btn btn-dark w-100">Send Message</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
