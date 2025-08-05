@@ -5,9 +5,10 @@ from django.urls import reverse
 from django.http import JsonResponse
 import json
 from conversation.utils.image_gpt import extract_conversation_from_image
-from conversation.utils.custom_gpt import generate_custom_comeback
+from conversation.utils.custom_gpt import generate_custom_response
 from django.views.decorators.http import require_POST
 from django_ratelimit.decorators import ratelimit
+import re
 
 # Create your views here.
 def conversation_home(request):
@@ -40,32 +41,37 @@ def ajax_reply(request):
         data = json.loads(request.body)
         from datetime import datetime
 
-        # Auto-generate title if not provided
-        now_str = datetime.now().strftime("%b %d, %H:%M")
-        girl_title = f"Conversation on {now_str}"
         last_text = data.get('last_text', '').strip()
         situation = data.get('situation', '').strip()
         her_info = data.get('her_info', '').strip()
 
+        print(her_info)
         
-        conversation, created = Conversation.objects.get_or_create(
-            user=request.user,
-            girl_title=girl_title,
-            defaults={
-                'content': last_text,
-                'situation': situation,
-                'her_info': her_info,
-            }
-        )
-        if not created:
+        conversation = Conversation.objects.filter(user=request.user, content=last_text).first()
+
+        if conversation:
+            # Update conversation (but keep the original title)
             conversation.content = last_text
             conversation.situation = situation
             conversation.her_info = her_info
             conversation.save()
+            created = False
+        else:
+            # Generate title ONCE from the message
+            generated_title = generate_title(last_text)
+
+            conversation = Conversation.objects.create(
+                user=request.user,
+                content=last_text,
+                situation=situation,
+                her_info=her_info,
+                girl_title=generated_title
+            )
+            created = True
 
 
         # Generate AI response
-        custom_response, success = generate_custom_comeback(last_text,situation,her_info)
+        custom_response, success = generate_custom_response(last_text,situation,her_info)
         print(custom_response)
         
         # Validate success before deducting credit
@@ -99,8 +105,8 @@ def conversation_detail(request, pk):
         return JsonResponse({
             'girl_title': convo.girl_title,
             'content': convo.content,
-            'tone': convo.tone,
-            'goal': convo.goal,
+            'situation': convo.situation,
+            'her_info': convo.her_info,
         })
     except Conversation.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
@@ -162,4 +168,17 @@ def delete_conversation(request):
     except Conversation.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
 
+def generate_title(last_text):
+    # Find all 'her:' messages (with flexible spacing)
+    matches = re.findall(r'(?:^|\n)her\s*:\s*(.+)', last_text, re.IGNORECASE)
 
+    if matches:
+        snippet = matches[-1][:40]  # use the LAST match
+    else:
+        snippet = last_text.strip().split('\n')[-1][:40]  # fallback to last line
+
+    # Clean and format snippet
+    snippet = re.sub(r'\s+', ' ', snippet).strip().capitalize()
+    title = f"{snippet}..."
+
+    return title

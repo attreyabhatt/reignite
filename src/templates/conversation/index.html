@@ -52,7 +52,7 @@
                             <i class="fa fa-bullseye me-1 text-primary"></i> What's the situation?
                         </label>
                         <select class="form-select rounded-pill" id="situation" name="situation" required>
-                            <option value="" disabled selected>Select your situation</option>
+                            <option value="stuck_after_reply" selected>She replied, but I don’t know what to say</option>
                     
                             <optgroup label="Starting the conversation">
                                 <option value="just_matched">We just matched</option>
@@ -85,12 +85,12 @@
 
                     <div class="mb-3">
                         <label for="her-info" class="form-label fw-semibold">
-                            <i class="fa-solid fa-user-secret me-1 text-secondary"></i> Her Info
+                            <i class="fa-solid fa-user-secret me-1 text-secondary"></i> Her Information (optional)
                         </label>
-                        <textarea name="her-info" id="her-info" class="form-control" rows="3"
-                            placeholder="Add anything that might help — her bio, hobbies, vibe, or how long it's been."></textarea>
+                        <textarea name="her-info" id="her_info" class="form-control" rows="3"
+                            placeholder="Add anything that might help — her bio, hobbies, vibe, or her hair style." value=""></textarea>
                         <div class="form-text">
-                            Users who add information get 10X responses for there matches.
+                            Users who add information get 10X responses for their matches.
                         </div>
                     </div>
 
@@ -193,7 +193,7 @@
         let girl_title = ""; // will be auto-generated
         let last_reply = document.getElementById('last-reply').value;
         let situation = document.getElementById('situation').value;
-        let her_info = document.getElementById('her-info').value;
+        let her_info = document.getElementById('her_info').value;
 
         window.scrollTo({
             top: 0,
@@ -329,9 +329,10 @@
                                         alert('Could not load conversation.');
                                         return;
                                     }
+                                    alert(data.her_info);
                                     document.getElementById('last-reply').value = data.content;
                                     document.getElementById('situation').value = data.situation || 'just_matched';
-                                    document.getElementById('her-info').value = data.her_info || '';
+                                    document.getElementById('her_info').value = data.her_info ;
                                     document.getElementById('suggestedReplyMsg').innerHTML = 'No response has been generated yet';
                                     document.getElementById("suggestedReply2").style.display = "none";
                                     document.getElementById("suggestedReply3").style.display = "none";
@@ -373,7 +374,7 @@
                     }
                     document.getElementById('last-reply').value = data.content;
                     document.getElementById('situation').value = data.situation || 'just_matched';
-                    document.getElementById('her-info').value = data.her_info || ' ';
+                    document.getElementById('her_info').value = data.her_info || ' ';
                     document.getElementById('suggestedReplyMsg').innerHTML = 'No response has been generated yet';
                     var suggestedReply2 = document.getElementById("suggestedReply2");
                     suggestedReply2.style.display = "none"
