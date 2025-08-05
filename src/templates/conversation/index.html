@@ -47,52 +47,56 @@
                 <form id="chatForm" class="rounded-4 shadow-lg bg-white p-4 w-100">
                     {% csrf_token %}
 
-                    <!-- Platform and What Happened -->
-                    <div class="mb-4">
-                        <div class="row g-2">
-                            <div class="col-12 col-md-6">
-                                <label for="tone" class="form-label fw-semibold">
-                                    <i class="fa fa-magic me-1 text-primary"></i> Tone
-                                </label>
-                                <select class="form-select rounded-pill" id="tone" name="tone">
-                                    <option value="playful">Playful</option>
-                                    <option value="flirty">Flirty</option>
-                                    <option value="sincere">Sincere</option>
-                                    <option value="confident">Confident</option> <!-- Replaces "cocky" -->
-                                    <option value="mysterious">Mysterious</option>
-                                    <option value="funny">Funny</option>
-                                </select>
-                            </div>
-
-                            <div class="col-12 col-md-6">
-                                <label for="goal" class="form-label fw-semibold">
-                                    <i class="fa fa-bullseye me-1 text-info"></i> Conversation Goal
-                                </label>
-                                <select class="form-select rounded-pill" id="goal" name="goal">
-                                    <option value="keep it going">Keep It Going</option>
-                                    <option value="increase flirtation">Flirt a Little More</option>
-                                    <!-- Replaces "escalate" -->
-                                    <option value="build emotional connection">Build Emotional Connection</option>
-                                    <option value="suggest casual meetup">Ask Her Out</option> <!-- Safer phrasing -->
-                                    <option value="recover from bad message">Recover from a Dry/Bad Reply</option>
-                                    <option value="playfully test her interest">Playfully Test Her Interest</option>
-                                    <!-- Replaces "test her" -->
-                                </select>
-                            </div>
-                        </div>
-
-
+                    <div class="mb-3">
+                        <label for="situation" class="form-label fw-semibold">
+                            <i class="fa fa-bullseye me-1 text-primary"></i> What's the situation?
+                        </label>
+                        <select class="form-select rounded-pill" id="situation" name="situation" required>
+                            <option value="" disabled selected>Select your situation</option>
+                    
+                            <optgroup label="Starting the conversation">
+                                <option value="just_matched">We just matched</option>
+                                <option value="responding_to_prompt">She responded to something on my profile</option>
+                            </optgroup>
+                    
+                            <optgroup label="Mid-conversation">
+                                <option value="stuck_after_reply">She replied, but I don’t know what to say</option>
+                                <option value="dry_reply">She gave a dry or one-word reply</option>
+                                <option value="she_asked_question">She asked me a question</option>
+                                <option value="feels_like_interview">Conversation feels like an interview</option>
+                            </optgroup>
+                    
+                            <optgroup label="Recovering or Reigniting">
+                                <option value="left_on_read">She left me on read</option>
+                                <option value="reviving_old_chat">I haven’t talked to her in a while</option>
+                                <option value="recovering_after_cringe">I think I said something off</option>
+                                <option value="mixed_signals">She’s giving mixed signals</option>
+                            </optgroup>
+                    
+                            <optgroup label="Escalating or Transitioning">
+                                <option value="she_interested">She seems really into me</option>
+                                <option value="planning_date">We’re planning a date</option>
+                                <option value="post_date_followup">Following up after a date or call</option>
+                                <option value="switching_platforms">Trying to move to another platform</option>
+                            </optgroup>
+                        </select>
                     </div>
+
+
+                    <div class="mb-3">
+                        <label for="her-info" class="form-label fw-semibold">
+                            <i class="fa-solid fa-user-secret me-1 text-secondary"></i> Her Info
+                        </label>
+                        <textarea name="her-info" id="her-info" class="form-control" rows="3"
+                            placeholder="Add anything that might help — her bio, hobbies, vibe, or how long it's been."></textarea>
+                        <div class="form-text">
+                            Users who add information get 10X responses for there matches.
+                        </div>
+                    </div>
+
 
                     <!-- Title and Screenshot Upload -->
                     <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;">
-                        <label for="girl-title" class="form-label fw-semibold">
-                            <i class="fa fa-tag me-1 text-secondary"></i> Conversation Title
-                            <span class="small text-muted ms-1">(only you see this)</span>
-                        </label>
-                        <input type="text" class="form-control rounded-pill mb-2" id="girl-title" name="girl-title"
-                            placeholder="E.g. Girl with nice teeth">
-
                         <label for="formFile" class="form-label mt-2 fw-semibold">
                             <i class="me-1 text-success"></i> Upload Screenshot
                             <span class="small text-muted">(optional – for instant extracting messages)</span>
@@ -115,7 +119,7 @@
                             <i class="me-1 text-warning"></i> Conversation
                         </label>
                         <textarea name="last-reply" id="last-reply" class="form-control" style="min-height:120px"
-                            placeholder="you: hey, free thursday?&#10;her: (seen, no reply)"></textarea>
+                            placeholder="you: hey, free thursday?&#10;her: (seen, no reply)" rows="5"></textarea>
                     </div>
 
                     <!-- Submit -->
@@ -186,11 +190,10 @@
             <span class="ms-2 text-muted">Generating your texts…</span>
         `;
 
-        let girl_title = document.getElementById('girl-title').value;
+        let girl_title = ""; // will be auto-generated
         let last_reply = document.getElementById('last-reply').value;
-        let tone = document.getElementById('tone').value;
-        let goal = document.getElementById('goal').value;
-
+        let situation = document.getElementById('situation').value;
+        let her_info = document.getElementById('her-info').value;
 
         window.scrollTo({
             top: 0,
@@ -206,8 +209,8 @@
             body: JSON.stringify({
                 last_text: last_reply,
                 girl_title: girl_title,
-                tone: tone,
-                goal: goal
+                situation: situation,
+                her_info: her_info
             })
         })
             .then(response => response.json())
@@ -326,10 +329,9 @@
                                         alert('Could not load conversation.');
                                         return;
                                     }
-                                    document.getElementById('girl-title').value = data.girl_title;
                                     document.getElementById('last-reply').value = data.content;
-                                    document.getElementById('platform').value = data.platform || 'Instagram DM';
-                                    document.getElementById('what-happened').value = data.what_happened || 'Not sure / Just stopped';
+                                    document.getElementById('situation').value = data.situation || 'just_matched';
+                                    document.getElementById('her-info').value = data.her_info || '';
                                     document.getElementById('suggestedReplyMsg').innerHTML = 'No response has been generated yet';
                                     document.getElementById("suggestedReply2").style.display = "none";
                                     document.getElementById("suggestedReply3").style.display = "none";
@@ -369,10 +371,9 @@
                         alert('Could not load conversation.');
                         return;
                     }
-                    document.getElementById('girl-title').value = data.girl_title;
                     document.getElementById('last-reply').value = data.content;
-                    document.getElementById('tone').value = data.tone || 'playful';
-                    document.getElementById('goal').value = data.goal || 'keep it going';
+                    document.getElementById('situation').value = data.situation || 'just_matched';
+                    document.getElementById('her-info').value = data.her_info || ' ';
                     document.getElementById('suggestedReplyMsg').innerHTML = 'No response has been generated yet';
                     var suggestedReply2 = document.getElementById("suggestedReply2");
                     suggestedReply2.style.display = "none"

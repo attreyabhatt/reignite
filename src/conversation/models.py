@@ -16,8 +16,8 @@ class Conversation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversations')
     girl_title = models.CharField(max_length=255)
     content = models.TextField()
-    tone = models.CharField(max_length=50, blank=True, null=True)
-    goal = models.CharField(max_length=100, blank=True, null=True)
+    situation = models.CharField(max_length=150)  # e.g. 'left_on_read'
+    her_info = models.TextField(blank=True)       # Freeform input about her
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):

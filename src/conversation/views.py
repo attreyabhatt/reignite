@@ -38,29 +38,34 @@ def ajax_reply(request):
             return JsonResponse({'redirect_url': reverse('pricing:pricing')})
 
         data = json.loads(request.body)
-        girl_title = data.get('girl_title', '').strip()
+        from datetime import datetime
+
+        # Auto-generate title if not provided
+        now_str = datetime.now().strftime("%b %d, %H:%M")
+        girl_title = f"Conversation on {now_str}"
         last_text = data.get('last_text', '').strip()
-        tone = data.get('tone', '').strip()
-        goal = data.get('goal', '').strip()
+        situation = data.get('situation', '').strip()
+        her_info = data.get('her_info', '').strip()
+
         
-        # Save the conversation for the user
         conversation, created = Conversation.objects.get_or_create(
             user=request.user,
             girl_title=girl_title,
             defaults={
                 'content': last_text,
-                'tone': tone,
-                'goal': goal,
+                'situation': situation,
+                'her_info': her_info,
             }
         )
         if not created:
             conversation.content = last_text
-            conversation.tone = tone
-            conversation.goal = goal
+            conversation.situation = situation
+            conversation.her_info = her_info
             conversation.save()
 
+
         # Generate AI response
-        custom_response, success = generate_custom_comeback(last_text,tone,goal)
+        custom_response, success = generate_custom_comeback(last_text,situation,her_info)
         print(custom_response)
         
         # Validate success before deducting credit
