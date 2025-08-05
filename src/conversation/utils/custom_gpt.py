@@ -177,22 +177,42 @@ def make_prompt_safe_with_gpt(system_prompt):
     
 import re
 
-def is_left_on_read(last_text):
-    lines = [line.strip() for line in last_text.strip().split('\n') if line.strip()]
-    if not lines:
+def is_left_on_read(text):
+    """
+    Robustly checks if you were left on read in a conversation string.
+    Handles 'you:' or 'her:', any capitalization, extra spaces, and multi-line messages.
+    Returns True if the last message is from 'you', else False.
+    """
+    # Regex: matches 'you' or 'her', optional spaces, colon, then message (possibly empty)
+    pattern = re.compile(r'^(you|her)\s*:\s*', re.IGNORECASE)
+
+    # Process each line, building full messages with sender
+    messages = []
+    current_sender = None
+    current_message = ''
+    for line in text.splitlines():
+        if not line.strip():
+            continue  # Skip blank lines
+
+        match = pattern.match(line)
+        if match:
+            # Save previous message if exists
+            if current_sender is not None:
+                messages.append((current_sender, current_message.strip()))
+            current_sender = match.group(1).lower()
+            current_message = line[match.end():].strip()
+        else:
+            # Continuation of previous message
+            current_message += '\n' + line.strip()
+
+    # Add the last message
+    if current_sender is not None:
+        messages.append((current_sender, current_message.strip()))
+
+    if not messages:
         return False
-    
-    # Regex to match "you:" with possible spaces and ignore case
-    you_pattern = re.compile(r'^you\s*:', re.IGNORECASE)
 
-    # Case 1: Last line starts with "you:"
-    if you_pattern.match(lines[-1]):
-        return True
-
-    # Case 2: Last two lines are ["You:", "[message]"], with possible spaces
-    if len(lines) >= 2 and you_pattern.match(lines[-2]):
-        return True
-
-    return False
+    # Check if last message is from 'you'
+    return messages[-1][0] == 'you'
 
 
