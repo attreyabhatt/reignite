@@ -5,10 +5,10 @@ client = OpenAI(api_key=config('GPT_API_KEY'))
 
 def make_prompt_safe_with_gpt(system_prompt):
     prompt = f"""
-        You're an assistant that helps prepare a a system prompt for safe AI processing.
+        You're an assistant that helps prepare a system prompt for safe AI processing.
 
         Instructions:
-        - Rewrite this prmpt to remove or reword any language that could trigger safety filters (e.g. explicit, sexual, suggestive, or aggressive language)
+        - Rewrite this prompt to remove or reword any language that could trigger safety filters (e.g. explicit, sexual, suggestive, or aggressive language)
         - Keep the original tone and meaning as much as possible
         - Keep formatting of the conversation (e.g. "Her: ...", "You: ...") intact
 
