@@ -7,3 +7,4 @@ dj-database-url
 requests
 django-allauth
 django-ratelimit
+dodopayments
