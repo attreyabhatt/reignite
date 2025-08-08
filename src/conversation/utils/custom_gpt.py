@@ -48,7 +48,7 @@ def generate_custom_response(last_text, situation, her_info):
     
     success = False
     try:
-        response = generate_gpt_response(system_prompt,user_prompt,model="gpt-4o")
+        response = generate_gpt_response(system_prompt,user_prompt,model="gpt-5")
         print(response)
         ai_choice = response.choices[0].message
         

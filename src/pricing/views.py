@@ -47,7 +47,7 @@ def purchase_credits(request, amount):
 def dodo_webhook(request):
     try:
         payload = json.loads(request.body)
-
+        print(payload)
         # Dodo sends the payment object directly
         payment_id = payload.get("payment_id")
         status = payload.get("status")
