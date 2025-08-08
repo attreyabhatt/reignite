@@ -8,11 +8,18 @@ from django.http import JsonResponse
 import json
 from django.urls import reverse
 from django.contrib.auth.models import User
+from decouple import config
 
-DODO_PRODUCT_IDS = {
-    10: "pdt_QWDNC1hvRqnpHk4oxM9LK",
+DODO_TEST_PRODUCT_IDS = {
+    10: "pdt_QWDNC1hvRqnpHk4oxM9LK", 
     50: "pdt_9XcpTOPW3WWKdq0lwM9X3",
     200: "pdt_XT5MQEY7S7x1aBCbcdYeZ"
+}
+
+DODO_LIVE_PRODUCT_IDS = {
+    10: "pdt_k5SWFFZjyJxIFfxmWM0zc",
+    50: "pdt_rRouhnxqZCImG427QT7sC",
+    200: "pdt_EGR8j3QjeTxjxvlsqRm6A",
 }
 
 def pricing(request):
@@ -26,7 +33,13 @@ def pricing(request):
 
 @login_required
 def purchase_credits(request, amount):
-    product_id = DODO_PRODUCT_IDS.get(amount)
+    
+    is_debug = config('DJANGO_DEBUG', default=False, cast=bool)
+    
+    if is_debug:
+        product_id = DODO_TEST_PRODUCT_IDS.get(amount)
+    else:
+        product_id = DODO_LIVE_PRODUCT_IDS.get(amount)
 
     if not product_id:
         messages.error(request, "Invalid credit pack selected.")
@@ -34,10 +47,18 @@ def purchase_credits(request, amount):
 
     # Optional: Add metadata to redirect URL (e.g., ?credits=50)
     redirect_url = request.build_absolute_uri(reverse("conversation_home"))
+    
+    # Choose test or live checkout base URL
+    
+    dodo_base_url = (
+        "https://test.checkout.dodopayments.com/buy/"
+        if is_debug else
+        "https://checkout.dodopayments.com/buy/"
+    )
 
-    # Build full Dodo link
+    # Build full payment URL
     payment_url = (
-        f"https://test.checkout.dodopayments.com/buy/{product_id}"
+        f"{dodo_base_url}{product_id}"
         f"?quantity=1&redirect_url={redirect_url}"
     )
 
@@ -45,6 +66,7 @@ def purchase_credits(request, amount):
 
 @csrf_exempt
 def dodo_webhook(request):
+    is_debug = config('DJANGO_DEBUG', default=False, cast=bool)
     try:
         payload = json.loads(request.body)
         print(payload)
@@ -63,13 +85,21 @@ def dodo_webhook(request):
         if not email or not product_id:
             return JsonResponse({"status": "error", "message": "Missing email or product info"}, status=400)
 
-        PRODUCT_CREDIT_MAPPING = {
-            "pdt_QWDNC1hvRqnpHk4oxM9LK": 10,
-            "pdt_9XcpTOPW3WWKdq0lwM9X3": 50,
-            "pdt_XT5MQEY7S7x1aBCbcdYeZ": 200
-        }
+        if is_debug:
+            PRODUCT_TEST_CREDIT_MAPPING = {
+                "pdt_QWDNC1hvRqnpHk4oxM9LK": 10,
+                "pdt_9XcpTOPW3WWKdq0lwM9X3": 50,
+                "pdt_XT5MQEY7S7x1aBCbcdYeZ": 200
+            }
+            credits = PRODUCT_TEST_CREDIT_MAPPING.get(product_id)
+        else:
+            PRODUCT_LIVE_CREDIT_MAPPING = {
+                "pdt_k5SWFFZjyJxIFfxmWM0zc": 10,
+                "pdt_rRouhnxqZCImG427QT7sC": 50,
+                "pdt_EGR8j3QjeTxjxvlsqRm6A": 200
+            }
+            credits = PRODUCT_LIVE_CREDIT_MAPPING.get(product_id)
 
-        credits = PRODUCT_CREDIT_MAPPING.get(product_id)
         if not credits:
             return JsonResponse({"status": "error", "message": "Unknown product ID"}, status=400)
 
