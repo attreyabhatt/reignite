@@ -173,6 +173,19 @@
         </div>
     </div>
 </div>
+<!-- Payment Toast Notification -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055">
+    <div id="paymentToast" class="toast align-items-center text-white bg-success border-0" role="alert"
+        aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="paymentToastMessage">
+                Payment succeeded!
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                aria-label="Close"></button>
+        </div>
+    </div>
+</div>
 
 
 <!-- JS -->
@@ -485,5 +498,37 @@
     }
 
 </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentStatus = urlParams.get('status');
+        const paymentId = urlParams.get('payment_id');
+
+        if (paymentStatus && paymentId) {
+            const toastEl = document.getElementById('paymentToast');
+            const toastMessage = document.getElementById('paymentToastMessage');
+
+            if (paymentStatus === 'succeeded') {
+                toastEl.classList.remove('bg-danger');
+                toastEl.classList.add('bg-success');
+                toastMessage.innerHTML = `✅ Payment successful! <br> Credits have been successfully added to your account.`;
+            } else {
+                toastEl.classList.remove('bg-success');
+                toastEl.classList.add('bg-danger');
+                toastMessage.innerHTML = `❌ Payment failed or incomplete. Please try again.`;
+            }
+
+            const toast = new bootstrap.Toast(toastEl);
+            toast.show();
+
+            // Clean the URL without reloading
+            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+        }
+    });
+</script>
+
+
 
 {% endblock %}
