@@ -49,19 +49,20 @@ def dodo_webhook(request):
         payload = json.loads(request.body)
         print(payload)
         # Dodo sends the payment object directly
-        payment_id = payload.get("payment_id")
-        status = payload.get("status")
-        email = payload.get("customer", {}).get("email")
-        product_cart = payload.get("product_cart", [])
-        amount_paid = payload.get("settlement_amount", 0) / 100  # Paise → INR
+        payment_id = payload['data']['payment_id']
+        status = payload['data']['status']
+        email = payload['data']['customer']['email']
+        product_id = payload['data']['product_cart'][0]['product_id']
+        amount_paid = payload['data']['settlement_amount'] / 100  # Paise → INR
+        
+        print(f"Payment ID: {payment_id}, Status: {status}, Email: {email}, Product ID: {product_id}, Amount Paid: {amount_paid}")
 
         if status != "succeeded":
             return JsonResponse({"status": "ignored", "reason": "Not a successful payment"}, status=200)
 
-        if not email or not product_cart:
+        if not email or not product_id:
             return JsonResponse({"status": "error", "message": "Missing email or product info"}, status=400)
 
-        product_id = product_cart[0].get("product_id")
         PRODUCT_CREDIT_MAPPING = {
             "pdt_QWDNC1hvRqnpHk4oxM9LK": 10,
             "pdt_9XcpTOPW3WWKdq0lwM9X3": 50,
