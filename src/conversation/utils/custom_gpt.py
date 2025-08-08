@@ -28,9 +28,6 @@ def generate_custom_response(last_text, situation, her_info):
     coach_key = SITUATION_TO_COACH.get(situation, "marc")  # fallback to Marc
     system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info)
     
-    print("Coach Key: " + coach_key)
-    print("System Prompt: " + system_prompt)
-
     user_prompt = '''
                 Respond ONLY with a JSON array of 3 objects.
                 Each object must have:
@@ -48,8 +45,7 @@ def generate_custom_response(last_text, situation, her_info):
     
     success = False
     try:
-        response = generate_gpt_response(system_prompt,user_prompt,model="gpt-5")
-        print(response)
+        response = generate_gpt_response(system_prompt,user_prompt,model="gpt-4o")
         ai_choice = response.choices[0].message
         
         if ai_choice and ai_choice.content:
