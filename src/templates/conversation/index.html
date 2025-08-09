@@ -53,33 +53,35 @@
                         </label>
                         <select class="form-select rounded-pill" id="situation" name="situation" required>
                             <option value="stuck_after_reply" selected>She replied, but I don’t know what to say</option>
-                    
-                            <optgroup label="Starting the conversation">
+                            
+                            <optgroup label="🟢 Early-Conversation">
                                 <option value="just_matched">We just matched</option>
-                                <option value="responding_to_prompt">She responded to something on my profile</option>
+                                <option value="spark_interest">I want to spark her interest</option>
                             </optgroup>
-                    
-                            <optgroup label="Mid-conversation">
+                        
+                            <optgroup label="🟡 Mid-Conversation">
                                 <option value="stuck_after_reply">She replied, but I don’t know what to say</option>
                                 <option value="dry_reply">She gave a dry or one-word reply</option>
                                 <option value="she_asked_question">She asked me a question</option>
                                 <option value="feels_like_interview">Conversation feels like an interview</option>
+                                <option value="sassy_challenge">She is being sassy or challenging</option>
+                                <option value="spark_deeper_conversation">Be sincere and vulnerable</option>
+                                <option value="pivot_conversation">Change the subject</option>
                             </optgroup>
-                    
-                            <optgroup label="Recovering or Reigniting">
+                        
+                            <optgroup label="🔁 Recovery or Reigniting">
                                 <option value="left_on_read">She left me on read</option>
                                 <option value="reviving_old_chat">I haven’t talked to her in a while</option>
                                 <option value="recovering_after_cringe">I think I said something off</option>
-                                <option value="mixed_signals">She’s giving mixed signals</option>
                             </optgroup>
-                    
-                            <optgroup label="Escalating or Transitioning">
-                                <option value="she_interested">She seems really into me</option>
-                                <option value="planning_date">We’re planning a date</option>
-                                <option value="post_date_followup">Following up after a date or call</option>
+                        
+                            <optgroup label="🟣 Late-Conversation">
+                                <option value="ask_her_out">Ask her out</option>
                                 <option value="switching_platforms">Trying to move to another platform</option>
                             </optgroup>
+                        
                         </select>
+
                     </div>
 
 
@@ -120,6 +122,7 @@
                         </label>
                         <textarea name="last-reply" id="last-reply" class="form-control" style="min-height:120px"
                             placeholder="you: hey, free thursday?&#10;her: (seen, no reply)" rows="5"></textarea>
+                        <div class="form-text text-end"><span id="charCount">0</span> characters</div>
                     </div>
 
                     <!-- Submit -->
@@ -436,6 +439,7 @@
                     } else {
                         lastReply.value = data.ocr_text;
                     }
+                    updateCounter();
                 } else {
                     alert(data.error || "Failed to extract text from image.");
                 }
@@ -529,6 +533,26 @@
     });
 </script>
 
+<script>
+    function updateCounter() {
+        const ta = document.getElementById('last-reply');
+        const c = document.getElementById('charCount');
+        if (ta && c) c.textContent = ta.value.length;
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const ta = document.getElementById('last-reply');
+        updateCounter(); // initial count on load
+        if (ta) {
+            ta.addEventListener('input', updateCounter);
+            ta.addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    document.getElementById('chatForm').requestSubmit();
+                }
+            });
+        }
+    });
+</script>
 
 
 {% endblock %}

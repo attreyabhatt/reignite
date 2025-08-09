@@ -82,7 +82,7 @@ def generate_reignite_comeback(last_text,platform,what_happened):
     # Compose OpenAI API call
     try:
         response = client.chat.completions.create(
-            model="gpt-5",  # Or "gpt-4" if preferred
+            model="gpt-4o",  # Or "gpt-4" if preferred
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}

@@ -8,3 +8,4 @@ requests
 django-allauth
 django-ratelimit
 dodopayments
+Pillow
