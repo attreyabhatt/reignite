@@ -46,7 +46,7 @@ def get_prompt_for_coach(coach, last_text, situation, her_info):
         - Make assumptions and tease.
 
         ## Conversation Categories & Rules
-        - **Cold Opener (just_matched):** Start with a playful, attention-grabbing opener that teases or references something from her profile.
+        - **Cold Opener (just_matched):** Start with a playful, attention-grabbing opener that teases or references something from her profile. Her profile - {her_info}
         - **Low-Effort Response (dry_reply):** If she gives a dry reply (e.g., “lol”, “yes”), playfully call her out or challenge her to up the energy.
         - _Examples:_
         1. "So you’re just going to disappear like the end of a mysterious French film?"
@@ -141,6 +141,7 @@ def get_prompt_for_coach(coach, last_text, situation, her_info):
 
         Messaging Strategies:
         - Respond naturally to her most recent reply, aligning with or gently amplifying her energy
+        - In the situation spark_interest: Use her profile details to craft a message that highlights shared interests or intriguing aspects of her personality. Her profile - {her_info}
         - If her message is playful, match or heighten the playfulness through a gentle tease or bold move
         - If her message is deep or thoughtful, reflect briefly and connect with vulnerability or a meaningful question
         - If her reply is dry, acknowledge it with humor or inject intrigue to spark her curiosity

@@ -65,8 +65,8 @@
                                 <option value="she_asked_question">She asked me a question</option>
                                 <option value="feels_like_interview">Conversation feels like an interview</option>
                                 <option value="sassy_challenge">She is being sassy or challenging</option>
-                                <option value="spark_deeper_conversation">Be sincere and vulnerable</option>
-                                <option value="pivot_conversation">Change the subject</option>
+                                <option value="spark_deeper_conversation">Want to be sincere and vulnerable</option>
+                                <option value="pivot_conversation">I want to change the topic</option>
                             </optgroup>
                         
                             <optgroup label="🔁 Recovery or Reigniting">
@@ -85,7 +85,7 @@
                     </div>
 
 
-                    <div class="mb-3">
+                    <div class="mb-3" id="her-info-div">
                         <label for="her-info" class="form-label fw-semibold">
                             <i class="fa-solid fa-user-secret me-1 text-secondary"></i> Her Information (optional)
                         </label>
@@ -554,5 +554,30 @@
     });
 </script>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const situationSelect = document.getElementById('situation');
+        const herInfoDiv = document.getElementById('her-info-div');
+
+        // Hide by default
+        herInfoDiv.style.display = 'none';
+
+        // Function to toggle visibility
+        function toggleHerInfo() {
+            const val = situationSelect.value;
+            if (val === 'just_matched' || val === 'spark_interest') {
+                herInfoDiv.style.display = 'block';
+            } else {
+                herInfoDiv.style.display = 'none';
+            }
+        }
+
+        // Initial check
+        toggleHerInfo();
+
+        // Listen for changes
+        situationSelect.addEventListener('change', toggleHerInfo);
+    });
+</script>
 
 {% endblock %}
