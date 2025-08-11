@@ -6,7 +6,7 @@ from django.dispatch import receiver
 
 class ChatCredit(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='chat_credit')
-    balance = models.PositiveIntegerField(default=5)  # Start with 5 free credits
+    balance = models.PositiveIntegerField(default=10)  # Start with 5 free credits
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
