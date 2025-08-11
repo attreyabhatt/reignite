@@ -65,7 +65,7 @@
                                 <option value="she_asked_question">She asked me a question</option>
                                 <option value="feels_like_interview">Conversation feels like an interview</option>
                                 <option value="sassy_challenge">She is being Sassy / Challenging</option>
-                                <option value="spark_deeper_conversation">I want to be sincere and vulnerable</option>
+                                <option value="spark_deeper_conversation">I want to be sincere / vulnerable</option>
                                 <option value="pivot_conversation">Change the topic</option>
                             </optgroup>
                         
@@ -98,7 +98,7 @@
 
 
                     <!-- Title and Screenshot Upload -->
-                    <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;">
+                    <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;" id="screenshot-upload">
                         <label for="formFile" class="form-label mt-2 fw-semibold">
                             <i class="me-1 text-success"></i> Upload Screenshot
                             <span class="small text-muted">(optional – for instant extracting messages)</span>
@@ -116,7 +116,7 @@
                     </div>
 
                     <!-- Conversation Paste Area -->
-                    <div class="mb-3">
+                    <div class="mb-3" id="conversation-paste-area">
                         <label for="last-reply" class="form-label fw-semibold">
                             <i class="me-1 text-warning"></i> Conversation
                         </label>
@@ -126,7 +126,7 @@
                     </div>
 
                     <!-- Submit -->
-                    <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex justify-content-between align-items-center" id="submit-area">
                         <button type="submit" class="btn btn-dark btn-lg px-4 rounded-pill shadow-sm" id="generate-btn">
                             <i class="fa fa-fire me-2"></i>Generate Reply
                         </button>
