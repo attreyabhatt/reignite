@@ -4,6 +4,8 @@ import json
 from .left_on_read import is_left_on_read
 client = OpenAI(api_key=config('GPT_API_KEY'))
 from .prompts import get_prompt_for_coach
+from typing import Dict, Any, Optional
+import tiktoken
 
 def generate_custom_response(last_text, situation, her_info):
     
@@ -14,7 +16,7 @@ def generate_custom_response(last_text, situation, her_info):
     "dry_reply": "alex",
     "she_asked_question": "matthew",
     "feels_like_interview": "mark",
-    "sassy_challenge": "todd",
+    "sassy_challenge": "shit_test",
     "spark_deeper_conversation": "logan",
     "pivot_conversation": "matthew",
     "left_on_read": "alex",
@@ -33,8 +35,13 @@ def generate_custom_response(last_text, situation, her_info):
     - "message": a string with the generated message
     - "confidence_score": a numeric value between 0 and 1 indicating your confidence in the message.
 
-    Do not use em dashes (—) in any of the messages.
-    
+    Rules:
+    - Do not use em dashes (—) in any of the messages.
+    - Favor assumptive or observational statements over direct questions to invite responses. Unless its a shit test - then each reply should be short, punchy, and clearly pass the shit test while inviting a response.
+    - When expressing curiosity, phrase it as a confident statement that invites her to respond, rather than asking directly.
+    - Message investment rule: Detect her average message length in the conversation and effort level, then reply one level lower on the scale (1–4). Never exceed her investment.
+      Unless it's a shit test - then each reply should be short, punchy, and clearly pass the shit test while inviting a response OR she’s at Level 1 — then match her length but add intrigue, challenge, playfulness
+
     Example:
     [
     {"message": "Did I just break your texting app or are you this mysterious?", "confidence_score": 0.95},
@@ -62,12 +69,13 @@ def generate_custom_response(last_text, situation, her_info):
     }
     
     success = False
+    usage_info: Optional[Dict[str, Any]] = None
     try:
         # effort, verbosity = SITUATION_TO_CONFIG.get(situation, ("medium", "low"))
         effort = "low"
         verbosity = "low"
         # use the mapped effort/verbosity instead of hardcoding 'low'
-        response = generate_gpt_response(system_prompt, user_prompt, effort=effort, verbosity=verbosity, model="gpt-5")
+        response, usage_info = generate_gpt_response(system_prompt, user_prompt, effort=effort, verbosity=verbosity, model="gpt-5")
 
         # Responses API helper – this is a plain string of the model’s text output
         ai_reply = (response.output_text or "").strip()
@@ -87,6 +95,9 @@ def generate_custom_response(last_text, situation, her_info):
             {"message": "We hit a hiccup generating replies. Try again in a moment.", "confidence_score": 0.0}
         ])
 
+    if usage_info:
+        print("[USAGE]", usage_info)
+        
     return ai_reply, success
 
 def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5"):
@@ -97,7 +108,43 @@ def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='l
         reasoning={"effort": effort},
         text={"verbosity": verbosity}
     )
+    
+    usage_info = extract_usage(response)
+    print(f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}")
 
-    return response
+    return response, usage_info
 
 
+def extract_usage(response):
+    """Safely extract usage info from a Responses API result."""
+    u = getattr(response, "usage", None)
+    if not u:
+        return {}
+
+    # Helper to get attributes if present, else dict keys, else default
+    def safe_get(obj, key, default=0):
+        if hasattr(obj, key):
+            return getattr(obj, key)
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return default
+
+    input_tokens = safe_get(u, "input_tokens")
+    output_tokens = safe_get(u, "output_tokens")
+    total_tokens = safe_get(u, "total_tokens", input_tokens + output_tokens)
+    reasoning_tokens = safe_get(u, "reasoning_tokens", 0)
+
+    # Prompt caching details (optional)
+    cached_tokens = 0
+    prompt_tokens_details = safe_get(u, "prompt_tokens_details", None)
+    if prompt_tokens_details:
+        cached_tokens = safe_get(prompt_tokens_details, "cached_tokens", 0)
+
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "total_tokens": total_tokens,
+        "cached_input_tokens": cached_tokens,
+        "uncached_input_tokens": max(input_tokens - cached_tokens, 0)
+    }

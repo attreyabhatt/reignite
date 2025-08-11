@@ -6,6 +6,7 @@ from reignitehome.utils.ip_check import get_client_ip
 from django.urls import reverse
 from reignitehome.models import TrialIP,ContactMessage
 from django_ratelimit.decorators import ratelimit
+from conversation.utils.custom_gpt import generate_custom_response
 
 def home(request):
     if 'chat_credits' not in request.session:
@@ -63,8 +64,10 @@ def ajax_reply_home(request):
         request.session['chat_credits'] = credits - 1
         credits_left = request.session['chat_credits']
         
-        custom_response = generate_reignite_comeback(last_text,platform,what_happened)
-        print(last_text)
+        # custom_response = generate_reignite_comeback(last_text,platform,what_happened)
+        custom_response,success = generate_custom_response(last_text, what_happened, '')
+
+        print(custom_response)
         response_data = {
         'custom': custom_response,
         'credits_left': credits_left,

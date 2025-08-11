@@ -2,7 +2,7 @@ import base64
 from openai import OpenAI
 from decouple import config
 import time
-
+from .custom_gpt import extract_usage
 client = OpenAI(api_key=config('GPT_API_KEY'))
 
 def extract_conversation_from_image(screenshot_file):
@@ -55,6 +55,8 @@ def extract_conversation_from_image(screenshot_file):
         text={"verbosity": verbosity}
     )
 
+    usage_info = extract_usage(resp)
+    print(f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}")
     output = resp.output_text.strip()
     end_time = time.time()
     elapsed = end_time - start_time
