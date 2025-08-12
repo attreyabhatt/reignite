@@ -42,6 +42,18 @@
         </footer>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('click', function (e) {
+            if (e.target.classList.contains('copy-btn')) {
+                const suggestionId = e.target.dataset.suggestionId || 'unknown';
+                gtag('event', 'copy_suggestion', {
+                    event_category: 'engagement',
+                    event_label: 'suggestion_' + suggestionId,
+                    value: 1
+                });
+            }
+        });
+    </script>
     {% block extra_scripts %}
     {% endblock %}
 </body>
