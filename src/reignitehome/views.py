@@ -65,7 +65,7 @@ def ajax_reply_home(request):
         credits_left = request.session['chat_credits']
         
         # custom_response = generate_reignite_comeback(last_text,platform,what_happened)
-        custom_response,success = generate_custom_response(last_text, what_happened, '')
+        custom_response,success = generate_reignite_comeback(last_text, platform, what_happened)
 
         print(custom_response)
         response_data = {

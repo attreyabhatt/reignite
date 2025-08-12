@@ -87,6 +87,58 @@ def generate_reignite_comeback(last_text,platform,what_happened):
     Verbosity:
     - Keep output minimal and focused on concise, impactful messaging.
     """
+    
+    left_on_red_prompt = f"""
+    You are my texting wingman.  
+    I will paste part of a conversation with a girl and optionally mention how long it has been since her last message.  
+
+    Step 1 — Infer internally:  
+    - Whether the conversation had been going well before the silence.  
+    - Whether my last text was bad, needy, awful, or creepy.  
+    - Whether the last text may have been too difficult for her to respond to.  
+    - Approximate time since her last reply using this logic:  
+    - Assume short gap if messages clearly flow in sequence without delay signals.  
+    - Assume long gap only if there’s wording/context that signals it (e.g., apologies for delay, topic reset, tone shift).  
+    - Default to Rule 2 if timing is unclear.  
+
+    Step 2 — Apply the correct rule:  
+
+    Rule 1 – Short gap, convo going well, last text fine  
+    Mindset: I am entitled to a response but not butthurt.  
+    Generate 3 short playful curiosity-provoking variations in the style of: “??” / “..?” / “👀” — minimal and casual.  
+
+    Rule 2 – >24 hours, default timing, or I’ve already sent a Rule 1 reply  
+    Mindset: Playfully call out her vanishing.  
+    Generate 3 teasing, lighthearted variations in the style of: “Dear Diary, cute girl vanished. Should I send a search party?” — avoid neediness.  
+
+    Rule 3 – Last text was too hard for her to respond to  
+    Mindset: Cute + funny, slightly self-deprecating, not butthurt.  
+    Randomly choose 3 unique lines from this variation bank (and rephrase them naturally each time):  
+    1. Think I accidentally hit the “mute” button on you 😅  
+    2. Hello? Echooo… nope, just me here.  
+    3. Are you blinking twice for “send help” or is that just slow texting? 😉  
+    4. Either my phone’s broken or you’ve gone full stealth mode 🥷  
+    5. I’ve decided you’re my pen pal now — 1 reply a month?  
+    6. Wow, you *really* took “playing hard to get” seriously 😂  
+    7. If this is a staring contest, you’re totally winning 👀  
+    8. Testing… testing… is this thing on? 🎤  
+    9. Are you charging per word? Because I can start a GoFundMe.  
+    10. Still waiting for your TED Talk on that last message 😏  
+
+    Rule 4 – Conversation dead for a long time (several days/weeks)  
+    Mindset: Bold, playful re-entry like you’re returning from an epic journey.  
+    Generate 3 cinematic, funny variations in the style of: “And just like that… I return from the shadows.” / “Sorry, got stuck in traffic… for 2 weeks.” / “Bet you didn’t expect a plot twist this late in the story.”  
+
+    Always:  
+    - Identify the correct rule internally (do not explain which one you chose).  
+    - Output only the 3 chosen variations.  
+    - Keep each variation short, natural, and in texting style.
+
+    # Inputs
+    - Situation that I need help with: {what_happened}
+    - Conversation so far: {last_text}
+    """
+
 
     user_prompt = """
     Respond only with a JSON array containing exactly three objects, following this structure for each:
@@ -95,9 +147,6 @@ def generate_reignite_comeback(last_text,platform,what_happened):
 
     Rules:
     - Do not use em dashes (—) in any of the messages.
-    - Favor assumptive or observational statements over direct questions to invite responses.
-    - When expressing curiosity, phrase it as a confident statement that invites her to respond, rather than asking directly.
-    - Do NOT suggest meeting in person, switching platforms, or exchanging contact info.
     
     Example:
     [
@@ -115,7 +164,7 @@ def generate_reignite_comeback(last_text,platform,what_happened):
         effort = "low"
         verbosity = "low"
         # use the mapped effort/verbosity instead of hardcoding 'low'
-        response = generate_gpt_response(system_prompt, user_prompt, effort=effort, verbosity=verbosity, model="gpt-5")
+        response = generate_gpt_response(left_on_red_prompt, user_prompt, effort=effort, verbosity=verbosity, model="gpt-5")
 
         # Responses API helper – this is a plain string of the model’s text output
         ai_reply = (response.output_text or "").strip()
@@ -125,7 +174,7 @@ def generate_reignite_comeback(last_text,platform,what_happened):
         else:
             # Fallback JSON (keeps your frontend parser happy)
             ai_reply = json.dumps([
-                {"message": "Sorry, I couldn't generate a comeback this time.", "confidence_score": 0.0},
+                {"message": "Sorry, I couldn't generate a response this time.", "confidence_score": 0.0},
                 {"message": "Want to try rephrasing the situation?", "confidence_score": 0.0},
                 {"message": "Or paste a bit more context from the chat.", "confidence_score": 0.0}
             ])
@@ -135,7 +184,7 @@ def generate_reignite_comeback(last_text,platform,what_happened):
             {"message": "We hit a hiccup generating replies. Try again in a moment.", "confidence_score": 0.0}
         ])
         
-    return ai_reply
+    return ai_reply,success
 
 def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5"):
     full_prompt = f"{system_prompt.strip()}\n\n{user_prompt.strip()}"

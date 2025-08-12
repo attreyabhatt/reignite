@@ -19,7 +19,7 @@ def generate_custom_response(last_text, situation, her_info):
     "sassy_challenge": "shit_test",
     "spark_deeper_conversation": "logan",
     "pivot_conversation": "matthew",
-    "left_on_read": "alex",
+    "left_on_read": "left_on_read_coach",
     "reviving_old_chat": "marc",
     "recovering_after_cringe": "ken",
     "ask_her_out": "corey",
@@ -27,7 +27,7 @@ def generate_custom_response(last_text, situation, her_info):
 }
     
     
-    coach_key = SITUATION_TO_COACH.get(situation, "marc")  # fallback to Marc
+    coach_key = SITUATION_TO_COACH.get(situation, "logan")  # fallback to Marc
     system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info)
     
     user_prompt = """
@@ -37,10 +37,7 @@ def generate_custom_response(last_text, situation, her_info):
 
     Rules:
     - Do not use em dashes (—) in any of the messages.
-    - Favor assumptive or observational statements over direct questions to invite responses. Unless its a shit test - then each reply should be short, punchy, and clearly pass the shit test while inviting a response.
-    - When expressing curiosity, phrase it as a confident statement that invites her to respond, rather than asking directly.
-    - Message investment rule: Detect her average message length in the conversation and effort level, then reply one level lower on the scale (1–4). Never exceed her investment.
-      Unless it's a shit test - then each reply should be short, punchy, and clearly pass the shit test while inviting a response OR she’s at Level 1 — then match her length but add intrigue, challenge, playfulness
+    - Keep each variation short, natural, and in texting style.
 
     Example:
     [
