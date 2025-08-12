@@ -25,6 +25,14 @@
 
         gtag('config', 'G-5KFLPTVDQ7');
     </script>
+    <style>
+        .navbar-brand svg path[fill^="var(--tat-accent)"] { transition: transform .2s ease; transform-origin: 75% 35%; }
+        @media (prefers-reduced-motion: reduce) {
+        .navbar-brand svg path[fill^="var(--tat-accent)"] { transition: none; }
+        }
+        .navbar-brand:hover svg path[fill^="var(--tat-accent)"] { transform: scale(1.06); }
+
+    </style>
     {% block extra_head %}
 
 
