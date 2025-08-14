@@ -6,9 +6,11 @@ from .custom_gpt import extract_usage
 client = OpenAI(api_key=config('GPT_API_KEY'))
 
 def extract_conversation_from_image(screenshot_file):
-    
+    # with open(screenshot_file, "rb") as f:
+    #     img_bytes = f.read()
+        
+    # mime = "image/jpeg"  # since your file is a JPEG
     img_bytes = screenshot_file.read()
-    # img_bytes, mime = preprocess_image_bytes(img_bytes)
     mime = screenshot_file.content_type or "image/png"
     b64 = base64.b64encode(img_bytes).decode("utf-8")
     data_url = f"data:{mime};base64,{b64}"

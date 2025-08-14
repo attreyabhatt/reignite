@@ -27,15 +27,47 @@ SECRET_KEY = config("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DJANGO_DEBUG",cast=bool, default=False)
 
+# Behind DO App Platform / proxies
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 ALLOWED_HOSTS = [
-    "*",
+    "tryagaintext-app-k6uby.ondigitalocean.app",
+    "tryagaintext.com",
+    "www.tryagaintext.com"
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+        "https://tryagaintext.com",
+        "https://www.tryagaintext.com",
+        "https://tryagaintext-app-k6uby.ondigitalocean.app",
+]
+
+# HTTPS hardening
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
 
 if DEBUG:
     ALLOWED_HOSTS += [
         "127.0.0.1",
         "localhost"
     ]
+    
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "https://tryagaintext-app-k6uby.ondigitalocean.app",
+    ]
+    
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
 
 
 # Application definition
