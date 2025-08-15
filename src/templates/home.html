@@ -351,191 +351,230 @@
 
 
 <!-- JS -->
-
 <script>
-    const csrfToken = '{{ csrf_token }}';
+    document.addEventListener('DOMContentLoaded', function () {
+        // Pull CSRF from the hidden input rendered by {% csrf_token %}
+        const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
 
-    document.getElementById('chatForm').addEventListener('submit', function (e) {
-        e.preventDefault();
+        // Cache DOM
+        const form = document.getElementById('chatForm');
+        const generateBtn = document.getElementById('generate-btn');
 
-        document.getElementById('suggestedReplyMsg').innerHTML = `
-            <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
-            <span class="ms-2 text-muted">Generating your texts…</span>
+        const responseArea = document.getElementById('responseArea');
+        const card1 = document.getElementById('suggestedReply');
+        const card2 = document.getElementById('suggestedReply2');
+        const card3 = document.getElementById('suggestedReply3');
+
+        const msg1 = document.getElementById('suggestedReplyMsg');
+        const score1 = document.getElementById('suggestedReplyScore');
+        const msg2 = document.getElementById('suggestedReplyMsg2');
+        const score2 = document.getElementById('suggestedReplyScore2');
+        const msg3 = document.getElementById('suggestedReplyMsg3');
+        const score3 = document.getElementById('suggestedReplyScore3');
+
+        // Keep everything hidden on load (matches your markup)
+        if (responseArea) responseArea.style.display = 'none';
+        if (card1) card1.style.display = 'none';
+        if (card2) card2.style.display = 'none';
+        if (card3) card3.style.display = 'none';
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // Disable button + inline spinner
+            const oldBtnHTML = generateBtn.innerHTML;
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = `<span class="spinner-border spinner-border-sm align-middle" role="status"></span>
+                               <span class="ms-2">Generating…</span>`;
+
+            // Show ONLY Card #1 with "Generating your texts…" right away
+            if (responseArea) responseArea.style.display = 'block';
+            if (card1) card1.style.display = 'block';
+            if (card2) card2.style.display = 'none';
+            if (card3) card3.style.display = 'none';
+
+            if (msg1) {
+                msg1.innerHTML = `
+          <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
+          <span class="ms-2 text-muted">Generating your texts…</span>
         `;
-
-        document.getElementById('responseArea').style.display = 'block';
-        var suggestedReply = document.getElementById("suggestedReply");
-        suggestedReply.style.display = "block"
-        let last_reply = document.getElementById('last-reply').value;
-        let platform = document.getElementById('platform').value;
-        let what_happened = document.getElementById('what-happened').value;
-
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-
-        fetch("{% url 'ajax_reply_home' %}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify({
-                last_text: last_reply,
-                platform: platform,
-                what_happened: what_happened
-            })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url + '?next=/&message=out_of_credits';
-                    return;
-                }
-
-                
-
-                // --- CUSTOM AI RESPONSE HANDLING ---
-                let customResponse = data.custom;
-
-                // Remove "json" prefix (case-insensitive), and trim
-                customResponse = customResponse.replace(/^json\s*/i, '').trim();
-
-                // Now, customResponse should start with '[' and end with ']'
-                if (!customResponse.startsWith('[')) {
-                    // Try to extract JSON array with regex as fallback
-                    const match = customResponse.match(/\[.*\]/s);
-                    if (match) {
-                        customResponse = match[0];
-                    }
-                }
-
-                // Try to parse, and handle any errors
-                let suggestions;
-                try {
-                    suggestions = JSON.parse(customResponse);
-                    // Now you can safely use the array
-                } catch (e) {
-                    alert('Parse error: ' + e.message);
-                    console.error('Could not parse:', customResponse, e);
-                    // Fallback: Show the raw string
-                    document.getElementById('suggestedReply').innerHTML = `<span>${customResponse}</span>`;
-                    document.getElementById('suggestedReply2').style.display = "none";
-                    document.getElementById('suggestedReply3').style.display = "none";
-                    return;
-                }
-
-
-                if (Array.isArray(suggestions) && suggestions.length > 0) {
-                    // Reply 1
-
-                    const msg1 = document.getElementById('suggestedReplyMsg');
-                    const score1 = document.getElementById('suggestedReplyScore');
-                    if (msg1) msg1.innerText = suggestions[0].message;
-                    if (score1) score1.innerText = `Confidence: ${Math.round(suggestions[0].confidence_score * 100)}%`;
-
-                    // Reply 2
-                    if (suggestions[1]) {
-                        document.getElementById('suggestedReply2').style.display = "block";
-                        const msg2 = document.getElementById('suggestedReplyMsg2');
-                        const score2 = document.getElementById('suggestedReplyScore2');
-                        if (msg2) msg2.innerText = suggestions[1].message;
-                        if (score2) score2.innerText = `Confidence: ${Math.round(suggestions[1].confidence_score * 100)}%`;
-                    } else {
-                        document.getElementById('suggestedReply2').style.display = "none";
-                    }
-
-                    // Reply 3
-                    if (suggestions[2]) {
-                        document.getElementById('suggestedReply3').style.display = "block";
-                        const msg3 = document.getElementById('suggestedReplyMsg3');
-                        const score3 = document.getElementById('suggestedReplyScore3');
-                        if (msg3) msg3.innerText = suggestions[2].message;
-                        if (score3) score3.innerText = `Confidence: ${Math.round(suggestions[2].confidence_score * 100)}%`;
-                    } else {
-                        document.getElementById('suggestedReply3').style.display = "none";
-                    }
-                } else {
-                    document.getElementById('suggestedReply').innerHTML = `<span>No suggestions available.</span>`;
-                    document.getElementById('suggestedReply2').style.display = "none";
-                    document.getElementById('suggestedReply3').style.display = "none";
-                }
-
-
-                document.getElementById('chatCredits').innerText = "Chat Credits: " + data.credits_left;
-                document.getElementById('chatCredits').innerText = data.credits_left;
-
-            })
-            .catch(error => {
-                alert("Error generating reply.");
-                console.error(error);
-            });
-    });
-</script>
-
-<!-- Screenshot ocr -->
-<script>
-    const fileInput = document.getElementById('formFile').addEventListener('change', function (e) {
-        const fileInput = e.target;
-        const file = fileInput.files[0];
-        if (!file) return;
-
-        // Show spinner/status
-        document.getElementById('ocr-status').style.display = 'inline-flex';
-
-        const formData = new FormData();
-        formData.append('screenshot', file);
-
-        fetch("/conversations/ocr-screenshot/", {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrfToken
-            },
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
-                if (data.ocr_text) {
-                    const lastReply = document.getElementById('last-reply');
-                    if (lastReply.value.trim()) {
-                        lastReply.value = lastReply.value.trim() + "\n\n" + data.ocr_text;
-                    } else {
-                        lastReply.value = data.ocr_text;
-                    }
-                } else {
-                    alert(data.error || "Failed to extract text from image.");
-                }
-                fileInput.value = '';
-            })
-            .catch(() => {
-                document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
-                alert("Failed to OCR the screenshot.");
-                fileInput.value = '';
-            });
-    });
-
-
-</script>
-
-<!-- copied -->
-<script>
-    function copyToClipboard(elementId, btn) {
-        const text = document.getElementById(elementId).innerText;
-        navigator.clipboard.writeText(text).then(function () {
-            // Show the "Copied!" tooltip
-            const tooltip = btn.querySelector('.copied-tooltip');
-            if (tooltip) {
-                tooltip.style.display = 'inline-block';
-                setTimeout(() => {
-                    tooltip.style.display = 'none';
-                }, 1000); // 1 second
             }
+            if (score1) score1.innerText = '';
+
+            // Gather inputs
+            const last_reply = document.getElementById('last-reply').value;
+            const platform = document.getElementById('platform').value;
+            const what_happened = document.getElementById('what-happened').value;
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            fetch("{% url 'ajax_reply_home' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    last_text: last_reply,
+                    platform: platform,
+                    what_happened: what_happened
+                })
+            })
+                .then(async (response) => {
+                    const data = await response.json().catch(() => null);
+
+                    // Out-of-credits path your backend returns
+                    if (data && data.redirect_url) {
+                        window.location.href = data.redirect_url + '?next=/&message=out_of_credits';
+                        throw 'redirected';
+                    }
+
+                    // Show server-provided error (views return 'error' for bad requests/AI failure)
+                    if (!response.ok || (data && data.error)) {
+                        const msg = (data && data.error) ? data.error : `Error ${response.status}`;
+                        throw new Error(msg);
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    // Parse the custom suggestions payload your view returns (custom + credits_left)
+                    // views.py sends: {'custom': <string>, 'credits_left': <int>, ...} :contentReference[oaicite:3]{index=3}
+                    let customResponse = data.custom;
+                    if (typeof customResponse !== 'string') {
+                        throw new Error('Unexpected response format from server.');
+                    }
+
+                    // Remove possible "json" prefix and try to coerce to a JSON array
+                    customResponse = customResponse.replace(/^json\s*/i, '').trim();
+                    if (!customResponse.startsWith('[')) {
+                        const match = customResponse.match(/\[.*\]/s);
+                        if (match) customResponse = match[0];
+                    }
+
+                    let suggestions;
+                    try {
+                        suggestions = JSON.parse(customResponse);
+                    } catch (e) {
+                        throw new Error('Could not parse AI response. ' + e.message);
+                    }
+
+                    // After success: SHOW ALL THREE CARDS (as requested), fill with fallbacks if missing
+                    if (responseArea) responseArea.style.display = 'block';
+                    card1.style.display = 'block';
+                    card2.style.display = 'block';
+                    card3.style.display = 'block';
+
+                    const s1 = suggestions?.[0] || {};
+                    const s2 = suggestions?.[1] || {};
+                    const s3 = suggestions?.[2] || {};
+
+                    msg1.innerText = s1.message || '—';
+                    score1.innerText = (typeof s1.confidence_score === 'number')
+                        ? `Confidence: ${Math.round(s1.confidence_score * 100)}%`
+                        : '';
+
+                    msg2.innerText = s2.message || '—';
+                    score2.innerText = (typeof s2.confidence_score === 'number')
+                        ? `Confidence: ${Math.round(s2.confidence_score * 100)}%`
+                        : '';
+
+                    msg3.innerText = s3.message || '—';
+                    score3.innerText = (typeof s3.confidence_score === 'number')
+                        ? `Confidence: ${Math.round(s3.confidence_score * 100)}%`
+                        : '';
+
+                    // Update credits (your span is already next to “Chat Credits:”)
+                    if (typeof data.credits_left !== 'undefined') {
+                        document.getElementById('chatCredits').innerText = data.credits_left;
+                    }
+                })
+                .catch((err) => {
+                    if (err === 'redirected') return;
+
+                    // Show the precise error text from the server (e.g., AI fail / invalid / unauthorized)
+                    alert(err?.message || 'Error generating reply.');
+
+                    // Revert to pre-submit look: keep only Card #1 visible with default copy
+                    if (msg1) msg1.innerText = 'No response has been generated yet';
+                    if (score1) score1.innerText = '';
+                    card2.style.display = 'none';
+                    card3.style.display = 'none';
+                    // Optionally hide the whole area on error — comment the next line if you prefer to keep it visible
+                    // responseArea.style.display = 'none';
+                })
+                .finally(() => {
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = oldBtnHTML;
+                });
         });
-    }
 
+        // Screenshot OCR (left intact, just uses the same CSRF + better error surfacing)
+        document.getElementById('formFile').addEventListener('change', function (e) {
+            const inputEl = e.target;
+            const file = inputEl.files?.[0];
+            if (!file) return;
 
+            const ocrStatus = document.getElementById('ocr-status');
+            if (ocrStatus) ocrStatus.style.display = 'inline-flex';
+
+            const formData = new FormData();
+            formData.append('screenshot', file);
+
+            fetch("/conversations/ocr-screenshot/", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData
+            })
+                .then(async (response) => {
+                    const data = await response.json().catch(() => null);
+                    if (!response.ok || (data && data.error)) {
+                        // Same redirect/error pattern as your backend provides for OCR too :contentReference[oaicite:4]{index=4}
+                        if (data && data.redirect_url) {
+                            window.location.href = data.redirect_url;
+                            throw 'redirected';
+                        }
+                        const msg = (data && data.error) ? data.error : `OCR failed (status ${response.status})`;
+                        throw new Error(msg);
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    if (ocrStatus) ocrStatus.style.display = 'none';
+                    if (data.ocr_text) {
+                        const lastReply = document.getElementById('last-reply');
+                        if (lastReply.value.trim()) {
+                            lastReply.value = lastReply.value.trim() + "\n\n" + data.ocr_text;
+                        } else {
+                            lastReply.value = data.ocr_text;
+                        }
+                    } else {
+                        throw new Error("Failed to extract text from image.");
+                    }
+                })
+                .catch((err) => {
+                    if (err === 'redirected') return;
+                    if (ocrStatus) ocrStatus.style.display = 'none';
+                    alert(err?.message || "Failed to OCR the screenshot.");
+                })
+                .finally(() => {
+                    inputEl.value = '';
+                });
+        });
+
+        // Copy helper (same as yours)
+        window.copyToClipboard = function (elementId, btn) {
+            const text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text).then(function () {
+                const tooltip = btn.querySelector('.copied-tooltip');
+                if (tooltip) {
+                    tooltip.style.display = 'inline-block';
+                    setTimeout(() => { tooltip.style.display = 'none'; }, 1000);
+                }
+            });
+        };
+    });
 </script>
+
+
 
 {% endblock %}

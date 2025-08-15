@@ -194,184 +194,130 @@
 <!-- JS -->
 
 <script>
+    const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('chatForm');
+        const generateBtn = document.getElementById('generate-btn') || form.querySelector('button[type="submit"]');
 
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        // Cards & fields
+        const responseArea = document.getElementById('responseArea');
+        const card1 = document.getElementById('suggestedReply');
+        const card2 = document.getElementById('suggestedReply2');
+        const card3 = document.getElementById('suggestedReply3');
+        const msg1 = document.getElementById('suggestedReplyMsg');
+        const score1 = document.getElementById('suggestedReplyScore');
+        const msg2 = document.getElementById('suggestedReplyMsg2');
+        const score2 = document.getElementById('suggestedReplyScore2');
+        const msg3 = document.getElementById('suggestedReplyMsg3');
+        const score3 = document.getElementById('suggestedReplyScore3');
 
-    // Handle form submission for generating a reply
-    document.getElementById('chatForm').addEventListener('submit', function (e) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // Disable button + spinner
+            const oldBtnHTML = generateBtn ? generateBtn.innerHTML : '';
+            if (generateBtn) {
+                generateBtn.disabled = true;
+                generateBtn.setAttribute('aria-busy', 'true');
+                generateBtn.innerHTML = `<span class="spinner-border spinner-border-sm align-middle" role="status"></span>
+                                 <span class="ms-2">Generating…</span>`;
+            }
 
-        e.preventDefault();
-        document.getElementById('suggestedReplyMsg').innerHTML = `
-            <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
-            <span class="ms-2 text-muted">Generating your texts…</span>
+            // Immediately show ONLY card #1 with “Generating…”
+            if (card1) card1.style.display = 'block';
+            if (card2) card2.style.display = 'none';
+            if (card3) card3.style.display = 'none';
+            if (msg1) {
+                msg1.innerHTML = `
+          <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
+          <span class="ms-2 text-muted">Generating your texts…</span>
         `;
+            }
+            if (score1) score1.innerText = '';
 
-        let girl_title = ""; // will be auto-generated
-        let last_reply = document.getElementById('last-reply').value;
-        let situation = document.getElementById('situation').value;
-        let her_info = document.getElementById('her_info').value;
+            const payload = {
+                last_text: document.getElementById('last-reply')?.value || '',
+                situation: document.getElementById('situation')?.value || '',
+                her_info: document.getElementById('her_info')?.value || ''
+            };
 
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
+            fetch("{% url 'ajax_reply' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            })
+                .then(async (response) => {
+                    const data = await response.json().catch(() => null);
+
+                    if (data && data.redirect_url) { // out-of-credits path
+                        window.location.href = data.redirect_url;
+                        throw 'redirected';
+                    }
+
+                    if (!response.ok || (data && data.error)) {
+                        const msg = (data && data.error) ? data.error : `Error ${response.status}`;
+                        throw new Error(msg);
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    // Parse the AI suggestions from data.custom safely
+                    let custom = data.custom;
+                    if (typeof custom !== 'string') throw new Error('Unexpected response format from server.');
+                    custom = custom.replace(/^json\s*/i, '').trim();
+                    if (!custom.startsWith('[')) { const m = custom.match(/\[.*\]/s); if (m) custom = m[0]; }
+
+                    let suggestions;
+                    try { suggestions = JSON.parse(custom); }
+                    catch (e) { throw new Error('Could not parse AI response. ' + e.message); }
+
+                    // Show ALL 3 cards (fill placeholders if missing)
+                    if (responseArea) responseArea.style.display = 'block';
+                    card1.style.display = 'block';
+                    card2.style.display = 'block';
+                    card3.style.display = 'block';
+
+                    const s1 = suggestions?.[0] || {};
+                    const s2 = suggestions?.[1] || {};
+                    const s3 = suggestions?.[2] || {};
+
+                    msg1.innerText = s1.message || '—';
+                    score1.innerText = (typeof s1.confidence_score === 'number') ? `Confidence: ${Math.round(s1.confidence_score * 100)}%` : '';
+
+                    msg2.innerText = s2.message || '—';
+                    score2.innerText = (typeof s2.confidence_score === 'number') ? `Confidence: ${Math.round(s2.confidence_score * 100)}%` : '';
+
+                    msg3.innerText = s3.message || '—';
+                    score3.innerText = (typeof s3.confidence_score === 'number') ? `Confidence: ${Math.round(s3.confidence_score * 100)}%` : '';
+
+                    if (typeof data.credits_left !== 'undefined') {
+                        const creditsEl = document.getElementById('chatCredits');
+                        if (creditsEl) creditsEl.innerText = data.credits_left;
+                    }
+                })
+                .catch((err) => {
+                    if (err === 'redirected') return;
+                    alert(err?.message || 'Error generating reply.');
+
+                    // Revert to “idle” in card #1
+                    if (msg1) msg1.innerText = 'No response has been generated yet';
+                    if (score1) score1.innerText = '';
+                    if (card2) card2.style.display = 'none';
+                    if (card3) card3.style.display = 'none';
+                })
+                .finally(() => {
+                    if (generateBtn) {
+                        generateBtn.disabled = false;
+                        generateBtn.removeAttribute('aria-busy');
+                        generateBtn.innerHTML = oldBtnHTML;
+                    }
+                });
         });
-
-        fetch("{% url 'ajax_reply' %}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify({
-                last_text: last_reply,
-                girl_title: girl_title,
-                situation: situation,
-                her_info: her_info
-            })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                    return;
-                }
-                document.getElementById('responseArea').style.display = 'block';
-
-                // --- CUSTOM AI RESPONSE HANDLING ---
-                let customResponse = data.custom;
-
-                // Remove "json" prefix (case-insensitive), and trim
-                customResponse = customResponse.replace(/^json\s*/i, '').trim();
-
-                // Now, customResponse should start with '[' and end with ']'
-                if (!customResponse.startsWith('[')) {
-                    // Try to extract JSON array with regex as fallback
-                    const match = customResponse.match(/\[.*\]/s);
-                    if (match) {
-                        customResponse = match[0];
-                    }
-                }
-
-                // Try to parse, and handle any errors
-                let suggestions;
-                try {
-                    suggestions = JSON.parse(customResponse);
-                    console.log(suggestions)
-                    // Now you can safely use the array
-                } catch (e) {
-                    alert('Parse error: ' + e.message);
-                    console.error('Could not parse:', customResponse, e);
-                    // Fallback: Show the raw string
-                    document.getElementById('suggestedReply').innerHTML = `<span>${customResponse}</span>`;
-                    document.getElementById('suggestedReply2').style.display = "none";
-                    document.getElementById('suggestedReply3').style.display = "none";
-                    return;
-                }
-
-
-                if (Array.isArray(suggestions) && suggestions.length > 0) {
-                    // Reply 1
-
-                    const msg1 = document.getElementById('suggestedReplyMsg');
-                    const score1 = document.getElementById('suggestedReplyScore');
-                    if (msg1) msg1.innerText = suggestions[0].message;
-                    if (score1) score1.innerText = `Confidence: ${Math.round(suggestions[0].confidence_score * 100)}%`;
-                    document.getElementById('suggestedReplyScore').style.display = "block";
-
-                    // Reply 2
-                    if (suggestions[1]) {
-                        document.getElementById('suggestedReply2').style.display = "block";
-                        const msg2 = document.getElementById('suggestedReplyMsg2');
-                        const score2 = document.getElementById('suggestedReplyScore2');
-                        if (msg2) msg2.innerText = suggestions[1].message;
-                        if (score2) score2.innerText = `Confidence: ${Math.round(suggestions[1].confidence_score * 100)}%`;
-                    } else {
-                        document.getElementById('suggestedReply2').style.display = "none";
-                    }
-
-                    // Reply 3
-                    if (suggestions[2]) {
-                        document.getElementById('suggestedReply3').style.display = "block";
-                        const msg3 = document.getElementById('suggestedReplyMsg3');
-                        const score3 = document.getElementById('suggestedReplyScore3');
-                        if (msg3) msg3.innerText = suggestions[2].message;
-                        if (score3) score3.innerText = `Confidence: ${Math.round(suggestions[2].confidence_score * 100)}%`;
-                    } else {
-                        document.getElementById('suggestedReply3').style.display = "none";
-                    }
-                } else {
-                    document.getElementById('suggestedReply').innerHTML = `<span>No suggestions available.</span>`;
-                    document.getElementById('suggestedReply2').style.display = "none";
-                    document.getElementById('suggestedReply3').style.display = "none";
-                }
-
-                document.getElementById('chatCredits').innerText = "Chat Credits: " + data.credits_left;
-
-                // If a new conversation was created, add it to the sidebar instantly
-                if (data.new_conversation) {
-                    const ul = document.querySelector('.list-group');
-                    if (ul) {
-                        // Create a new <a> element with inner HTML (matches Django template)
-                        const a = document.createElement('a');
-                        a.href = "#";
-                        a.className = "list-group-item list-group-item-action list-group-item-light convo-link";
-                        a.setAttribute('data-id', data.new_conversation.id);
-
-                        // Inner HTML with delete button
-                        a.innerHTML = `
-                            <div class="d-flex w-100 justify-content-between align-items-center">
-                                <span>${data.new_conversation.girl_title}</span>
-                                <button class="btn btn-sm btn-link text-danger delete-convo-btn" data-id="${data.new_conversation.id}" title="Delete">
-                                    <span aria-hidden="true">&times;</span>
-                                </button>
-                            </div>
-                        `;
-
-                        // Add click handler for loading the conversation
-                        a.addEventListener('click', function (e) {
-                            // Prevent delete button from triggering this event!
-                            if (e.target.closest('.delete-convo-btn')) return;
-
-                            e.preventDefault();
-                            const convoId = this.getAttribute('data-id');
-                            fetch(`/conversations/detail/${convoId}/`, {
-                                headers: {
-                                    'X-CSRFToken': csrfToken
-                                }
-                            })
-                                .then(response => response.json())
-                                .then(data => {
-                                    if (data.error) {
-                                        alert('Could not load conversation.');
-                                        return;
-                                    }
-                                    alert(data.her_info);
-                                    document.getElementById('last-reply').value = data.content;
-                                    document.getElementById('situation').value = data.situation || 'just_matched';
-                                    document.getElementById('her_info').value = data.her_info ;
-                                    document.getElementById('suggestedReplyMsg').innerHTML = 'No response has been generated yet';
-                                    document.getElementById("suggestedReply2").style.display = "none";
-                                    document.getElementById("suggestedReply3").style.display = "none";
-
-
-                                })
-                                .catch(() => alert('Failed to load conversation.'));
-                        });
-
-                        // Add new conversation link at the top of the sidebar
-                        ul.insertBefore(a, ul.firstChild);
-                    }
-                }
-
-
-
-            })
-            .catch(error => {
-                alert("AI failed to generate a proper response. Try again. No credit deducted");
-                console.error(error);
-            });
     });
 
+
+
+    
     // Attach event listeners to all sidebar conversation links (for initial page load)
     document.querySelectorAll('.convo-link').forEach(function (link) {
         link.addEventListener('click', function (e) {
