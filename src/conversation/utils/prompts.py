@@ -172,7 +172,6 @@ def get_prompt_for_coach(coach, last_text, situation, her_info):
 
         Inputs Provided:
         - Current situation: {situation}
-        - Her profile (optional, for spark_interest): {her_info}
         - Conversation so far (use the latest turn for anchors/callbacks): {last_text}
 
         Disallowed phrasings (to avoid templated feel):
@@ -419,8 +418,58 @@ def get_prompt_for_coach(coach, last_text, situation, her_info):
         - Situation that I need help with: {situation}
         - Conversation so far: {last_text}
         """
-
         
+        opener_prompt = """
+        You are an assistant that generates dating app openers.
+
+        You have 3 lists of openers:
+
+        type1 = [
+        "you're adorable...fingers crossed you are not crazy 🤞",
+        "Cute smile… dangerous for productivity, but I’ll allow it.",
+        "You look normal… which is suspicious 👀",
+        "You look like someone who’d be fun… and slightly exhausting",
+        "You look like fun… exhausting, but fun ;)",
+        "You seem normal… but then again, so did my ex"
+        ]
+
+        type2 = [
+        "Um, hi. I feel you appear attractive and consequently I would like to explore the possibility of enhancing your life by means of exposure to my awesomeness. K, thanks bye.",
+        "Adorable profile pic… but let’s be honest, how much of it is just filters and witchcraft?",
+        "You seem normal… but that’s usually how the best Netflix true crime documentaries start 😏",
+        "So we matched… the algorithm clearly has a twisted sense of humor."
+        ]
+
+        type3 = [
+        "Hey, Maya, cool that we matched. So is this the part where we start a whirlwind romance and get married and divorced way too fast ;)",
+        "Hey, Maya, cool that we matched. Are we doing the whirlwind romance, the impulsive wedding, and the bitter divorce all in one season?",
+        "Hey, Maya, cool that we matched. So is this the part where we fall for each other instantly, tie the knot too soon, and then argue over who gets custody of the dog?",
+        "Hey, Maya, cool that we matched. We could be the couple everyone envies… until the divorce lawyers get all our money",
+        "Hey, Maya, cool that we matched. So is this the part where we have instant chemistry, take dreamy vows and then have bitter divorce… at least the wedding photos will slap."
+        ]
+
+        Instructions:
+        1. Select exactly one opener from each type (type1, type2, type3).  
+        2. Base your choices on any profile information or conversation context if provided.  
+        - Example: if the profile mentions desserts → favor the dessert line from type1.  
+        - If the person looks very polished → the "filters and witchcraft" line in type2 may fit.  
+        3. If no profile info or conversation context is given, always use a random opener from each type. 
+
+        # Output
+        Respond only with a JSON array containing exactly three objects, following this structure for each:
+        - "message": a string with the message
+        - "confidence_score": a random value between 0.8 and 1 indicating your confidence in the message.
+
+        Example:
+        [
+        {"message": "you're adorable...fingers crossed you are not crazy 🤞?", "confidence_score": 0.95},
+        {"message": "Um, hi. I feel you appear attractive and consequently I would like to explore the possibility of enhancing your life by means of exposure to my awesomeness. K, thanks bye.", "confidence_score": 0.90},
+        {"message": "Hey, Maya, cool that we matched. So is this the part where we start a whirlwind romance and get married and divorced way too fast ;)", "confidence_score": 0.88}
+        ]
+
+        Begin by reviewing your planned output for strict schema alignment. Respond with only the JSON array; do not include any extra explanation or text.
+        """
+
         if coach == "marc":
                 return marc_prompt
         elif coach == "logan":
@@ -441,5 +490,7 @@ def get_prompt_for_coach(coach, last_text, situation, her_info):
                 return shit_test_prompt
         elif coach == "left_on_read_coach":
                 return left_on_red_prompt
+        elif coach == "opener_coach":
+                return opener_prompt
         else:
                 return marc_prompt

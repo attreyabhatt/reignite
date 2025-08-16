@@ -85,7 +85,7 @@
                     </div>
 
 
-                    <div class="mb-3" id="her-info-div">
+                    <div class="mb-3" id="her-info-div" style="display: none;">
                         <label for="her-info" class="form-label fw-semibold">
                             <i class="fa-solid fa-user-secret me-1 text-secondary"></i> Her Information (optional)
                         </label>
@@ -505,16 +505,15 @@
         const situationSelect = document.getElementById('situation');
         const herInfoDiv = document.getElementById('her-info-div');
 
-        // Hide by default
-        herInfoDiv.style.display = 'none';
-
         // Function to toggle visibility
         function toggleHerInfo() {
             const val = situationSelect.value;
-            if (val === 'just_matched' || val === 'spark_interest') {
-                herInfoDiv.style.display = 'block';
+            if (val === 'just_matched') {
+                document.getElementById('screenshot-upload').style.display = 'none';
+                document.getElementById('conversation-paste-area').style.display = 'none';
             } else {
-                herInfoDiv.style.display = 'none';
+                document.getElementById('screenshot-upload').style.display = 'block';
+                document.getElementById('conversation-paste-area').style.display = 'block';
             }
         }
 

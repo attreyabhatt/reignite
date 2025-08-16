@@ -10,7 +10,7 @@ import tiktoken
 def generate_custom_response(last_text, situation, her_info):
     
     SITUATION_TO_COACH = {
-    "just_matched": "marc",
+    "just_matched": "opener_coach",
     "spark_interest": "matthew",
     "stuck_after_reply": "matthew",
     "dry_reply": "alex",
@@ -72,7 +72,7 @@ def generate_custom_response(last_text, situation, her_info):
         effort = "low"
         verbosity = "low"
         # use the mapped effort/verbosity instead of hardcoding 'low'
-        response, usage_info = generate_gpt_response(system_prompt, user_prompt, effort=effort, verbosity=verbosity, model="gpt-5")
+        response, usage_info = generate_gpt_response(system_prompt, user_prompt, effort=effort, verbosity=verbosity, model="gpt-5",situation=situation, her_info=her_info)
 
         # Responses API helper – this is a plain string of the model’s text output
         ai_reply = (response.output_text or "").strip()
@@ -97,8 +97,11 @@ def generate_custom_response(last_text, situation, her_info):
         
     return ai_reply, success
 
-def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5"):
+def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5", situation='', her_info=''):
     full_prompt = f"{system_prompt.strip()}\n\n{user_prompt.strip()}"
+    if situation == "just_matched":
+        full_prompt = system_prompt
+
     response = client.responses.create(
         model=model,
         input=full_prompt,
