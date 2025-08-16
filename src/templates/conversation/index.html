@@ -291,9 +291,10 @@
                     score3.innerText = (typeof s3.confidence_score === 'number') ? `Confidence: ${Math.round(s3.confidence_score * 100)}%` : '';
 
                     if (typeof data.credits_left !== 'undefined') {
-                        const creditsEl = document.getElementById('chatCredits');
-                        if (creditsEl) creditsEl.innerText = data.credits_left;
+                        const creditsCountEl = document.getElementById('chatCreditsCount');
+                        if (creditsCountEl) creditsCountEl.innerText = data.credits_left;
                     }
+
                 })
                 .catch((err) => {
                     if (err === 'redirected') return;
