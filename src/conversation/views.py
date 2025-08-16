@@ -78,7 +78,7 @@ def ajax_reply(request):
     her_info = (data.get('her_info') or "").strip()
 
     # ---- Validation ----
-    if len(last_text) < 5:
+    if not last_text and situation != "just_matched":
         return _json_error("Conversation text is required.")
     if len(last_text) > MAX_LAST_TEXT:
         return _json_error(f"Conversation is too long (>{MAX_LAST_TEXT} chars). Please shorten it.")
