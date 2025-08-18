@@ -43,12 +43,14 @@
                 </li>
                 <!-- Chat Credits -->
                 <li class="nav-item d-flex align-items-center">
+                    <a href="{% url 'pricing:pricing' %}">
                     <span class="nav-link disabled" tabindex="-1" aria-disabled="true">
                     <span class="badge bg-success ms-2 p-2" >
-                        Chat Credits: <span id="chatCreditsCount">{{ request.user.chat_credit.balance }}</span>
+                    Chat Credits: <span id="chatCreditsCount">{{ request.user.chat_credit.balance }}</span>
                     </span>
 
                     </span>
+                    </a>
                 </li>
                 <!-- User Dropdown -->
                 <li class="nav-item dropdown">
