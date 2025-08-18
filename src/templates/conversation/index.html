@@ -1,66 +1,448 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Dead Chat? We Got You. | Reignite{% endblock %}
+{% block title %}Conversations – Reignite{% endblock %}
 
 {% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
+    :root {
+        --bg-start: #f7f8fb;
+        --bg-end: #eef1f7;
+        --glass-bg: rgba(255, 255, 255, .65);
+        --glass-border: rgba(255, 255, 255, .7);
+        --card-border: rgba(17, 24, 39, .06);
+        --text: #0b1220;
+        --muted: #6b7280;
+        --accent: #0a84ff;
+        /* calm Apple blue */
+        --shadow: 0 10px 30px rgba(17, 24, 39, .08);
+        --radius-xl: 20px;
+        --radius-lg: 16px;
+    }
+
+    body {
+        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: var(--text);
+        background: linear-gradient(180deg, var(--bg-start), var(--bg-end)) fixed;
+    }
+
+    /* badges + card polish for the examples */
+    .badge-glass {
+        display: inline-block;
+        padding: .35rem .7rem;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, .6);
+        border: 1px solid rgba(17, 24, 39, .08);
+        backdrop-filter: saturate(180%) blur(14px);
+        -webkit-backdrop-filter: saturate(180%) blur(14px);
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .showcase-card {
+        border: 1px solid rgba(17, 24, 39, .06);
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(17, 24, 39, .08);
+    }
+
+    /* Frosted layer */
+    .glass {
+        position: relative;
+        isolation: isolate;
+        background: rgba(255, 255, 255, .55);
+        backdrop-filter: saturate(180%) blur(18px);
+        -webkit-backdrop-filter: saturate(180%) blur(18px);
+        border: 1px solid rgba(255, 255, 255, .65);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow);
+    }
+
+    @media (min-width: 992px) {
+        .glass {
+            background: rgba(255, 255, 255, .48);
+            backdrop-filter: saturate(180%) blur(22px);
+            -webkit-backdrop-filter: saturate(180%) blur(22px);
+            border-color: rgba(255, 255, 255, .60);
+        }
+    }
+
+    /* Subtle film so "glassiness" still shows even over very flat areas */
+    .glass::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0));
+    }
+
+    .glass--soft {
+        background: rgba(255, 255, 255, .55);
+        border: 1px solid rgba(255, 255, 255, .6);
+    }
+
+    .section-pad {
+        padding: clamp(2.5rem, 4vw, 4rem) 0;
+    }
+
+    .display-hero {
+        letter-spacing: -.02em;
+    }
+
+    /* Buttons */
+    .btn-dark {
+        --bs-btn-focus-shadow-rgb: 10, 132, 255;
+        border-radius: 9999px;
+        padding: .75rem 1.4rem;
+    }
+
+    .btn-ghost {
+        border-radius: 9999px;
+        padding: .75rem 1.4rem;
+        border: 1px solid var(--card-border);
+        background: #fff;
+        color: var(--text);
+    }
+
+    .btn-outline-dark {
+        border-radius: 9999px;
+        padding: .75rem 1.4rem;
+    }
+
+    .credit-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .4rem .8rem;
+        border-radius: 9999px;
+        background: #111827;
+        color: #fff;
+        font-size: .9rem;
+    }
+
+    /* Cards + items */
+    .rounded-xl {
+        border-radius: var(--radius-xl);
+    }
+
+    .rounded-lg {
+        border-radius: var(--radius-lg);
+    }
+
+    .soft-card {
+        background: #fff;
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow);
+    }
+
+    /* Suggestion cards */
+    .suggestion {
+        position: relative;
+    }
+
+    .suggestion .copy-btn {
+        position: absolute;
+        right: .5rem;
+        top: .4rem;
+    }
+
+    .copied-tooltip {
+        display: none;
+        position: absolute;
+        top: 120%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #111827;
+        color: #fff;
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 8px;
+        z-index: 2;
+    }
+
+    /* Minimal list chips */
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .55rem .9rem;
+        border: 1px solid var(--card-border);
+        border-radius: 9999px;
+        background: #fff;
+        margin: .25rem;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    /* Forms */
+    .form-select,
+    .form-control {
+        border-radius: 9999px;
+    }
+
+    textarea.form-control {
+        border-radius: var(--radius-lg) !important;
+    }
+
+    .form-text {
+        color: var(--muted);
+    }
+
+    /* List tweaks (sidebar) */
     .list-group-item.active,
     .list-group-item:hover {
         background: #e7f3ff !important;
+        border-color: var(--accent);
+        transform: translateY(-1px);
+    }
+
+    .list-group-item {
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius-lg) !important;
+        margin-bottom: .5rem;
+        transition: all .2s ease;
+    }
+
+    /* Motion (prefers-reduced-motion respected) */
+    .hover-lift {
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+    .hover-lift:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 40px rgba(17, 24, 39, .12);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .hover-lift {
+            transition: none;
+        }
+
+        .hover-lift:hover {
+            transform: none;
+            box-shadow: var(--shadow);
+        }
+
+        .list-group-item:hover {
+            transform: none;
+        }
+    }
+
+    /* Ensure page has a compositing context and something to blur */
+    html,
+    body {
+        height: 100%;
+    }
+
+    body {
+        position: relative;
+    }
+
+    /* Fixed, full-viewport backdrop behind all content */
+    body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        /* sits behind everything */
+        pointer-events: none;
+
+        /* soft gradient base (visible on large screens too) */
+        background:
+            radial-gradient(1200px 600px at 15% -10%, rgba(10, 15, 30, .08), transparent 60%),
+            linear-gradient(180deg, #f7f8fb 0%, #eef1f7 100%),
+            /* micrograin – parser-safe, no data URI */
+            repeating-linear-gradient(0deg, rgba(0, 0, 0, .015) 0 1px, transparent 1px 2px),
+            repeating-linear-gradient(90deg, rgba(0, 0, 0, .015) 0 1px, transparent 1px 2px);
+        background-blend-mode: normal, normal, overlay, overlay;
+    }
+
+    @media (min-width: 992px) {
+        body::before {
+            background-image:
+                radial-gradient(1200px 600px at 15% -10%, rgba(10, 15, 30, .09), transparent 60%),
+                linear-gradient(180deg, #f7f8fb 0%, #eef1f7 100%),
+                url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0%200%200%200%20.02%20.03%200%200%200%200%200%200%200%200%200'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+            background-blend-mode: normal, normal, overlay;
+        }
+    }
+
+    /* Collapsible sidebar styling */
+    .sidebar-toggle-icon {
+        transition: transform 0.3s ease;
+    }
+
+    .collapsed .sidebar-toggle-icon {
+        transform: rotate(-180deg);
+    }
+
+    /* Hide sidebar title on mobile when collapsible */
+    @media (max-width: 991.98px) {
+        .sidebar-title {
+            display: none !important;
+        }
+    }
+
+    .sidebar-title {
+        font-weight: 500;
+        color: var(--muted);
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+    }
+
+    /* Minimal list group styling */
+    .list-group {
+        --bs-list-group-border-width: 0;
+    }
+
+    .list-group-item {
+        background: transparent;
+        border: none !important;
+        border-radius: 0 !important;
+        border-bottom: 1px solid rgba(17, 24, 39, .06) !important;
+        margin-bottom: 0;
+        padding: 0.75rem 0;
+        transition: all .15s ease;
+    }
+
+    .list-group-item:last-child {
+        border-bottom: none !important;
+    }
+
+    .list-group-item:hover {
+        background: rgba(17, 24, 39, .02) !important;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .list-group-item.active {
+        background: rgba(10, 132, 255, .05) !important;
+        color: var(--accent) !important;
+        font-weight: 500;
+    }
+
+    /* Minimal delete button */
+    .delete-convo-btn {
+        opacity: 0;
+        transition: opacity .15s ease;
+        color: var(--muted) !important;
+        text-decoration: none !important;
+        font-size: 1.1rem;
+    }
+
+    .list-group-item:hover .delete-convo-btn {
+        opacity: 0.6;
+    }
+
+    .delete-convo-btn:hover {
+        opacity: 1 !important;
+        background: none !important;
+        color: #dc3545 !important;
+    }
+
+    /* Main content area styling */
+    .main-content {
+        min-height: 60vh;
+    }
+
+    /* Minimal suggestions styling */
+    .suggestions-title {
+        font-weight: 500;
+        color: var(--muted);
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+    }
+
+    /* Minimal suggestion cards */
+    #suggestedReply,
+    #suggestedReply2,
+    #suggestedReply3 {
+        background: #fff;
+        border: 1px solid rgba(17, 24, 39, .08);
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(17, 24, 39, .04);
+        transition: all .15s ease;
+    }
+
+    #suggestedReply:hover,
+    #suggestedReply2:hover,
+    #suggestedReply3:hover {
+        transform: none;
+        box-shadow: 0 4px 12px rgba(17, 24, 39, .08);
+        border-color: rgba(17, 24, 39, .12);
     }
 </style>
 {% endblock extra_head %}
 
 {% block content %}
-<div class="container px-3">
-    <div class="row gy-4 flex-column-reverse flex-lg-row">
+<div class="container py-4">
+    <div class="row gy-4">
 
-        <!-- Sidebar: Conversation List -->
-        <div class="col-12 col-lg-3">
-            {% if conversations %}
-            <ul class="list-group">
-                {% for conversation in conversations %}
-                <a href="#" class="list-group-item list-group-item-action list-group-item-light convo-link"
-                    data-id="{{ conversation.id }}">
-                    <div class="d-flex w-100 justify-content-between align-items-center">
-                        <span>{{ conversation.girl_title }}</span>
-                        <button class="btn btn-sm btn-link text-danger delete-convo-btn" data-id="{{ conversation.id }}"
-                            title="Delete">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                </a>
-                {% endfor %}
-            </ul>
-            {% endif %}
-            <div class="mt-3">
-                <a href="{% url 'conversation_home'%}" class="btn btn-outline-dark w-100" role="button">
-                    <i class="fa fa-plus me-1"></i>Add a new conversation
-                </a>
+        <!-- Sidebar (Conversations List) -->
+        <aside class="col-12 col-lg-3 order-1 order-lg-1">
+            <!-- Mobile Toggle Button -->
+            <button class="btn btn-outline-dark w-100 d-lg-none mb-3" type="button" data-bs-toggle="collapse"
+                data-bs-target="#sidebarContent" aria-expanded="false" aria-controls="sidebarContent">
+                <i class="fa fa-bars me-2"></i>Conversations
+                <i class="fa fa-chevron-down ms-auto sidebar-toggle-icon"></i>
+            </button>
+
+            <!-- Collapsible Content -->
+            <div class="collapse d-lg-block" id="sidebarContent">
+                <div class="sidebar-title d-none d-lg-block">Conversations</div>
+                {% if conversations %}
+                <ul class="list-group">
+                    {% for conversation in conversations %}
+                    <a href="#" class="list-group-item list-group-item-action convo-link"
+                        data-id="{{ conversation.id }}">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <span class="text-truncate">{{ conversation.girl_title }}</span>
+                            <button class="btn btn-sm btn-link delete-convo-btn" data-id="{{ conversation.id }}"
+                                title="Delete">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <div class="mb-2 opacity-50">💬</div>
+                    <small>No conversations yet</small>
+                </div>
+                {% endif %}
+                <div class="mt-4">
+                    <a href="{% url 'conversation_home' %}" class="btn btn-outline-dark w-100">
+                        <i class="fa fa-plus me-1"></i> New conversation
+                    </a>
+                </div>
             </div>
-        </div>
+        </aside>
 
-        <!-- Main Form -->
-        <div class="col-12 col-lg-6">
-            <div class="form-container">
-                <form id="chatForm" class="rounded-4 shadow-lg bg-white p-4 w-100">
+        <!-- Main (Glass) -->
+        <main class="col-12 col-lg-6 order-2 order-lg-2">
+            <div class="glass p-4 main-content">
+                <form id="chatForm">
                     {% csrf_token %}
 
+                    <!-- Situation -->
                     <div class="mb-3">
                         <label for="situation" class="form-label fw-semibold">
                             <i class="fa fa-bullseye me-1 text-primary"></i> What's the situation?
                         </label>
-                        <select class="form-select rounded-pill" id="situation" name="situation" required>
-                            <option value="stuck_after_reply" selected>She replied, but I don’t know what to say</option>
-                            
+                        <select class="form-select" id="situation" name="situation" required>
+                            <option value="stuck_after_reply" selected>She replied, but I don't know what to say
+                            </option>
+
                             <optgroup label="🟢 Early-Conversation">
                                 <option value="just_matched">We just matched</option>
                                 <option value="spark_interest">I want to spark her interest</option>
                             </optgroup>
-                        
+
                             <optgroup label="🟡 Mid-Conversation">
-                                <option value="stuck_after_reply">She replied, but I don’t know what to say</option>
+                                <option value="stuck_after_reply">She replied, but I don't know what to say</option>
                                 <option value="dry_reply">She gave a dry or one-word reply</option>
                                 <option value="she_asked_question">She asked me a question</option>
                                 <option value="feels_like_interview">Conversation feels like an interview</option>
@@ -68,139 +450,138 @@
                                 <option value="spark_deeper_conversation">I want to be sincere / vulnerable</option>
                                 <option value="pivot_conversation">Change the topic</option>
                             </optgroup>
-                        
-                            <optgroup label="🔁 Recovery or Reigniting">
+
+                            <optgroup label="🔄 Recovery or Reigniting">
                                 <option value="left_on_read">She left me on read</option>
-                                <option value="reviving_old_chat">I haven’t talked to her in a while</option>
+                                <option value="reviving_old_chat">I haven't talked to her in a while</option>
                                 <option value="recovering_after_cringe">I think I said something off</option>
                             </optgroup>
-                        
+
                             <optgroup label="🟣 Late-Conversation">
                                 <option value="ask_her_out">Ask her out</option>
                                 <option value="switching_platforms">Trying to move to another platform</option>
                             </optgroup>
-                        
                         </select>
-
                     </div>
 
-
-                    <div class="mb-3" id="her-info-div" style="display: none;">
-                        <label for="her-info" class="form-label fw-semibold">
+                    <!-- Her info (optional) -->
+                    <div class="mb-3" id="her-info-div" style="display:none;">
+                        <label for="her_info" class="form-label fw-semibold">
                             <i class="fa-solid fa-user-secret me-1 text-secondary"></i> Her Information (optional)
                         </label>
-                        <textarea name="her-info" id="her_info" class="form-control" rows="3"
-                            placeholder="Add anything that might help — her bio, hobbies, vibe, or her hair style." value=""></textarea>
-                        <div class="form-text">
-                            Users who add information get 10X responses for their matches.
-                        </div>
+                        <textarea name="her_info" id="her_info" class="form-control" rows="3"
+                            placeholder="Add anything that might help – her bio, hobbies, vibe, or her hairstyle."></textarea>
+                        <div class="form-text">Adding details can improve your results.</div>
                     </div>
 
-
-                    <!-- Title and Screenshot Upload -->
-                    <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;" id="screenshot-upload">
-                        <label for="formFile" class="form-label mt-2 fw-semibold">
+                    <!-- Screenshot upload -->
+                    <div class="mb-3 glass glass--soft p-3" id="screenshot-upload">
+                        <label for="formFile" class="form-label fw-semibold">
                             <i class="me-1 text-success"></i> Upload Screenshot
-                            <span class="small text-muted">(optional – for instant extracting messages)</span>
+                            <span class="small text-muted">(optional – we'll extract the messages)</span>
                         </label>
-                        <input class="form-control rounded-pill mb-2" type="file" id="formFile">
-
-                        <div class="form-text mb-2">
-                            Drag & drop a chat screenshot, or paste your convo below.
-                        </div>
-                        <div id="ocr-status" class="mt-2" style="display:none;">
+                        <input class="form-control mb-2" type="file" id="formFile">
+                        <div class="form-text">Drag & drop a chat screenshot, or paste your convo below.</div>
+                        <div id="ocr-status" class="mt-2 d-none">
                             <span class="spinner-border spinner-border-sm align-middle text-primary"
                                 role="status"></span>
                             <span class="ms-2 text-muted">Analyzing screenshot...</span>
                         </div>
                     </div>
 
-                    <!-- Conversation Paste Area -->
+                    <!-- Conversation -->
                     <div class="mb-3" id="conversation-paste-area">
                         <label for="last-reply" class="form-label fw-semibold">
                             <i class="me-1 text-warning"></i> Conversation
                         </label>
-                        <textarea name="last-reply" id="last-reply" class="form-control" style="min-height:120px"
-                            placeholder="you: hey, free thursday?&#10;her: (seen, no reply)" rows="5"></textarea>
+                        <textarea name="last-reply" id="last-reply" class="form-control" rows="5"
+                            placeholder="you: hey, free thursday?&#10;her: (seen, no reply)"></textarea>
                         <div class="form-text text-end"><span id="charCount">0</span> characters</div>
                     </div>
 
                     <!-- Submit -->
-                    <div class="d-flex justify-content-between align-items-center" id="submit-area">
-                        <button type="submit" class="btn btn-dark btn-lg px-4 rounded-pill shadow-sm" id="generate-btn">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button type="submit" class="btn btn-dark" id="generate-btn">
                             <i class="fa fa-fire me-2"></i>Generate Reply
                         </button>
                     </div>
                 </form>
             </div>
-        </div>
+        </main>
 
-        <!-- Suggested Responses -->
-        <div class="col-12 col-lg-3 text-center" id="responseArea">
-            <p>Suggested Responses</p>
+        <!-- Suggestions (Minimal styling) -->
+        <aside class="col-12 col-lg-3 order-3" id="responseArea">
+            <div class="suggestions-title">Suggested responses</div>
 
-            <div id="suggestedReply" class="p-4 bg-light rounded-4 shadow w-100 position-relative mb-3">
+            <div id="suggestedReply" class="p-3 position-relative mb-3 suggestion">
                 <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2 copy-btn"
-                    onclick="copyToClipboard('suggestedReplyMsg', this)" title="Copy to clipboard">
+                    onclick="copyToClipboard('suggestedReplyMsg', this)" title="Copy">
                     <i class="fa fa-copy"></i>
-                    <span class="copied-tooltip"
-                        style="display: none; position: absolute; top: 120%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 2px 8px; border-radius: 8px; font-size: 12px; z-index: 2;">Copied!</span>
+                    <span class="copied-tooltip">Copied!</span>
                 </button>
-                <span id="suggestedReplyMsg">No response has been generated yet</span><br>
-                <span class="small text-muted" id="suggestedReplyScore"></span>
+                <div id="suggestedReplyMsg">No response has been generated yet</div>
+                <div class="small text-muted mt-1" id="suggestedReplyScore"></div>
             </div>
 
-            <div id="suggestedReply2" class="p-4 bg-light rounded-4 shadow w-100 position-relative mb-3"
-                style="display: none;">
+            <div id="suggestedReply2" class="p-3 position-relative mb-3 suggestion" style="display:none;">
                 <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2 copy-btn"
-                    onclick="copyToClipboard('suggestedReplyMsg2', this)" title="Copy to clipboard">
+                    onclick="copyToClipboard('suggestedReplyMsg2', this)" title="Copy">
                     <i class="fa fa-copy"></i>
-                    <span class="copied-tooltip"
-                        style="display: none; position: absolute; top: 120%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 2px 8px; border-radius: 8px; font-size: 12px; z-index: 2;">Copied!</span>
+                    <span class="copied-tooltip">Copied!</span>
                 </button>
-                <span id="suggestedReplyMsg2">No response has been generated yet</span><br>
-                <span class="small text-muted" id="suggestedReplyScore2"></span>
+                <div id="suggestedReplyMsg2">No response has been generated yet</div>
+                <div class="small text-muted mt-1" id="suggestedReplyScore2"></div>
             </div>
 
-            <div id="suggestedReply3" class="p-4 bg-light rounded-4 shadow w-100 position-relative mb-3"
-                style="display: none;">
+            <div id="suggestedReply3" class="p-3 position-relative mb-3 suggestion" style="display:none;">
                 <button type="button" class="btn btn-link btn-sm position-absolute top-0 end-0 m-2 copy-btn"
-                    onclick="copyToClipboard('suggestedReplyMsg3', this)" title="Copy to clipboard">
+                    onclick="copyToClipboard('suggestedReplyMsg3', this)" title="Copy">
                     <i class="fa fa-copy"></i>
-                    <span class="copied-tooltip"
-                        style="display: none; position: absolute; top: 120%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 2px 8px; border-radius: 8px; font-size: 12px; z-index: 2;">Copied!</span>
+                    <span class="copied-tooltip">Copied!</span>
                 </button>
-                <span id="suggestedReplyMsg3">No response has been generated yet</span><br>
-                <span class="small text-muted" id="suggestedReplyScore3"></span>
+                <div id="suggestedReplyMsg3">No response has been generated yet</div>
+                <div class="small text-muted mt-1" id="suggestedReplyScore3"></div>
             </div>
-        </div>
+        </aside>
+
     </div>
 </div>
-<!-- Payment Toast Notification -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055">
+
+<!-- Payment Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1055">
     <div id="paymentToast" class="toast align-items-center text-white bg-success border-0" role="alert"
         aria-live="assertive" aria-atomic="true">
         <div class="d-flex">
-            <div class="toast-body" id="paymentToastMessage">
-                Payment succeeded!
-            </div>
+            <div class="toast-body" id="paymentToastMessage">Payment succeeded!</div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
                 aria-label="Close"></button>
         </div>
     </div>
 </div>
+{% endblock %}
 
-
-<!-- JS -->
-
+{% block extra_scripts %}
 <script>
     const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
+
+    // Copy helper (global)
+    function copyToClipboard(elementId, btn) {
+        const text = document.getElementById(elementId).innerText;
+        navigator.clipboard.writeText(text).then(function () {
+            const tooltip = btn.querySelector('.copied-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'inline-block';
+                setTimeout(() => { tooltip.style.display = 'none'; }, 1000);
+            }
+        });
+    }
+    window.copyToClipboard = copyToClipboard;
+
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('chatForm');
-        const generateBtn = document.getElementById('generate-btn') || form.querySelector('button[type="submit"]');
+        const generateBtn = document.getElementById('generate-btn');
 
-        // Cards & fields
-        const responseArea = document.getElementById('responseArea');
+        // Suggestions
         const card1 = document.getElementById('suggestedReply');
         const card2 = document.getElementById('suggestedReply2');
         const card3 = document.getElementById('suggestedReply3');
@@ -211,34 +592,59 @@
         const msg3 = document.getElementById('suggestedReplyMsg3');
         const score3 = document.getElementById('suggestedReplyScore3');
 
+        // Fields
+        const lastReply = document.getElementById('last-reply');
+        const situationSel = document.getElementById('situation');
+        const herInfo = document.getElementById('her_info');
+
+        // OCR
+        const ocrStatus = document.getElementById('ocr-status');
+        const screenshotUpload = document.getElementById('screenshot-upload');
+        const convArea = document.getElementById('conversation-paste-area');
+
+        // Counter
+        const charCount = document.getElementById('charCount');
+        function updateCounter() { if (charCount) charCount.textContent = (lastReply?.value || '').length; }
+        updateCounter();
+        lastReply?.addEventListener('input', updateCounter);
+
+        // Hide convo/screenshot when just_matched
+        function toggleConvoVisibility() {
+            const show = situationSel.value !== 'just_matched';
+            screenshotUpload.style.display = show ? 'block' : 'none';
+            convArea.style.display = show ? 'block' : 'none';
+            // Optionally show her-info by default on desktop if you want:
+            // document.getElementById('her-info-div').style.display = show ? 'block' : 'none';
+        }
+        toggleConvoVisibility();
+        situationSel.addEventListener('change', toggleConvoVisibility);
+
+        // Submit
         form.addEventListener('submit', function (e) {
             e.preventDefault();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            // Disable button + spinner
-            const oldBtnHTML = generateBtn ? generateBtn.innerHTML : '';
-            if (generateBtn) {
-                generateBtn.disabled = true;
-                generateBtn.setAttribute('aria-busy', 'true');
-                generateBtn.innerHTML = `<span class="spinner-border spinner-border-sm align-middle" role="status"></span>
-                                 <span class="ms-2">Generating…</span>`;
-            }
 
-            // Immediately show ONLY card #1 with “Generating…”
-            if (card1) card1.style.display = 'block';
-            if (card2) card2.style.display = 'none';
-            if (card3) card3.style.display = 'none';
-            if (msg1) {
-                msg1.innerHTML = `
-          <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
-          <span class="ms-2 text-muted">Generating your texts…</span>
-        `;
-            }
-            if (score1) score1.innerText = '';
+            // Scroll to suggestions (to mirror your latest home UX)
+            document.getElementById('suggestedReply')
+                .scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            const oldBtn = generateBtn.innerHTML;
+            generateBtn.disabled = true;
+            generateBtn.setAttribute('aria-busy', 'true');
+            generateBtn.innerHTML = `<span class="spinner-border spinner-border-sm align-middle" role="status"></span>
+                               <span class="ms-2">Generating…</span>`;
+
+            // Loading state in first card
+            card1.style.display = 'block';
+            card2.style.display = 'none';
+            card3.style.display = 'none';
+            msg1.innerHTML = `<span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
+                        <span class="ms-2 text-muted">Generating your replies…</span>`;
+            score1.textContent = '';
 
             const payload = {
-                last_text: document.getElementById('last-reply')?.value || '',
-                situation: document.getElementById('situation')?.value || '',
-                her_info: document.getElementById('her_info')?.value || ''
+                last_text: lastReply?.value || '',
+                situation: situationSel?.value || '',
+                her_info: herInfo?.value || ''
             };
 
             fetch("{% url 'ajax_reply' %}", {
@@ -249,11 +655,10 @@
                 .then(async (response) => {
                     const data = await response.json().catch(() => null);
 
-                    if (data && data.redirect_url) { // out-of-credits path
+                    if (data && data.redirect_url) {
                         window.location.href = data.redirect_url;
                         throw 'redirected';
                     }
-
                     if (!response.ok || (data && data.error)) {
                         const msg = (data && data.error) ? data.error : `Error ${response.status}`;
                         throw new Error(msg);
@@ -261,271 +666,133 @@
                     return data;
                 })
                 .then((data) => {
-                    // Parse the AI suggestions from data.custom safely
                     let custom = data.custom;
                     if (typeof custom !== 'string') throw new Error('Unexpected response format from server.');
                     custom = custom.replace(/^json\s*/i, '').trim();
-                    if (!custom.startsWith('[')) { const m = custom.match(/\[.*\]/s); if (m) custom = m[0]; }
+                    if (!custom.startsWith('[')) {
+                        const m = custom.match(/\[.*\]/s); if (m) custom = m[0];
+                    }
 
                     let suggestions;
                     try { suggestions = JSON.parse(custom); }
                     catch (e) { throw new Error('Could not parse AI response. ' + e.message); }
 
-                    // Show ALL 3 cards (fill placeholders if missing)
-                    if (responseArea) responseArea.style.display = 'block';
-                    card1.style.display = 'block';
-                    card2.style.display = 'block';
-                    card3.style.display = 'block';
-
                     const s1 = suggestions?.[0] || {};
                     const s2 = suggestions?.[1] || {};
                     const s3 = suggestions?.[2] || {};
 
-                    msg1.innerText = s1.message || '—';
-                    score1.innerText = (typeof s1.confidence_score === 'number') ? `Confidence: ${Math.round(s1.confidence_score * 100)}%` : '';
+                    msg1.textContent = s1.message || '—';
+                    score1.textContent = (typeof s1.confidence_score === 'number')
+                        ? `Confidence: ${Math.round(s1.confidence_score * 100)}%` : '';
 
-                    msg2.innerText = s2.message || '—';
-                    score2.innerText = (typeof s2.confidence_score === 'number') ? `Confidence: ${Math.round(s2.confidence_score * 100)}%` : '';
+                    document.getElementById('suggestedReplyMsg2').textContent = s2.message || '—';
+                    document.getElementById('suggestedReplyScore2').textContent =
+                        (typeof s2.confidence_score === 'number') ? `Confidence: ${Math.round(s2.confidence_score * 100)}%` : '';
+                    card2.style.display = 'block';
 
-                    msg3.innerText = s3.message || '—';
-                    score3.innerText = (typeof s3.confidence_score === 'number') ? `Confidence: ${Math.round(s3.confidence_score * 100)}%` : '';
-
-                    if (typeof data.credits_left !== 'undefined') {
-                        const creditsCountEl = document.getElementById('chatCreditsCount');
-                        if (creditsCountEl) creditsCountEl.innerText = data.credits_left;
-                    }
-
+                    document.getElementById('suggestedReplyMsg3').textContent = s3.message || '—';
+                    document.getElementById('suggestedReplyScore3').textContent =
+                        (typeof s3.confidence_score === 'number') ? `Confidence: ${Math.round(s3.confidence_score * 100)}%` : '';
+                    card3.style.display = 'block';
                 })
                 .catch((err) => {
                     if (err === 'redirected') return;
                     alert(err?.message || 'Error generating reply.');
-
-                    // Revert to “idle” in card #1
-                    if (msg1) msg1.innerText = 'No response has been generated yet';
-                    if (score1) score1.innerText = '';
-                    if (card2) card2.style.display = 'none';
-                    if (card3) card3.style.display = 'none';
+                    msg1.textContent = 'No response has been generated yet';
+                    score1.textContent = '';
+                    card2.style.display = 'none';
+                    card3.style.display = 'none';
                 })
                 .finally(() => {
-                    if (generateBtn) {
-                        generateBtn.disabled = false;
-                        generateBtn.removeAttribute('aria-busy');
-                        generateBtn.innerHTML = oldBtnHTML;
-                    }
+                    generateBtn.disabled = false;
+                    generateBtn.removeAttribute('aria-busy');
+                    generateBtn.innerHTML = oldBtn;
                 });
         });
-    });
 
-
-
-    
-    // Attach event listeners to all sidebar conversation links (for initial page load)
-    document.querySelectorAll('.convo-link').forEach(function (link) {
-        link.addEventListener('click', function (e) {
-            e.preventDefault();
-            const convoId = this.getAttribute('data-id');
-            fetch(`/conversations/detail/${convoId}/`, {
-                headers: {
-                    'X-CSRFToken': csrfToken
-                }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert('Could not load conversation.');
-                        return;
-                    }
-                    document.getElementById('last-reply').value = data.content;
-                    document.getElementById('situation').value = data.situation || 'just_matched';
-                    document.getElementById('her_info').value = data.her_info || ' ';
-                    document.getElementById('suggestedReplyMsg').innerHTML = 'No response has been generated yet';
-                    var suggestedReply2 = document.getElementById("suggestedReply2");
-                    suggestedReply2.style.display = "none"
-                    var suggestedReply3 = document.getElementById("suggestedReply3");
-                    suggestedReply3.style.display = "none"
-                    document.getElementById('suggestedReplyScore').style.display = "none";
-
-                })
-                .catch(() => alert('Failed to load conversation.'));
-        });
-    });
-</script>
-
-<!-- Screenshot ocr -->
-<script>
-    const fileInput = document.getElementById('formFile').addEventListener('change', function (e) {
-        const fileInput = e.target;
-        const file = fileInput.files[0];
-        if (!file) return;
-
-        // Show spinner/status
-        document.getElementById('ocr-status').style.display = 'inline-flex';
-        const formData = new FormData();
-        formData.append('screenshot', file);
-
-        fetch("/conversations/ocr-screenshot/", {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrfToken
-            },
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                    return;
-                }
-
-                document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
-                if (data.ocr_text) {
-                    const lastReply = document.getElementById('last-reply');
-                    if (lastReply.value.trim()) {
-                        lastReply.value = lastReply.value.trim() + "\n\n" + data.ocr_text;
-                    } else {
-                        lastReply.value = data.ocr_text;
-                    }
-                    updateCounter();
-                } else {
-                    alert(data.error || "Failed to extract text from image.");
-                }
-                fileInput.value = '';
-            })
-            .catch(() => {
-                document.getElementById('ocr-status').style.display = 'none'; // Hide spinner/status
-                alert("Failed to OCR the screenshot.");
-                fileInput.value = '';
+        // Load conversation into form
+        document.querySelectorAll('.convo-link').forEach(function (link) {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                const id = this.getAttribute('data-id');
+                fetch(`/conversations/detail/${id}/`, { headers: { 'X-CSRFToken': csrfToken } })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.error) { alert('Could not load conversation.'); return; }
+                        document.getElementById('last-reply').value = data.content || '';
+                        document.getElementById('situation').value = data.situation || 'just_matched';
+                        document.getElementById('her_info').value = data.her_info || '';
+                        // Reset cards
+                        document.getElementById('suggestedReplyMsg').innerHTML = 'No response has been generated yet';
+                        document.getElementById('suggestedReply2').style.display = 'none';
+                        document.getElementById('suggestedReply3').style.display = 'none';
+                        document.getElementById('suggestedReplyScore').style.display = 'none';
+                        updateCounter();
+                        toggleConvoVisibility();
+                    })
+                    .catch(() => alert('Failed to load conversation.'));
             });
-    });
+        });
 
+        // OCR upload
+        document.getElementById('formFile')?.addEventListener('change', function (e) {
+            const input = e.target; const file = input.files?.[0]; if (!file) return;
+            ocrStatus.style.display = 'inline-flex';
+            const fd = new FormData(); fd.append('screenshot', file);
 
-</script>
+            fetch("/conversations/ocr-screenshot/", { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.redirect_url) { window.location.href = data.redirect_url; return; }
+                    ocrStatus.style.display = 'none';
+                    if (data.ocr_text) {
+                        lastReply.value = lastReply.value.trim()
+                            ? (lastReply.value.trim() + "\n\n" + data.ocr_text)
+                            : data.ocr_text;
+                        updateCounter();
+                    } else {
+                        alert(data.error || "Failed to extract text from image.");
+                    }
+                    input.value = '';
+                })
+                .catch(() => { ocrStatus.style.display = 'none'; alert("Failed to OCR the screenshot."); input.value = ''; });
+        });
 
-<script>
-    // Event delegation for delete buttons (works for future elements too)
-    document.querySelector('.list-group').addEventListener('click', function (e) {
-        if (e.target.closest('.delete-convo-btn')) {
+        // Delete conversation (event delegation)
+        document.querySelector('.list-group')?.addEventListener('click', function (e) {
+            const btn = e.target.closest('.delete-convo-btn'); if (!btn) return;
             e.preventDefault();
-            const btn = e.target.closest('.delete-convo-btn');
             const convoId = btn.getAttribute('data-id');
-            if (!confirm("Are you sure you want to delete this conversation?")) return;
+            if (!confirm("Delete this conversation?")) return;
 
-            const formData = new FormData();
-            formData.append('id', convoId);
-
-            fetch('/conversations/delete/', {
-                method: 'POST',
-                headers: { 'X-CSRFToken': csrfToken },
-                body: formData
-            })
+            const fd = new FormData(); fd.append('id', convoId);
+            fetch('/conversations/delete/', { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.success) {
-                        // Remove the <a> parent of the button
-                        btn.closest('a').remove();
-                    } else {
-                        alert(data.error || "Failed to delete conversation.");
-                    }
+                    if (data.success) { btn.closest('a').remove(); }
+                    else { alert(data.error || "Failed to delete conversation."); }
                 });
-        }
-    });
-
-</script>
-
-<script>
-    function copyToClipboard(elementId, btn) {
-        const text = document.getElementById(elementId).innerText;
-        navigator.clipboard.writeText(text).then(function () {
-            // Show tooltip
-            const tooltip = btn.querySelector('.copied-tooltip');
-            if (tooltip) {
-                tooltip.style.display = 'inline-block';
-                setTimeout(() => {
-                    tooltip.style.display = 'none';
-                }, 1200);
-            }
         });
-    }
 
-</script>
+        // Toggle chevron icon when sidebar collapses/expands
+        const sidebarCollapse = document.getElementById('sidebarContent');
+        const toggleBtn = document.querySelector('[data-bs-target="#sidebarContent"]');
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentStatus = urlParams.get('status');
-        const paymentId = urlParams.get('payment_id');
+        if (sidebarCollapse && toggleBtn) {
+            sidebarCollapse.addEventListener('show.bs.collapse', function () {
+                toggleBtn.classList.remove('collapsed');
+            });
 
-        if (paymentStatus && paymentId) {
-            const toastEl = document.getElementById('paymentToast');
-            const toastMessage = document.getElementById('paymentToastMessage');
-
-            if (paymentStatus === 'succeeded') {
-                toastEl.classList.remove('bg-danger');
-                toastEl.classList.add('bg-success');
-                toastMessage.innerHTML = `✅ Payment successful! <br> Credits have been successfully added to your account.`;
-            } else {
-                toastEl.classList.remove('bg-success');
-                toastEl.classList.add('bg-danger');
-                toastMessage.innerHTML = `❌ Payment failed or incomplete. Please try again.`;
-            }
-
-            const toast = new bootstrap.Toast(toastEl);
-            toast.show();
-
-            // Clean the URL without reloading
-            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-            window.history.replaceState({}, document.title, cleanUrl);
-        }
-    });
-</script>
-
-<script>
-    function updateCounter() {
-        const ta = document.getElementById('last-reply');
-        const c = document.getElementById('charCount');
-        if (ta && c) c.textContent = ta.value.length;
-    }
-
-    document.addEventListener('DOMContentLoaded', function () {
-        const ta = document.getElementById('last-reply');
-        updateCounter(); // initial count on load
-        if (ta) {
-            ta.addEventListener('input', updateCounter);
-            ta.addEventListener('keydown', function (e) {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                    document.getElementById('chatForm').requestSubmit();
-                }
+            sidebarCollapse.addEventListener('hide.bs.collapse', function () {
+                toggleBtn.classList.add('collapsed');
             });
         }
+
+        // Cmd/Ctrl + Enter submits
+        const ta = document.getElementById('last-reply');
+        ta?.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') document.getElementById('chatForm').requestSubmit();
+        });
     });
 </script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const situationSelect = document.getElementById('situation');
-        const herInfoDiv = document.getElementById('her-info-div');
-
-        // Function to toggle visibility
-        function toggleHerInfo() {
-            const val = situationSelect.value;
-            if (val === 'just_matched') {
-                document.getElementById('screenshot-upload').style.display = 'none';
-                document.getElementById('conversation-paste-area').style.display = 'none';
-            } else {
-                document.getElementById('screenshot-upload').style.display = 'block';
-                document.getElementById('conversation-paste-area').style.display = 'block';
-            }
-        }
-
-        // Initial check
-        toggleHerInfo();
-
-        // Listen for changes
-        situationSelect.addEventListener('change', toggleHerInfo);
-    });
-</script>
-
-
-
 {% endblock %}

@@ -326,6 +326,7 @@
 </section>
 
 <!-- TRY IT: Main glass workspace -->
+<!-- TRY IT: Main glass workspace (matches home.html) -->
 <section id="try" class="section-pad">
     <div class="container">
         <div class="glass p-4">
@@ -382,7 +383,7 @@
                             <div class="form-text">Adding details can improve your results.</div>
                         </div>
 
-                        <!-- Screenshot upload -->
+                        <!-- Screenshot upload (glass, soft) -->
                         <div class="mb-3 glass glass--soft p-3" id="screenshot-upload">
                             <label for="formFile" class="form-label fw-semibold">
                                 <i class="me-1 text-success"></i> Upload Screenshot
@@ -407,7 +408,7 @@
                             <div class="form-text text-end"><span id="charCount">0</span> characters</div>
                         </div>
 
-                        <!-- Submit -->
+                        <!-- Submit + credits chip (same position as home.html) -->
                         <div class="d-flex align-items-center justify-content-between">
                             <button type="submit" class="btn btn-dark" id="generate-btn">
                                 <i class="fa fa-fire me-2"></i>Generate Replies
@@ -420,10 +421,11 @@
                     </form>
                 </div>
 
-                <!-- Suggestions -->
+                <!-- Suggestions (match classes exactly) -->
                 <div class="col-12 col-lg-4" id="suggestions">
                     <div class="small fw-semibold mb-2">Suggested Replies</div>
 
+                    <!-- First: rectangle -->
                     <div id="suggestedReply" class="soft-card p-3 rounded-0 suggestion mb-3">
                         <button type="button" class="btn btn-sm btn-link copy-btn"
                             onclick="copyToClipboard('suggestedReplyMsg', this)" title="Copy">
@@ -433,6 +435,7 @@
                         <div class="small text-muted mt-1" id="suggestedReplyScore"></div>
                     </div>
 
+                    <!-- Second/Third: rounded-xl and hidden initially -->
                     <div id="suggestedReply2" class="soft-card p-3 rounded-xl suggestion mb-3 d-none">
                         <button type="button" class="btn btn-sm btn-link copy-btn"
                             onclick="copyToClipboard('suggestedReplyMsg2', this)" title="Copy">
@@ -455,6 +458,7 @@
         </div>
     </div>
 </section>
+
 
 <!-- HOW IT WORKS -->
 <section class="section-pad">
