@@ -3,7 +3,6 @@ from django.urls import reverse
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django_ratelimit.decorators import ratelimit
-
 from .models import Conversation, ChatCredit
 
 from conversation.utils.image_gpt import extract_conversation_from_image
@@ -55,19 +54,12 @@ def conversation_home(request):
     return render(request, 'conversation/index.html', context)
 
 
+# conversation/views.py
+
 @require_POST
+@ratelimit(key='ip', rate='10/d', block=True)
 def ajax_reply(request):
-    # Auth required
-    if not request.user.is_authenticated:
-        return _json_error("Unauthorized", status=401)
-
-    # Credit check (before parsing heavy input)
-    chat_credit = request.user.chat_credit
-    if chat_credit.balance < 1:
-        # Keep your existing pricing redirect behavior
-        return JsonResponse({'redirect_url': reverse('pricing:pricing')})
-
-    # Parse JSON safely
+    # Parse JSON safely early
     try:
         data = json.loads(request.body or "{}")
     except json.JSONDecodeError:
@@ -77,7 +69,7 @@ def ajax_reply(request):
     situation = (data.get('situation') or "").strip()
     her_info = (data.get('her_info') or "").strip()
 
-    # ---- Validation ----
+    # ---- Validation (same as before) ----
     if not last_text and situation != "just_matched":
         return _json_error("Conversation text is required.")
     if len(last_text) > MAX_LAST_TEXT:
@@ -87,49 +79,73 @@ def ajax_reply(request):
     if len(her_info) > MAX_HER_INFO:
         return _json_error(f"'Her information' is too long (>{MAX_HER_INFO} chars).")
 
-    # Upsert conversation (title is generated once for new conversations)
-    convo = Conversation.objects.filter(user=request.user, content=last_text).first()
-    created = False
-    if convo:
-        convo.content = last_text
-        convo.situation = situation
-        convo.her_info = her_info
-        convo.save()
-    else:
-        generated_title = generate_title(last_text)
-        convo = Conversation.objects.create(
-            user=request.user,
-            content=last_text,
-            situation=situation,
-            her_info=her_info,
-            girl_title=generated_title
-        )
-        created = True
+    # ---- Authenticated flow (unchanged) ----
+    if request.user.is_authenticated:
+        chat_credit = request.user.chat_credit
+        if chat_credit.balance < 1:
+            # existing behavior: pricing redirect
+            return JsonResponse({'redirect_url': reverse('pricing:pricing')})
 
-    # ---- AI Call (no credit deduction unless success) ----
+        # Upsert conversation
+        convo = Conversation.objects.filter(user=request.user, content=last_text).first()
+        created = False
+        if convo:
+            convo.content = last_text
+            convo.situation = situation
+            convo.her_info = her_info
+            convo.save()
+        else:
+            generated_title = generate_title(last_text)
+            convo = Conversation.objects.create(
+                user=request.user,
+                content=last_text,
+                situation=situation,
+                her_info=her_info,
+                girl_title=generated_title
+            )
+            created = True
+
+        # AI call
+        try:
+            custom_response, success = generate_custom_response(last_text, situation, her_info)
+        except Exception:
+            return _json_error("AI engine error. Please try again.", status=500)
+        if not success:
+            return _json_error("AI failed to generate a proper response. Try again. No credit deducted.", status=500)
+
+        # Deduct 1 credit
+        chat_credit.balance = max(0, chat_credit.balance - 1)
+        chat_credit.save()
+
+        resp = {
+            "custom": custom_response,
+            "credits_left": chat_credit.balance,
+        }
+        if created:
+            resp["new_conversation"] = {"id": convo.id, "girl_title": convo.girl_title}
+        return JsonResponse(resp)
+
+    # ---- Guest (homepage) flow: 5 free session credits ----
+    credits = int(request.session.get('chat_credits', 5))
+    if credits < 1:
+        # out of free credits → ask to signup, then land them on /conversations/
+        signup_url = reverse('account_signup') + "?next=/conversations/&message=out_of_credits"
+        return JsonResponse({'redirect_url': signup_url}, status=403)
+
+    # AI call (no DB save for guests)
     try:
         custom_response, success = generate_custom_response(last_text, situation, her_info)
-    except Exception as e:
-        # Log if you want; return safe error to user
+    except Exception:
         return _json_error("AI engine error. Please try again.", status=500)
-
     if not success:
         return _json_error("AI failed to generate a proper response. Try again. No credit deducted.", status=500)
 
-    # Deduct exactly 1 credit on success
-    chat_credit.balance = max(0, chat_credit.balance - 1)
-    chat_credit.save()
-
-    resp = {
+    # Deduct 1 session credit on success
+    request.session['chat_credits'] = max(0, credits - 1)
+    return JsonResponse({
         "custom": custom_response,
-        "credits_left": chat_credit.balance,
-    }
-    if created:
-        resp["new_conversation"] = {
-            "id": convo.id,
-            "girl_title": convo.girl_title
-        }
-    return JsonResponse(resp)
+        "credits_left": request.session['chat_credits'],
+    })
 
 
 def conversation_detail(request, pk):
