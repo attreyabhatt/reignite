@@ -2,12 +2,12 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django_ratelimit.decorators import ratelimit
 from .models import Conversation, ChatCredit
 
 from conversation.utils.image_gpt import extract_conversation_from_image
 from conversation.utils.custom_gpt import generate_custom_response
 
+from django_ratelimit.decorators import ratelimit
 import json
 import re
 
@@ -57,7 +57,6 @@ def conversation_home(request):
 # conversation/views.py
 
 @require_POST
-@ratelimit(key='ip', rate='10/d', block=True)
 def ajax_reply(request):
     # Parse JSON safely early
     try:
