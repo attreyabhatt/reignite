@@ -57,6 +57,7 @@ def conversation_home(request):
 # conversation/views.py
 
 @require_POST
+@ratelimit(key='ip', rate='50/d', block=True)
 def ajax_reply(request):
     # Parse JSON safely early
     try:

@@ -613,6 +613,7 @@
             const show = situationSel.value !== 'just_matched';
             screenshotUpload.style.display = show ? 'block' : 'none';
             convArea.style.display = show ? 'block' : 'none';
+            document.getElementById('her-info-div').style.display = show ? 'none' : 'block';
             // Optionally show her-info by default on desktop if you want:
             // document.getElementById('her-info-div').style.display = show ? 'block' : 'none';
         }
@@ -736,6 +737,8 @@
 
         // OCR upload
         document.getElementById('formFile')?.addEventListener('change', function (e) {
+
+            ocrStatus.classList.remove('d-none');
             const input = e.target; const file = input.files?.[0]; if (!file) return;
             ocrStatus.style.display = 'inline-flex';
             const fd = new FormData(); fd.append('screenshot', file);
@@ -744,7 +747,7 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.redirect_url) { window.location.href = data.redirect_url; return; }
-                    ocrStatus.style.display = 'none';
+                    
                     if (data.ocr_text) {
                         lastReply.value = lastReply.value.trim()
                             ? (lastReply.value.trim() + "\n\n" + data.ocr_text)
@@ -753,9 +756,10 @@
                     } else {
                         alert(data.error || "Failed to extract text from image.");
                     }
+                    ocrStatus.classList.add('d-none');
                     input.value = '';
                 })
-                .catch(() => { ocrStatus.style.display = 'none'; alert("Failed to OCR the screenshot."); input.value = ''; });
+                .catch(() => { ocrStatus.classList.add('d-none'); alert("Failed to OCR the screenshot."); input.value = ''; });
         });
 
         // Delete conversation (event delegation)

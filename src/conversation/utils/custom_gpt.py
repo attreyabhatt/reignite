@@ -6,7 +6,7 @@ client = OpenAI(api_key=config('GPT_API_KEY'))
 from .prompts import get_prompt_for_coach
 from typing import Dict, Any, Optional
 import tiktoken
-
+from .dating.openers import get_openers
 def generate_custom_response(last_text, situation, her_info):
     
     SITUATION_TO_COACH = {
@@ -26,10 +26,15 @@ def generate_custom_response(last_text, situation, her_info):
     "switching_platforms": "marc",
 }
     
+    example1 = ''
+    example2 = ''
+    example3 = ''
+    if situation == "just_matched":
+        example1, example2, example3 = get_openers()
     
     coach_key = SITUATION_TO_COACH.get(situation, "logan")  # fallback to Marc
-    system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info)
-    
+    system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info, example1=example1, example2=example2, example3=example3)
+
     user_prompt = """
     Respond only with a JSON array containing exactly three objects, following this structure for each:
     - "message": a string with the generated message
@@ -65,6 +70,8 @@ def generate_custom_response(last_text, situation, her_info):
         "switching_platforms": ("medium", "low"),
     }
     
+    
+        
     success = False
     usage_info: Optional[Dict[str, Any]] = None
     try:
@@ -72,7 +79,9 @@ def generate_custom_response(last_text, situation, her_info):
         effort = "low"
         verbosity = "low"
         # use the mapped effort/verbosity instead of hardcoding 'low'
-        response, usage_info = generate_gpt_response(system_prompt, user_prompt, effort=effort, verbosity=verbosity, model="gpt-5",situation=situation, her_info=her_info)
+        response, usage_info = generate_gpt_response(
+            system_prompt, user_prompt, effort=effort, verbosity=verbosity, model="gpt-5",situation=situation, her_info=her_info
+            )
 
         # Responses API helper – this is a plain string of the model’s text output
         ai_reply = (response.output_text or "").strip()
@@ -99,8 +108,8 @@ def generate_custom_response(last_text, situation, her_info):
 
 def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5", situation='', her_info=''):
     full_prompt = f"{system_prompt.strip()}\n\n{user_prompt.strip()}"
-    if situation == "just_matched":
-        full_prompt = system_prompt
+    # if situation == "just_matched":
+    #     full_prompt = system_prompt
 
     response = client.responses.create(
         model=model,
