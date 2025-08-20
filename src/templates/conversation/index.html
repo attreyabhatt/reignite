@@ -564,19 +564,6 @@
 <script>
     const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
 
-    // Copy helper (global)
-    function copyToClipboard(elementId, btn) {
-        const text = document.getElementById(elementId).innerText;
-        navigator.clipboard.writeText(text).then(function () {
-            const tooltip = btn.querySelector('.copied-tooltip');
-            if (tooltip) {
-                tooltip.style.display = 'inline-block';
-                setTimeout(() => { tooltip.style.display = 'none'; }, 1000);
-            }
-        });
-    }
-    window.copyToClipboard = copyToClipboard;
-
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('chatForm');
         const generateBtn = document.getElementById('generate-btn');
@@ -799,4 +786,51 @@
         });
     });
 </script>
+
+<script>
+
+    // Copy helper (global)
+    function copyToClipboard(elementId, btn) {
+        const text = document.getElementById(elementId).innerText;
+
+        // 1) Copy to clipboard (existing behavior)
+        navigator.clipboard.writeText(text).then(function () {
+            const tooltip = btn.querySelector('.copied-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'inline-block';
+                setTimeout(() => { tooltip.style.display = 'none'; }, 1000);
+            }
+        });
+
+        // 2) Log to backend
+        try {
+            const situationSel = document.getElementById('situation');
+            const herInfo = document.getElementById('her_info');
+            const lastReply = document.getElementById('last-reply');
+
+            // If you ever track a loaded conversation id, set it on body or a hidden input and read it here.
+            // For now we omit it (backend will try to match by content).
+            const payload = {
+                situation: situationSel?.value || '',
+                her_info: herInfo?.value || '',
+                conversation_text: lastReply?.value || '',
+                copied_message: text,
+                // conversation_id: document.body.dataset.conversationId || null
+            };
+
+            fetch("/conversations/copy/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken
+                },
+                body: JSON.stringify(payload)
+            }).catch(() => { /* swallow logging errors silently */ });
+        } catch (e) {
+            // ignore logging failures
+        }
+    }
+    window.copyToClipboard = copyToClipboard;
+</script>
+
 {% endblock %}

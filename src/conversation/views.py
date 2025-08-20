@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from .models import Conversation, ChatCredit
+from .models import Conversation, ChatCredit, CopyEvent
 
 from conversation.utils.image_gpt import extract_conversation_from_image
 from conversation.utils.custom_gpt import generate_custom_response
@@ -236,3 +236,51 @@ def delete_conversation(request):
 
     convo.delete()
     return JsonResponse({'success': True})
+
+@require_POST
+@ratelimit(key='ip', rate='200/d', block=True)   # optional but nice for guests
+def log_copy(request):
+    # Parse JSON safely
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return _json_error("Invalid JSON body.")
+
+    situation = (data.get('situation') or "").strip()
+    her_info = (data.get('her_info') or "").strip()
+    conversation_text = (data.get('conversation_text') or "").strip()
+    copied_message = (data.get('copied_message') or "").strip()
+    convo_id = data.get('conversation_id')
+
+    # Validation (reuse your existing limits/constants)
+    if not copied_message:
+        return _json_error("'copied_message' is required.")
+    if not situation or len(situation) > MAX_SITUATION_LEN or situation not in ALLOWED_SITUATIONS:
+        return _json_error("Invalid 'situation' value.")
+    if len(her_info) > MAX_HER_INFO:
+        return _json_error(f"'Her information' is too long (>{MAX_HER_INFO} chars).")
+    if len(conversation_text) > MAX_LAST_TEXT:
+        return _json_error(f"Conversation is too long (>{MAX_LAST_TEXT} chars).")
+
+    # Allow guests
+    user = request.user if request.user.is_authenticated else None
+
+    # Only try to link a Conversation when logged in
+    convo = None
+    if user and convo_id and str(convo_id).isdigit():
+        try:
+            convo = Conversation.objects.get(pk=int(convo_id), user=user)
+        except Conversation.DoesNotExist:
+            convo = None
+
+    # Persist the copy event (works for guests too)
+    CopyEvent.objects.create(
+        user=user,
+        conversation=convo,
+        situation=situation,
+        her_info=her_info,
+        conversation_text=conversation_text,
+        copied_message=copied_message,
+    )
+
+    return JsonResponse({'ok': True})

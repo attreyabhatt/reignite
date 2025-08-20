@@ -539,8 +539,8 @@
 
 {% block extra_scripts %}
 <script>
+    const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
     document.addEventListener('DOMContentLoaded', function () {
-        const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
         const form = document.getElementById('chatForm');
         const generateBtn = document.getElementById('generate-btn') || form.querySelector('button[type="submit"]');
 
@@ -737,18 +737,6 @@
         });
     });
 
-    // Copy helper (global)
-    function copyToClipboard(elementId, btn) {
-        const text = document.getElementById(elementId).innerText;
-        navigator.clipboard.writeText(text).then(function () {
-            const tooltip = btn.querySelector('.copied-tooltip');
-            if (tooltip) {
-                tooltip.style.display = 'inline-block';
-                setTimeout(() => { tooltip.style.display = 'none'; }, 1000);
-            }
-        });
-    }
-    window.copyToClipboard = copyToClipboard;
 </script>
 
 <script>
@@ -762,9 +750,11 @@
             if (val === 'just_matched') {
                 document.getElementById('screenshot-upload').style.display = 'none';
                 document.getElementById('conversation-paste-area').style.display = 'none';
+                herInfoDiv.style.display = 'block';
             } else {
                 document.getElementById('screenshot-upload').style.display = 'block';
                 document.getElementById('conversation-paste-area').style.display = 'block';
+                herInfoDiv.style.display = 'none';
             }
         }
 
@@ -775,4 +765,51 @@
         situationSelect.addEventListener('change', toggleHerInfo);
     });
 </script>
+
+<script>
+    // Copy helper (global) — now also logs the copy event for homepage
+    function copyToClipboard(elementId, btn) {
+        const text = document.getElementById(elementId).innerText;
+
+        // 1) Copy to clipboard (existing behavior)
+        navigator.clipboard.writeText(text).then(function () {
+            const tooltip = btn.querySelector('.copied-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'inline-block';
+                setTimeout(() => { tooltip.style.display = 'none'; }, 1000);
+            }
+        });
+
+        // 2) Log to backend (same endpoint/model you already added)
+        try {
+            const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
+            const situationSel = document.getElementById('situation');
+            const herInfo = document.getElementById('her_info');
+            const lastReply = document.getElementById('last-reply');
+
+            const payload = {
+                situation: situationSel?.value || '',
+                her_info: herInfo?.value || '',
+                conversation_text: lastReply?.value || '',
+                copied_message: text,
+                // If you surface a conversation id on the homepage, include it:
+                // conversation_id: document.body.dataset.conversationId || null
+            };
+
+            fetch("/conversations/copy/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken
+                },
+                body: JSON.stringify(payload)
+            }).catch(() => { /* ignore silent logging errors */ });
+
+        } catch (e) {
+            /* ignore logging failures */
+        }
+    }
+    window.copyToClipboard = copyToClipboard;
+</script>
+
 {% endblock %}
