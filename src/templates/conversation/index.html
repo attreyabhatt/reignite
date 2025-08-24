@@ -597,15 +597,21 @@
 
         // Hide convo/screenshot when just_matched
         function toggleConvoVisibility() {
-            const show = situationSel.value !== 'just_matched';
-            screenshotUpload.style.display = show ? 'block' : 'none';
-            convArea.style.display = show ? 'block' : 'none';
-            document.getElementById('her-info-div').style.display = show ? 'none' : 'block';
-            // Optionally show her-info by default on desktop if you want:
-            // document.getElementById('her-info-div').style.display = show ? 'block' : 'none';
+            const val = situationSel.value;
+
+            // Show convo/screenshot for everything except "just_matched"
+            const showConvo = val !== 'just_matched';
+            screenshotUpload.style.display = showConvo ? 'block' : 'none';
+            convArea.style.display = showConvo ? 'block' : 'none';
+
+            // Show her-info when value is "just_matched" OR "spark_interest"
+            const showHerInfo = val === 'just_matched' || val === 'spark_interest';
+            document.getElementById('her-info-div').style.display = showHerInfo ? 'block' : 'none';
         }
+
         toggleConvoVisibility();
         situationSel.addEventListener('change', toggleConvoVisibility);
+
 
         // Submit
         form.addEventListener('submit', function (e) {

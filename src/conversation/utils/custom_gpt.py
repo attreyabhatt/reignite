@@ -11,7 +11,7 @@ def generate_custom_response(last_text, situation, her_info):
     
     SITUATION_TO_COACH = {
     "just_matched": "opener_coach",
-    "spark_interest": "matthew",
+    "spark_interest": "spark_coach",
     "stuck_after_reply": "matthew",
     "dry_reply": "alex",
     "she_asked_question": "matthew",
