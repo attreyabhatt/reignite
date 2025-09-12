@@ -103,7 +103,9 @@ def generate_custom_response(last_text, situation, her_info):
 
     if usage_info:
         print("[USAGE]", usage_info)
-        
+    
+    
+    print(ai_reply)
     return ai_reply, success
 
 def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5", situation='', her_info=''):

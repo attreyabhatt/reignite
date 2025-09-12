@@ -10,3 +10,4 @@ django-ratelimit
 dodopayments
 Pillow
 tiktoken
+djangorestframework

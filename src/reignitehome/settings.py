@@ -86,7 +86,26 @@ INSTALLED_APPS = [
     'reignitehome',
     'conversation',
     'pricing',
+    
+    'rest_framework',
 ]
+
+# settings.py
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",   # public endpoints
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [],        # no Django session auth -> no CSRF requirement
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.MultiPartParser",  # for screenshot uploads
+        "rest_framework.parsers.FormParser",
+    ],
+}
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
