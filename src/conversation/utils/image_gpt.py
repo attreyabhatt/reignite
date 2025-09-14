@@ -3,11 +3,29 @@ from openai import OpenAI
 from decouple import config
 import time
 from .custom_gpt import extract_usage
+
 client = OpenAI(api_key=config('GPT_API_KEY'))
 
 def extract_conversation_from_image(screenshot_file):
     img_bytes = screenshot_file.read()
-    mime = screenshot_file.content_type or "image/png"
+    
+    # Force proper MIME type - prioritize actual image formats
+    mime = 'image/jpeg'  # Default for mobile screenshots
+    
+    # Only check magic bytes for definitive identification
+    if img_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
+        mime = 'image/png'
+    elif img_bytes.startswith(b'RIFF') and len(img_bytes) > 11 and img_bytes[8:12] == b'WEBP':
+        mime = 'image/webp'
+    elif img_bytes.startswith(b'\xff\xd8\xff'):
+        mime = 'image/jpeg'
+    
+    # Log for debugging
+    print(f"[DEBUG] Original content_type: {screenshot_file.content_type}")
+    print(f"[DEBUG] Using MIME type: {mime}")
+    print(f"[DEBUG] File size: {len(img_bytes)} bytes")
+    print(f"[DEBUG] First 10 bytes: {img_bytes[:10].hex()}")
+    
     b64 = base64.b64encode(img_bytes).decode("utf-8")
     data_url = f"data:{mime};base64,{b64}"
 
@@ -46,30 +64,35 @@ def extract_conversation_from_image(screenshot_file):
     effort = "low"
     verbosity = "low"
     start_time = time.time()
-    resp = client.responses.create(
-        model="gpt-5",
-        input=[{
-            "role": "user",
-            "content": [
-                {"type": "input_text", "text": prompt},
-                {"type": "input_image", "image_url": data_url}
-            ]
-        }],
-        reasoning={"effort": effort},
-        text={"verbosity": verbosity}
-    )
+    
+    try:
+        resp = client.responses.create(
+            model="gpt-5",
+            input=[{
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": prompt},
+                    {"type": "input_image", "image_url": data_url}
+                ]
+            }],
+            reasoning={"effort": effort},
+            text={"verbosity": verbosity}
+        )
 
-    usage_info = extract_usage(resp)
-    print(f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}")
+        usage_info = extract_usage(resp)
+        print(f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}")
 
-    output = resp.output_text.strip()
-    elapsed = time.time() - start_time
-    print(f"Response time: {elapsed:.2f} seconds")
+        output = resp.output_text.strip()
+        elapsed = time.time() - start_time
+        print(f"Response time: {elapsed:.2f} seconds")
 
-    # Failsafe: require labeled lines with a timestamp bracket
-    # e.g., "you [", "her [", or "system ["
-    if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
-        return ("Failed to extract the conversation with timestamps. Please try uploading the screenshot again. "
-                "If it keeps happening, try a clearer, uncropped screenshot.")
+        # Failsafe: require labeled lines with a timestamp bracket
+        if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
+            return ("Failed to extract the conversation with timestamps. Please try uploading the screenshot again. "
+                    "If it keeps happening, try a clearer, uncropped screenshot.")
 
-    return output
+        return output
+        
+    except Exception as e:
+        print(f"[ERROR] OpenAI API error: {str(e)}")
+        return f"Failed to process image: {str(e)}"
