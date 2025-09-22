@@ -4,13 +4,57 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+class TrialIP(models.Model):
+    ip_address = models.GenericIPAddressField(unique=True)
+    first_seen = models.DateTimeField(auto_now_add=True)
+    trial_used = models.BooleanField(default=False)
+    credits_used = models.IntegerField(default=0)  # Track trial credits used
+
+    def __str__(self):
+        return f"{self.ip_address} - Trial: {'Used' if self.trial_used else 'Available'}"
+
+class ContactMessage(models.Model):
+    REASON_CHOICES = [
+        ('bug', 'Bug Report'),
+        ('payment', 'Payments'),
+        ('feedback', 'Feedback'),
+        ('other', 'Other'),
+    ]
+    
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES)
+    title = models.CharField(max_length=100)
+    subject = models.TextField()
+    email = models.EmailField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.get_reason_display()}: {self.title} from {self.email}"
+
 class ChatCredit(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='chat_credit')
-    balance = models.PositiveIntegerField(default=10)  # Start with 5 free credits
+    balance = models.PositiveIntegerField(default=3)  # Start with 3 free credits
+    signup_bonus_given = models.BooleanField(default=False)  # Track if signup bonus was given
+    total_earned = models.PositiveIntegerField(default=3)  # Track total credits earned
+    total_used = models.PositiveIntegerField(default=0)  # Track total credits used
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.balance} credits"
+
+    def use_credit(self):
+        """Use one credit if available"""
+        if self.balance > 0:
+            self.balance -= 1
+            self.total_used += 1
+            self.save()
+            return True
+        return False
+
+    def add_credits(self, amount, reason=""):
+        """Add credits to user account"""
+        self.balance += amount
+        self.total_earned += amount
+        self.save()
 
 class Conversation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='conversations')
@@ -26,7 +70,12 @@ class Conversation(models.Model):
 @receiver(post_save, sender=User)
 def create_user_chat_credit(sender, instance, created, **kwargs):
     if created:
-        ChatCredit.objects.create(user=instance)
+        ChatCredit.objects.create(
+            user=instance, 
+            balance=3,  # 3 signup bonus
+            signup_bonus_given=True,
+            total_earned=3
+        )
         
 class CopyEvent(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='copy_events')

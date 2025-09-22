@@ -11,3 +11,4 @@ dodopayments
 Pillow
 tiktoken
 djangorestframework
+django-ipware
