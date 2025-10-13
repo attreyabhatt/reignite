@@ -12,3 +12,4 @@ Pillow
 tiktoken
 djangorestframework
 django-ipware
+django-cors-headers

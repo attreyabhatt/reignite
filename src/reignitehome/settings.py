@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     'pricing',
     
     'rest_framework',
+    'rest_framework.authtoken',
 ]
 
 # settings.py

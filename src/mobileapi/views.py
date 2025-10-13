@@ -12,14 +12,23 @@ from conversation.utils.custom_gpt import generate_custom_response
 from conversation.utils.image_gpt import extract_conversation_from_image
 from conversation.models import ChatCredit, TrialIP
 from django.utils import timezone
-import ipware
 
 logger = logging.getLogger(__name__)
 
 def get_client_ip(request):
     """Get client IP address"""
-    ip_info = ipware.get_client_ip(request)
-    return ip_info[0] if ip_info[0] else '127.0.0.1'
+    try:
+        from ipware import get_client_ip as ipware_get_client_ip
+        ip, is_routable = ipware_get_client_ip(request)
+        return ip if ip else '127.0.0.1'
+    except ImportError:
+        # Fallback if ipware is not installed
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR', '127.0.0.1')
+        return ip
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
