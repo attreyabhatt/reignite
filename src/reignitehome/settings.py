@@ -62,6 +62,7 @@ if DEBUG:
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "https://tryagaintext-app-k6uby.ondigitalocean.app",
+        "http://tryagaintext.com",
     ]
     
     SECURE_SSL_REDIRECT = False
@@ -96,7 +97,10 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",   # public endpoints
     ],
-    "DEFAULT_AUTHENTICATION_CLASSES": [],        # no Django session auth -> no CSRF requirement
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',  # First - for mobile API
+        'rest_framework.authentication.SessionAuthentication',  # Second - for web browsable API
+    ],
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],

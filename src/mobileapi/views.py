@@ -165,11 +165,17 @@ def generate_text_with_credits(request):
         if not last_text or not situation:
             return HttpResponseBadRequest("Missing required fields")
         
+        logger.info(f"Generate request - User authenticated: {request.user.is_authenticated}")
+        logger.info(f"User: {request.user if request.user.is_authenticated else 'Anonymous'}")
+        
         # Check if user is authenticated
         if request.user.is_authenticated:
+            logger.info(f"Authenticated user: {request.user.username}")
             # Check credits
             try:
                 chat_credit = ChatCredit.objects.get(user=request.user)
+                logger.info(f"User credits: {chat_credit.balance}")
+                
                 if chat_credit.balance <= 0:
                     return Response({
                         "success": False, 
@@ -185,6 +191,7 @@ def generate_text_with_credits(request):
                     chat_credit.balance -= 1
                     chat_credit.total_used += 1
                     chat_credit.save()
+                    logger.info(f"Credit deducted. New balance: {chat_credit.balance}")
                 
                 return Response({
                     "success": success, 
@@ -193,8 +200,9 @@ def generate_text_with_credits(request):
                 })
                 
             except ChatCredit.DoesNotExist:
+                logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 # Create chat credit for user
-                chat_credit = ChatCredit.objects.create(user=request.user, balance=9)  # 10-1
+                chat_credit = ChatCredit.objects.create(user=request.user, balance=5)  # 6-1
                 reply, success = generate_custom_response(last_text, situation, her_info)
                 
                 return Response({
@@ -203,12 +211,17 @@ def generate_text_with_credits(request):
                     "credits_remaining": chat_credit.balance
                 })
         else:
+            logger.info("Guest user detected")
             # Handle guest users with IP-based trial
             client_ip = get_client_ip(request)
+            logger.info(f"Guest IP: {client_ip}")
+            
             trial_ip, created = TrialIP.objects.get_or_create(
                 ip_address=client_ip,
                 defaults={'trial_used': False, 'credits_used': 0}
             )
+            
+            logger.info(f"Trial IP - Created: {created}, Credits used: {trial_ip.credits_used}")
             
             # Check if guest has used all 3 trial credits
             if trial_ip.credits_used >= 3:
@@ -227,6 +240,7 @@ def generate_text_with_credits(request):
                 if trial_ip.credits_used >= 3:
                     trial_ip.trial_used = True
                 trial_ip.save()
+                logger.info(f"Trial credit used. Remaining: {3 - trial_ip.credits_used}")
             
             return Response({
                 "success": success, 
@@ -237,7 +251,7 @@ def generate_text_with_credits(request):
             
     except Exception as e:
         logger.error(f"Generate text error: {str(e)}", exc_info=True)
-        return Response({"success": False, "error": "Generation failed"})
+        return Response({"success": False, "error": "Generation failed", "message": str(e)})
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
