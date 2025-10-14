@@ -72,7 +72,7 @@ def create_user_chat_credit(sender, instance, created, **kwargs):
     if created:
         ChatCredit.objects.create(
             user=instance, 
-            balance=3,  # 3 signup bonus
+            balance=3,  # Only 3 credits for new signups
             signup_bonus_given=True,
             total_earned=3
         )
