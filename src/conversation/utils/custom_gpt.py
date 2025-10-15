@@ -7,12 +7,13 @@ from .prompts import get_prompt_for_coach
 from typing import Dict, Any, Optional
 import tiktoken
 from .dating.openers import get_openers
-def generate_custom_response(last_text, situation, her_info):
+def generate_custom_response(last_text, situation, her_info, tone="Natural"):
     
     SITUATION_TO_COACH = {
     "just_matched": "opener_coach",
     "spark_interest": "spark_coach",
     "stuck_after_reply": "stuck_reply_coach",
+    "mobile_stuck_reply_prompt": "mobile_stuck_reply_coach",
     "dry_reply": "alex",
     "she_asked_question": "matthew",
     "feels_like_interview": "mark",
@@ -33,7 +34,7 @@ def generate_custom_response(last_text, situation, her_info):
         example1, example2, example3 = get_openers()
     
     coach_key = SITUATION_TO_COACH.get(situation, "logan")  # fallback to Marc
-    system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info, example1=example1, example2=example2, example3=example3)
+    system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info, example1=example1, example2=example2, example3=example3, tone=tone)
 
     user_prompt = """
     Respond only with a JSON array containing exactly three objects, following this structure for each:
