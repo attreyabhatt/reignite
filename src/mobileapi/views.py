@@ -10,6 +10,7 @@ import logging
 
 from conversation.utils.custom_gpt import generate_custom_response
 from conversation.utils.image_gpt import extract_conversation_from_image
+from conversation.utils.profile_analyzer import analyze_profile_image
 from conversation.models import ChatCredit, TrialIP
 from django.utils import timezone
 
