@@ -359,3 +359,50 @@ def extract_from_image_with_credits(request):
         return Response({
             "conversation": f"Error processing image: {str(e)}"
         }, status=500)
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def analyze_profile(request):
+    """Analyze profile image/screenshot to extract information"""
+    try:
+        profile_image = request.FILES.get("profile_image")
+        
+        if not profile_image:
+            return HttpResponseBadRequest("No file provided")
+        
+        # Validate file
+        if profile_image.size == 0:
+            return HttpResponseBadRequest("Empty file received")
+            
+        if profile_image.size > 10 * 1024 * 1024:  # 10MB limit
+            return HttpResponseBadRequest("File too large (max 10MB)")
+        
+        # Check content type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic']
+        if profile_image.content_type and profile_image.content_type not in allowed_types:
+            logger.warning(f"Unusual content type: {profile_image.content_type}")
+        
+        logger.info("Analyzing profile image...")
+        
+        # Analyze the profile image
+        analysis = analyze_profile_image(profile_image)
+        
+        if not analysis or "Failed" in analysis or "Unable" in analysis:
+            logger.error("Profile analysis failed")
+            return Response({
+                "success": False,
+                "profile_info": "Could not analyze the image. Please try a clearer screenshot or photo."
+            })
+        
+        logger.info("Profile analysis successful")
+        return Response({
+            "success": True,
+            "profile_info": analysis
+        })
+        
+    except Exception as e:
+        logger.error(f"Profile analysis error: {str(e)}", exc_info=True)
+        return Response({
+            "success": False,
+            "profile_info": f"Error analyzing image: {str(e)}"
+        }, status=500)
