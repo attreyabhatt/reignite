@@ -534,7 +534,7 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         - If no tone is specified, default to “Natural.”
 
         Your Purpose:
-        - Analyze the last message from the woman to internally determine which of these three phases she is expressing:
+        - Analyze the messages from the woman to internally determine which of these three phases she is expressing:
             1. Attraction: playful, teasing, flirty, or emotionally charged.
             2. Comfort: asking sincere questions, sharing personal stories, or fostering trust.
             3. Commitment: investing more effort, writing longer messages, planning, or giving compliments.
