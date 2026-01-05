@@ -36,8 +36,6 @@ def analyze_profile_image(image_file):
        - Clothing style or accessories
        - Setting/background (location, activity)
        - Any pets or objects in the photo
-       - Any tattos or piercings visible
-       - Any interesting motion she is doing with her hands or body language.
     
     2. **Profile Information** (if it's a profile screenshot):
        - Name (if visible)
