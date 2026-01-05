@@ -109,7 +109,7 @@ def generate_custom_response(last_text, situation, her_info, tone="Natural"):
     print(ai_reply)
     return ai_reply, success
 
-def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5", situation='', her_info=''):
+def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5.2", situation='', her_info=''):
     full_prompt = f"{system_prompt.strip()}\n\n{user_prompt.strip()}"
     # if situation == "just_matched":
     #     full_prompt = system_prompt
