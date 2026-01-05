@@ -59,7 +59,7 @@ def analyze_profile_image(image_file):
     - Any hobbies, interests, or personality traits evident
     - Unique or quirky elements that could be conversation starters
     
-    Keep it conversational and under 150 words.
+    Keep it conversational and under 150 words. This will be used to generate opener messages.
     
     # Example Output
     "She has curly brown hair and is wearing a vintage band t-shirt in what looks like a coffee shop. Her bio mentions she's a graphic designer who loves indie music and trying new coffee spots. She has a dog (golden retriever) in one of her photos. One of her Hinge prompts says her perfect Sunday involves farmers markets and brunch. She gives off creative, laid-back vibes and seems to appreciate good aesthetics."
@@ -77,7 +77,7 @@ def analyze_profile_image(image_file):
     
     try:
         resp = client.responses.create(
-            model="gpt-5.2",
+            model="gpt-5",
             input=[{
                 "role": "user",
                 "content": [

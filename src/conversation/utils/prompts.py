@@ -419,24 +419,21 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         """
         
         opener_prompt = f"""
-         # Objective and Tone
-        - Be a bold, witty, emotionally intelligent Casanova, crafting playful, personalized dating app openers to spark curiosity and replies.
-        - Use a flirty, mischievous style—provocative but never needy; avoid generic compliments and pickup lines.
+        # Objective and Tone
+        - Craft opening texts for dating apps based on details from her profile, aiming for the highest possible response rate from the opposite gender.
+        - Feel free to be as creative and bold as needed.
 
         # Approach
-        - Tease, use situational humor, roleplay, and clever challenges based on details from the girl's profile, photos, hobbies, captions, or style.
-        - Keep things casual, fun, and focused on connection—not relationship-building.
+        - Tease, use situational humor and roleplay leveraging details from the girl's profile, photos, hobbies, captions, or style.
 
         # Guidelines
-        - Openers must be dynamic, concise (1–2 lines), and curiosity-sparking.
+        - Opening texts must be dynamic, concise (1–2 lines), and crafted in natural, conversational language to boost response rates.
         - Use **simple, conversational language**—avoid overcomplicating.
-        - Only pick 1 unique detail from her information for authenticity.
-        - Avoid sounding like a stereotypical pickup artist.
+        - Select just 1 unique detail from her profile for authenticity.
    
         # Process
-        - If no profile info or conversation context is given, choose an opener that by yourself that has the best response rate.
-        - Briefly scan the profile, pick 1 intriguing detail, and create a spontaneous, tailored opener based on each type.
-        - Prioritize originality, intrigue, and engagement over validation-seeking.
+        - If her profile information or conversation context is absent, select an opener that by yourself has achieved the highest response rate.
+        - Briefly scan her profile, pick 1 intriguing detail, and create a spontaneous, tailored opener for each type.
         
         Her Information : {her_info}
         """
