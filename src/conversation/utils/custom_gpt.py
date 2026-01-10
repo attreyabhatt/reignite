@@ -110,65 +110,6 @@ def generate_custom_response(last_text, situation, her_info, tone="Natural"):
     return ai_reply, success
 
 
-def generate_custom_response_stream(last_text, situation, her_info, tone="Natural", model="gpt-5"):
-    SITUATION_TO_COACH = {
-    "just_matched": "opener_coach",
-    "spark_interest": "spark_coach",
-    "stuck_after_reply": "stuck_reply_coach",
-    "mobile_stuck_reply_prompt": "mobile_stuck_reply_coach",
-    "dry_reply": "alex",
-    "she_asked_question": "matthew",
-    "feels_like_interview": "mark",
-    "sassy_challenge": "shit_test",
-    "spark_deeper_conversation": "logan",
-    "pivot_conversation": "matthew",
-    "left_on_read": "left_on_read_coach",
-    "reviving_old_chat": "marc",
-    "recovering_after_cringe": "ken",
-    "ask_her_out": "corey",
-    "switching_platforms": "marc",
-}
-
-    example1 = ''
-    example2 = ''
-    example3 = ''
-    if situation == "just_matched":
-        example1, example2, example3 = get_openers()
-
-    coach_key = SITUATION_TO_COACH.get(situation, "logan")
-    system_prompt = get_prompt_for_coach(
-        coach_key,
-        last_text,
-        situation,
-        her_info,
-        example1=example1,
-        example2=example2,
-        example3=example3,
-        tone=tone
-    )
-
-    user_prompt = """
-    Generate exactly three reply options with confidence scores. Preserve the original constraints as closely as possible:
-    - Keep each reply short, natural, and in texting style.
-    - Do not use em dashes (—).
-    - Provide a confidence score between 0 and 1 for each reply.
-
-    Output format (one reply per line, no extra text):
-    <message> || <confidence_score>
-
-    Example:
-    Did I just break your texting app or are you this mysterious? || 0.95
-    You ghost better than I flirt. Is it a competition? || 0.90
-    I see you like to keep me on my toes. || 0.88
-    """
-
-    effort = "low"
-    verbosity = "low"
-    full_prompt = f"{system_prompt.strip()}\n\n{user_prompt.strip()}"
-
-    for delta in stream_gpt_response(full_prompt, effort=effort, verbosity=verbosity, model=model):
-        yield delta
-
 def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5.2", situation='', her_info=''):
     full_prompt = f"{system_prompt.strip()}\n\n{user_prompt.strip()}"
     # if situation == "just_matched":
@@ -187,7 +128,6 @@ def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='l
     return response, usage_info
 
 
-def stream_gpt_response(full_prompt, effort='low', verbosity='low', model="gpt-5.2"):
     stream = client.responses.create(
         model=model,
         input=full_prompt,

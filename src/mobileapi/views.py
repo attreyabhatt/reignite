@@ -10,7 +10,7 @@ from django.db import IntegrityError
 import json
 import logging
 
-from conversation.utils.custom_gpt import generate_custom_response, generate_custom_response_stream
+from conversation.utils.custom_gpt import generate_custom_response
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
@@ -272,124 +272,6 @@ def generate_text_with_credits(request):
         logger.error(f"Generate text error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Generation failed", "message": str(e)})
 
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-@renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
-def generate_text_with_credits_stream(request):
-    """Stream generate responses with credit system"""
-    last_text = request.data.get("last_text")
-    situation = request.data.get("situation")
-    her_info = request.data.get("her_info", "")
-    tone = request.data.get("tone", "Natural")
-
-    if not last_text or not situation:
-        return HttpResponseBadRequest("Missing required fields")
-
-    def _error_stream(error_code, message):
-        payload = json.dumps({"type": "error", "error": error_code, "message": message})
-        yield _sse_event(payload)
-
-    if request.user.is_authenticated:
-        try:
-            chat_credit = ChatCredit.objects.get(user=request.user)
-            if chat_credit.balance <= 0:
-                return StreamingHttpResponse(
-                    _error_stream("insufficient_credits", "No credits remaining. Please upgrade your account."),
-                    content_type="text/event-stream",
-                )
-        except ChatCredit.DoesNotExist:
-            chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
-
-        def gen():
-            output_parts = []
-            try:
-                for delta in generate_custom_response_stream(
-                    last_text, situation, her_info, tone=tone, model="gpt-5"
-                ):
-                    output_parts.append(delta)
-                    yield _sse_event(json.dumps({"type": "delta", "text": delta}))
-
-                full = "".join(output_parts).strip()
-                success = bool(full)
-
-                if success:
-                    chat_credit.balance -= 1
-                    chat_credit.total_used += 1
-                    chat_credit.save()
-
-                yield _sse_event(
-                    json.dumps(
-                        {
-                            "type": "done",
-                            "success": success,
-                            "reply": full,
-                            "credits_remaining": chat_credit.balance,
-                        }
-                    )
-                )
-            except Exception as exc:
-                yield _sse_event(
-                    json.dumps(
-                        {"type": "error", "error": "Generation failed", "message": str(exc)}
-                    )
-                )
-
-        response = StreamingHttpResponse(gen(), content_type="text/event-stream")
-    else:
-        client_ip = get_client_ip(request)
-        trial_ip, created = TrialIP.objects.get_or_create(
-            ip_address=client_ip,
-            defaults={'trial_used': False, 'credits_used': 0}
-        )
-
-        if trial_ip.credits_used >= 3:
-            return StreamingHttpResponse(
-                _error_stream("trial_expired", "Trial expired. Please sign up for more credits."),
-                content_type="text/event-stream",
-            )
-
-        def gen():
-            output_parts = []
-            try:
-                for delta in generate_custom_response_stream(
-                    last_text, situation, her_info, tone=tone, model="gpt-5"
-                ):
-                    output_parts.append(delta)
-                    yield _sse_event(json.dumps({"type": "delta", "text": delta}))
-
-                full = "".join(output_parts).strip()
-                success = bool(full)
-
-                if success:
-                    trial_ip.credits_used += 1
-                    if trial_ip.credits_used >= 3:
-                        trial_ip.trial_used = True
-                    trial_ip.save()
-
-                yield _sse_event(
-                    json.dumps(
-                        {
-                            "type": "done",
-                            "success": success,
-                            "reply": full,
-                            "is_trial": True,
-                            "trial_credits_remaining": 3 - trial_ip.credits_used,
-                        }
-                    )
-                )
-            except Exception as exc:
-                yield _sse_event(
-                    json.dumps(
-                        {"type": "error", "error": "Generation failed", "message": str(exc)}
-                    )
-                )
-
-        response = StreamingHttpResponse(gen(), content_type="text/event-stream")
-
-    response["Cache-Control"] = "no-cache"
-    response["X-Accel-Buffering"] = "no"
-    return response
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
