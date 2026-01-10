@@ -1,7 +1,8 @@
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, renderer_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
+from rest_framework import renderers
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.http import HttpResponseBadRequest, StreamingHttpResponse
@@ -12,6 +13,7 @@ import logging
 from conversation.utils.custom_gpt import generate_custom_response, generate_custom_response_stream
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
+from .renderers import EventStreamRenderer
 from conversation.models import ChatCredit, TrialIP
 from django.utils import timezone
 
@@ -273,6 +275,7 @@ def generate_text_with_credits(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
 def generate_text_with_credits_stream(request):
     """Stream generate responses with credit system"""
     last_text = request.data.get("last_text")
@@ -486,6 +489,7 @@ def extract_from_image_with_credits(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
 def extract_from_image_with_credits_stream(request):
     """Stream OCR extraction with credit system"""
     screenshot = request.FILES.get("screenshot")
@@ -671,6 +675,7 @@ def analyze_profile(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
 def analyze_profile_stream(request):
     """Stream profile analysis"""
     profile_image = request.FILES.get("profile_image")
