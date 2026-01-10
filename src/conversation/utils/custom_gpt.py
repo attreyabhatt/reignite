@@ -148,22 +148,18 @@ def generate_custom_response_stream(last_text, situation, her_info, tone="Natura
     )
 
     user_prompt = """
-    Respond only with a JSON array containing exactly three objects, following this structure for each:
-    - "message": a string with the generated message
-    - "confidence_score": a numeric value between 0 and 1 indicating your confidence in the message.
+    Generate exactly three reply options with confidence scores. Preserve the original constraints as closely as possible:
+    - Keep each reply short, natural, and in texting style.
+    - Do not use em dashes (—).
+    - Provide a confidence score between 0 and 1 for each reply.
 
-    Rules:
-    - Do not use em dashes (ƒ?") in any of the messages.
-    - Keep each variation short, natural, and in texting style.
+    Output format (one reply per line, no extra text):
+    <message> || <confidence_score>
 
     Example:
-    [
-    {"message": "Did I just break your texting app or are you this mysterious?", "confidence_score": 0.95},
-    {"message": "You ghost better than I flirt. Is it a competition?", "confidence_score": 0.90},
-    {"message": "I see you like to keep me on my toes.", "confidence_score": 0.88}
-    ]
-
-    Begin by reviewing your planned output for strict schema alignment. Respond with only the JSON array; do not include any extra explanation or text.
+    Did I just break your texting app or are you this mysterious? || 0.95
+    You ghost better than I flirt. Is it a competition? || 0.90
+    I see you like to keep me on my toes. || 0.88
     """
 
     effort = "low"
