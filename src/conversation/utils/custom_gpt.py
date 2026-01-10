@@ -128,32 +128,6 @@ def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='l
     return response, usage_info
 
 
-    stream = client.responses.create(
-        model=model,
-        input=full_prompt,
-        reasoning={"effort": effort},
-        text={"verbosity": verbosity},
-        stream=True
-    )
-
-    for event in stream:
-        event_type = getattr(event, "type", None)
-        if event_type == "response.output_text.delta":
-            delta = getattr(event, "delta", None)
-            if delta:
-                yield delta
-        elif event_type == "response.completed":
-            try:
-                usage_info = extract_usage(event.response)
-                print(
-                    f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | "
-                    f"output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | "
-                    f"cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}"
-                )
-            except Exception:
-                pass
-
-
 def extract_usage(response):
     """Safely extract usage info from a Responses API result."""
     u = getattr(response, "usage", None)
