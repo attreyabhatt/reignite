@@ -17,62 +17,21 @@ def extract_conversation_from_image(screenshot_file):
     if len(resized_bytes) != original_bytes:
         print(f"[DEBUG] Resized image bytes: {original_bytes} -> {len(resized_bytes)}")
 
-    # Force proper MIME type - prioritize actual image formats
-    mime = 'image/jpeg'  # Default for mobile screenshots
-    
-    # Only check magic bytes for definitive identification
-    if img_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
-        mime = 'image/png'
-    elif img_bytes.startswith(b'RIFF') and len(img_bytes) > 11 and img_bytes[8:12] == b'WEBP':
-        mime = 'image/webp'
-    elif img_bytes.startswith(b'\xff\xd8\xff'):
-        mime = 'image/jpeg'
-    
+    mime = _detect_mime(img_bytes)
+
     # Log for debugging
     print(f"[DEBUG] Original content_type: {screenshot_file.content_type}")
     print(f"[DEBUG] Using MIME type: {mime}")
     print(f"[DEBUG] File size: {len(resized_bytes)} bytes")
     print(f"[DEBUG] First 10 bytes: {resized_bytes[:10].hex()}")
-    
-    b64 = base64.b64encode(resized_bytes).decode("utf-8")
-    data_url = f"data:{mime};base64,{b64}"
 
-    prompt = """
-    # Role & Objective
-    Extract the full conversation from the screenshot and output line-by-line text with **sender labels and timestamps**.
-
-    # Extraction Rules
-    - Transcribe ALL visible messages exactly as written (no paraphrasing).
-    - For EACH message, include a timestamp in square brackets right after the sender label if any time is visible for that message in the UI.
-    - Accept valid timestamp forms exactly as shown: e.g., "9:14 PM", "21:14", "Yesterday 7:03 PM", "Mon, Aug 25 • 7:03 PM", "08/25/2025 19:03".
-    - If a message has no visible time next to it, but there is a nearby date/time header chip for the group (e.g., "Yesterday • 9:14 PM"), apply that header time to the messages in that group when it is clearly implied by the UI.
-    - If no time is visible or confidently implied for a message, leave the timestamp empty as "" (do NOT invent or infer new times).
-    - Keep sender identification as 'you:' and 'her:'. If ambiguous, infer from bubble color/orientation/username.
-
-    # Formatting
-    - One message per line in this exact pattern:
-      you [<timestamp>]: <message text>
-      her [<timestamp>]: <message text>
-    - If timestamp is unknown, leave it empty but keep the brackets:
-      you []: <message text>
-    - Preserve message order top-to-bottom as displayed in the screenshot.
-    - Include system/join/leave or date separator lines only if they clearly carry text; label such lines as:
-      system [<timestamp_or_empty>]: <text>
-      (Use 'system' only for non-user messages like "You accepted the invite", date separators, etc.)
-
-    # Validation
-    - Before finishing, check that every message line matches the pattern:
-      ^(you|her|system) \\[(.*?)\\]: .+$
-    - Confirm that all visible messages have been transcribed.
-
-    # Output
-    - Output ONLY the transcribed lines, no commentary or bullets.
-    """
+    data_url = _build_data_url(resized_bytes, mime)
+    prompt = _get_conversation_prompt()
 
     effort = "low"
     verbosity = "low"
     start_time = time.time()
-    
+
     try:
         output = _run_ocr_call(prompt, data_url, effort, verbosity, start_time)
 
@@ -86,8 +45,7 @@ def extract_conversation_from_image(screenshot_file):
         # Retry with original bytes if resized attempt fails
         print(f"[WARN] OCR failed on resized image, retrying original: {str(e)}")
         try:
-            b64_full = base64.b64encode(img_bytes).decode("utf-8")
-            data_url_full = f"data:{mime};base64,{b64_full}"
+            data_url_full = _build_data_url(img_bytes, mime)
             output = _run_ocr_call(prompt, data_url_full, effort, verbosity, time.time())
 
             if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
@@ -98,6 +56,19 @@ def extract_conversation_from_image(screenshot_file):
         except Exception as exc:
             print(f"[ERROR] OpenAI API error: {str(exc)}")
             return f"Failed to process image: {str(exc)}"
+
+
+def stream_conversation_from_image_bytes(img_bytes, use_resize=True):
+    mime = _detect_mime(img_bytes)
+    payload_bytes = _resize_image_bytes(img_bytes) if use_resize else img_bytes
+    data_url = _build_data_url(payload_bytes, mime)
+    prompt = _get_conversation_prompt()
+    effort = "low"
+    verbosity = "low"
+
+    for delta in _stream_ocr_call(prompt, data_url, effort, verbosity):
+        yield delta
+
 
 
 def _run_ocr_call(prompt, data_url, effort, verbosity, start_time):
@@ -124,6 +95,39 @@ def _run_ocr_call(prompt, data_url, effort, verbosity, start_time):
     return output
 
 
+def _stream_ocr_call(prompt, data_url, effort, verbosity):
+    stream = client.responses.create(
+        model="gpt-5",
+        input=[{
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": prompt},
+                {"type": "input_image", "image_url": data_url}
+            ]
+        }],
+        reasoning={"effort": effort},
+        text={"verbosity": verbosity},
+        stream=True
+    )
+
+    for event in stream:
+        event_type = getattr(event, "type", None)
+        if event_type == "response.output_text.delta":
+            delta = getattr(event, "delta", None)
+            if delta:
+                yield delta
+        elif event_type == "response.completed":
+            try:
+                usage_info = extract_usage(event.response)
+                print(
+                    f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | "
+                    f"output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | "
+                    f"cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}"
+                )
+            except Exception:
+                pass
+
+
 def _resize_image_bytes(img_bytes, max_long_edge=1280, quality=85):
     try:
         with Image.open(BytesIO(img_bytes)) as img:
@@ -148,3 +152,52 @@ def _resize_image_bytes(img_bytes, max_long_edge=1280, quality=85):
     except Exception as exc:
         print(f"[WARN] Image resize failed: {exc}")
         return img_bytes
+
+
+def _detect_mime(img_bytes):
+    if img_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if img_bytes.startswith(b'RIFF') and len(img_bytes) > 11 and img_bytes[8:12] == b'WEBP':
+        return 'image/webp'
+    if img_bytes.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    return 'image/jpeg'
+
+
+def _build_data_url(img_bytes, mime):
+    b64 = base64.b64encode(img_bytes).decode("utf-8")
+    return f"data:{mime};base64,{b64}"
+
+
+def _get_conversation_prompt():
+    return """
+    # Role & Objective
+    Extract the full conversation from the screenshot and output line-by-line text with **sender labels and timestamps**.
+
+    # Extraction Rules
+    - Transcribe ALL visible messages exactly as written (no paraphrasing).
+    - For EACH message, include a timestamp in square brackets right after the sender label if any time is visible for that message in the UI.
+    - Accept valid timestamp forms exactly as shown: e.g., "9:14 PM", "21:14", "Yesterday 7:03 PM", "Mon, Aug 25 ƒ?› 7:03 PM", "08/25/2025 19:03".
+    - If a message has no visible time next to it, but there is a nearby date/time header chip for the group (e.g., "Yesterday ƒ?› 9:14 PM"), apply that header time to the messages in that group when it is clearly implied by the UI.
+    - If no time is visible or confidently implied for a message, leave the timestamp empty as "" (do NOT invent or infer new times).
+    - Keep sender identification as 'you:' and 'her:'. If ambiguous, infer from bubble color/orientation/username.
+
+    # Formatting
+    - One message per line in this exact pattern:
+      you [<timestamp>]: <message text>
+      her [<timestamp>]: <message text>
+    - If timestamp is unknown, leave it empty but keep the brackets:
+      you []: <message text>
+    - Preserve message order top-to-bottom as displayed in the screenshot.
+    - Include system/join/leave or date separator lines only if they clearly carry text; label such lines as:
+      system [<timestamp_or_empty>]: <text>
+      (Use 'system' only for non-user messages like "You accepted the invite", date separators, etc.)
+
+    # Validation
+    - Before finishing, check that every message line matches the pattern:
+      ^(you|her|system) \\[(.*?)\\]: .+$
+    - Confirm that all visible messages have been transcribed.
+
+    # Output
+    - Output ONLY the transcribed lines, no commentary or bullets.
+    """

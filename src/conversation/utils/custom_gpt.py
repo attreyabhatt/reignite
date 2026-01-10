@@ -109,6 +109,70 @@ def generate_custom_response(last_text, situation, her_info, tone="Natural"):
     print(ai_reply)
     return ai_reply, success
 
+
+def generate_custom_response_stream(last_text, situation, her_info, tone="Natural", model="gpt-5"):
+    SITUATION_TO_COACH = {
+    "just_matched": "opener_coach",
+    "spark_interest": "spark_coach",
+    "stuck_after_reply": "stuck_reply_coach",
+    "mobile_stuck_reply_prompt": "mobile_stuck_reply_coach",
+    "dry_reply": "alex",
+    "she_asked_question": "matthew",
+    "feels_like_interview": "mark",
+    "sassy_challenge": "shit_test",
+    "spark_deeper_conversation": "logan",
+    "pivot_conversation": "matthew",
+    "left_on_read": "left_on_read_coach",
+    "reviving_old_chat": "marc",
+    "recovering_after_cringe": "ken",
+    "ask_her_out": "corey",
+    "switching_platforms": "marc",
+}
+
+    example1 = ''
+    example2 = ''
+    example3 = ''
+    if situation == "just_matched":
+        example1, example2, example3 = get_openers()
+
+    coach_key = SITUATION_TO_COACH.get(situation, "logan")
+    system_prompt = get_prompt_for_coach(
+        coach_key,
+        last_text,
+        situation,
+        her_info,
+        example1=example1,
+        example2=example2,
+        example3=example3,
+        tone=tone
+    )
+
+    user_prompt = """
+    Respond only with a JSON array containing exactly three objects, following this structure for each:
+    - "message": a string with the generated message
+    - "confidence_score": a numeric value between 0 and 1 indicating your confidence in the message.
+
+    Rules:
+    - Do not use em dashes (ƒ?") in any of the messages.
+    - Keep each variation short, natural, and in texting style.
+
+    Example:
+    [
+    {"message": "Did I just break your texting app or are you this mysterious?", "confidence_score": 0.95},
+    {"message": "You ghost better than I flirt. Is it a competition?", "confidence_score": 0.90},
+    {"message": "I see you like to keep me on my toes.", "confidence_score": 0.88}
+    ]
+
+    Begin by reviewing your planned output for strict schema alignment. Respond with only the JSON array; do not include any extra explanation or text.
+    """
+
+    effort = "low"
+    verbosity = "low"
+    full_prompt = f"{system_prompt.strip()}\n\n{user_prompt.strip()}"
+
+    for delta in stream_gpt_response(full_prompt, effort=effort, verbosity=verbosity, model=model):
+        yield delta
+
 def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='low', model="gpt-5.2", situation='', her_info=''):
     full_prompt = f"{system_prompt.strip()}\n\n{user_prompt.strip()}"
     # if situation == "just_matched":
@@ -125,6 +189,33 @@ def generate_gpt_response(system_prompt, user_prompt, effort='low', verbosity='l
     print(f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}")
 
     return response, usage_info
+
+
+def stream_gpt_response(full_prompt, effort='low', verbosity='low', model="gpt-5.2"):
+    stream = client.responses.create(
+        model=model,
+        input=full_prompt,
+        reasoning={"effort": effort},
+        text={"verbosity": verbosity},
+        stream=True
+    )
+
+    for event in stream:
+        event_type = getattr(event, "type", None)
+        if event_type == "response.output_text.delta":
+            delta = getattr(event, "delta", None)
+            if delta:
+                yield delta
+        elif event_type == "response.completed":
+            try:
+                usage_info = extract_usage(event.response)
+                print(
+                    f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | "
+                    f"output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | "
+                    f"cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}"
+                )
+            except Exception:
+                pass
 
 
 def extract_usage(response):

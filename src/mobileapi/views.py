@@ -4,17 +4,22 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, StreamingHttpResponse
 from django.db import IntegrityError
+import json
 import logging
 
-from conversation.utils.custom_gpt import generate_custom_response
-from conversation.utils.image_gpt import extract_conversation_from_image
-from conversation.utils.profile_analyzer import analyze_profile_image
+from conversation.utils.custom_gpt import generate_custom_response, generate_custom_response_stream
+from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
+from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from conversation.models import ChatCredit, TrialIP
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+def _sse_event(payload):
+    return f"data: {payload}\n\n"
 
 def get_client_ip(request):
     """Get client IP address"""
@@ -265,6 +270,124 @@ def generate_text_with_credits(request):
         logger.error(f"Generate text error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Generation failed", "message": str(e)})
 
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def generate_text_with_credits_stream(request):
+    """Stream generate responses with credit system"""
+    last_text = request.data.get("last_text")
+    situation = request.data.get("situation")
+    her_info = request.data.get("her_info", "")
+    tone = request.data.get("tone", "Natural")
+
+    if not last_text or not situation:
+        return HttpResponseBadRequest("Missing required fields")
+
+    def _error_stream(error_code, message):
+        payload = json.dumps({"type": "error", "error": error_code, "message": message})
+        yield _sse_event(payload)
+
+    if request.user.is_authenticated:
+        try:
+            chat_credit = ChatCredit.objects.get(user=request.user)
+            if chat_credit.balance <= 0:
+                return StreamingHttpResponse(
+                    _error_stream("insufficient_credits", "No credits remaining. Please upgrade your account."),
+                    content_type="text/event-stream",
+                )
+        except ChatCredit.DoesNotExist:
+            chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
+
+        def gen():
+            output_parts = []
+            try:
+                for delta in generate_custom_response_stream(
+                    last_text, situation, her_info, tone=tone, model="gpt-5"
+                ):
+                    output_parts.append(delta)
+                    yield _sse_event(json.dumps({"type": "delta", "text": delta}))
+
+                full = "".join(output_parts).strip()
+                success = bool(full)
+
+                if success:
+                    chat_credit.balance -= 1
+                    chat_credit.total_used += 1
+                    chat_credit.save()
+
+                yield _sse_event(
+                    json.dumps(
+                        {
+                            "type": "done",
+                            "success": success,
+                            "reply": full,
+                            "credits_remaining": chat_credit.balance,
+                        }
+                    )
+                )
+            except Exception as exc:
+                yield _sse_event(
+                    json.dumps(
+                        {"type": "error", "error": "Generation failed", "message": str(exc)}
+                    )
+                )
+
+        response = StreamingHttpResponse(gen(), content_type="text/event-stream")
+    else:
+        client_ip = get_client_ip(request)
+        trial_ip, created = TrialIP.objects.get_or_create(
+            ip_address=client_ip,
+            defaults={'trial_used': False, 'credits_used': 0}
+        )
+
+        if trial_ip.credits_used >= 3:
+            return StreamingHttpResponse(
+                _error_stream("trial_expired", "Trial expired. Please sign up for more credits."),
+                content_type="text/event-stream",
+            )
+
+        def gen():
+            output_parts = []
+            try:
+                for delta in generate_custom_response_stream(
+                    last_text, situation, her_info, tone=tone, model="gpt-5"
+                ):
+                    output_parts.append(delta)
+                    yield _sse_event(json.dumps({"type": "delta", "text": delta}))
+
+                full = "".join(output_parts).strip()
+                success = bool(full)
+
+                if success:
+                    trial_ip.credits_used += 1
+                    if trial_ip.credits_used >= 3:
+                        trial_ip.trial_used = True
+                    trial_ip.save()
+
+                yield _sse_event(
+                    json.dumps(
+                        {
+                            "type": "done",
+                            "success": success,
+                            "reply": full,
+                            "is_trial": True,
+                            "trial_credits_remaining": 3 - trial_ip.credits_used,
+                        }
+                    )
+                )
+            except Exception as exc:
+                yield _sse_event(
+                    json.dumps(
+                        {"type": "error", "error": "Generation failed", "message": str(exc)}
+                    )
+                )
+
+        response = StreamingHttpResponse(gen(), content_type="text/event-stream")
+
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def extract_from_image_with_credits(request):
@@ -360,6 +483,144 @@ def extract_from_image_with_credits(request):
             "conversation": f"Error processing image: {str(e)}"
         }, status=500)
 
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def extract_from_image_with_credits_stream(request):
+    """Stream OCR extraction with credit system"""
+    screenshot = request.FILES.get("screenshot")
+
+    if not screenshot:
+        return HttpResponseBadRequest("No file provided")
+
+    if screenshot.size == 0:
+        return HttpResponseBadRequest("Empty file received")
+
+    if screenshot.size > 10 * 1024 * 1024:
+        return HttpResponseBadRequest("File too large (max 10MB)")
+
+    allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic']
+    if screenshot.content_type and screenshot.content_type not in allowed_types:
+        logger.warning(f"Unusual content type: {screenshot.content_type}")
+
+    img_bytes = screenshot.read()
+
+    def _error_stream(error_code, message, extra=None):
+        payload = {"type": "error", "error": error_code, "message": message}
+        if extra:
+            payload.update(extra)
+        yield _sse_event(json.dumps(payload))
+
+    def _has_labeled_lines(text):
+        lowered = text.lower()
+        return any(tag in lowered for tag in ("you [", "her [", "system ["))
+
+    if request.user.is_authenticated:
+        try:
+            chat_credit = ChatCredit.objects.get(user=request.user)
+            if chat_credit.balance <= 0:
+                return StreamingHttpResponse(
+                    _error_stream("insufficient_credits", "No credits remaining. Please upgrade your account."),
+                    content_type="text/event-stream",
+                )
+        except ChatCredit.DoesNotExist:
+            chat_credit = ChatCredit.objects.create(user=request.user, balance=9)
+
+        def gen():
+            output_parts = []
+            try:
+                for delta in stream_conversation_from_image_bytes(img_bytes, use_resize=True):
+                    output_parts.append(delta)
+                    yield _sse_event(json.dumps({"type": "delta", "text": delta}))
+
+                full = "".join(output_parts).strip()
+                if not _has_labeled_lines(full):
+                    yield _sse_event(json.dumps({"type": "reset"}))
+                    output_parts = []
+                    for delta in stream_conversation_from_image_bytes(img_bytes, use_resize=False):
+                        output_parts.append(delta)
+                        yield _sse_event(json.dumps({"type": "delta", "text": delta}))
+                    full = "".join(output_parts).strip()
+
+                if not full:
+                    yield _sse_event(json.dumps({"type": "error", "error": "ocr_failed", "message": "Failed to extract conversation. Please try a clearer screenshot."}))
+                    return
+
+                chat_credit.balance -= 1
+                chat_credit.total_used += 1
+                chat_credit.save()
+
+                yield _sse_event(
+                    json.dumps(
+                        {
+                            "type": "done",
+                            "conversation": full,
+                            "credits_remaining": chat_credit.balance,
+                        }
+                    )
+                )
+            except Exception as exc:
+                yield _sse_event(
+                    json.dumps({"type": "error", "error": "ocr_failed", "message": str(exc)})
+                )
+
+        response = StreamingHttpResponse(gen(), content_type="text/event-stream")
+    else:
+        client_ip = get_client_ip(request)
+        trial_ip, created = TrialIP.objects.get_or_create(
+            ip_address=client_ip,
+            defaults={'trial_used': False, 'credits_used': 0}
+        )
+
+        if trial_ip.credits_used >= 3:
+            return StreamingHttpResponse(
+                _error_stream("trial_expired", "Trial expired. Please sign up for more credits.", {"trial_expired": True}),
+                content_type="text/event-stream",
+            )
+
+        def gen():
+            output_parts = []
+            try:
+                for delta in stream_conversation_from_image_bytes(img_bytes, use_resize=True):
+                    output_parts.append(delta)
+                    yield _sse_event(json.dumps({"type": "delta", "text": delta}))
+
+                full = "".join(output_parts).strip()
+                if not _has_labeled_lines(full):
+                    yield _sse_event(json.dumps({"type": "reset"}))
+                    output_parts = []
+                    for delta in stream_conversation_from_image_bytes(img_bytes, use_resize=False):
+                        output_parts.append(delta)
+                        yield _sse_event(json.dumps({"type": "delta", "text": delta}))
+                    full = "".join(output_parts).strip()
+
+                if full:
+                    trial_ip.credits_used += 1
+                    if trial_ip.credits_used >= 3:
+                        trial_ip.trial_used = True
+                    trial_ip.save()
+
+                yield _sse_event(
+                    json.dumps(
+                        {
+                            "type": "done",
+                            "conversation": full or "Failed to extract conversation.",
+                            "is_trial": True,
+                            "trial_credits_remaining": 3 - trial_ip.credits_used
+                        }
+                    )
+                )
+            except Exception as exc:
+                yield _sse_event(
+                    json.dumps({"type": "error", "error": "ocr_failed", "message": str(exc)})
+                )
+
+        response = StreamingHttpResponse(gen(), content_type="text/event-stream")
+
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def analyze_profile(request):
@@ -406,3 +667,54 @@ def analyze_profile(request):
             "success": False,
             "profile_info": f"Error analyzing image: {str(e)}"
         }, status=500)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def analyze_profile_stream(request):
+    """Stream profile analysis"""
+    profile_image = request.FILES.get("profile_image")
+
+    if not profile_image:
+        return HttpResponseBadRequest("No file provided")
+
+    if profile_image.size == 0:
+        return HttpResponseBadRequest("Empty file received")
+
+    if profile_image.size > 10 * 1024 * 1024:
+        return HttpResponseBadRequest("File too large (max 10MB)")
+
+    allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic']
+    if profile_image.content_type and profile_image.content_type not in allowed_types:
+        logger.warning(f"Unusual content type: {profile_image.content_type}")
+
+    img_bytes = profile_image.read()
+
+    def gen():
+        output_parts = []
+        try:
+            for delta in stream_profile_analysis_bytes(img_bytes):
+                output_parts.append(delta)
+                yield _sse_event(json.dumps({"type": "delta", "text": delta}))
+
+            full = "".join(output_parts).strip()
+            if not full or len(full) < 20:
+                yield _sse_event(
+                    json.dumps({"type": "error", "error": "analysis_failed", "message": "Could not analyze the image. Please try a clearer screenshot or photo."})
+                )
+                return
+
+            yield _sse_event(
+                json.dumps(
+                    {"type": "done", "success": True, "profile_info": full}
+                )
+            )
+        except Exception as exc:
+            yield _sse_event(
+                json.dumps({"type": "error", "error": "analysis_failed", "message": str(exc)})
+            )
+
+    response = StreamingHttpResponse(gen(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
