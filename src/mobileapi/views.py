@@ -7,6 +7,8 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.http import HttpResponseBadRequest, StreamingHttpResponse
 from django.db import IntegrityError
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 import json
 import logging
 
@@ -16,6 +18,7 @@ from conversation.utils.profile_analyzer import analyze_profile_image, stream_pr
 from .renderers import EventStreamRenderer
 from conversation.models import ChatCredit, TrialIP
 from django.utils import timezone
+from reignitehome.models import ContactMessage
 
 logger = logging.getLogger(__name__)
 
@@ -553,6 +556,46 @@ def analyze_profile(request):
             "success": False,
             "profile_info": f"Error analyzing image: {str(e)}"
         }, status=500)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def report_issue(request):
+    """Store a support/report request from the mobile app."""
+    reason = (request.data.get("reason") or "").strip()
+    title = (request.data.get("title") or "").strip()
+    subject = (request.data.get("subject") or "").strip()
+    email = (request.data.get("email") or "").strip()
+
+    if not all([reason, title, subject, email]):
+        return Response(
+            {"success": False, "error": "Missing required fields"},
+            status=400,
+        )
+
+    try:
+        validate_email(email)
+    except ValidationError:
+        return Response(
+            {"success": False, "error": "Invalid email address"},
+            status=400,
+        )
+
+    allowed_reasons = {choice[0] for choice in ContactMessage.REASON_CHOICES}
+    if reason not in allowed_reasons:
+        return Response(
+            {"success": False, "error": "Invalid reason"},
+            status=400,
+        )
+
+    ContactMessage.objects.create(
+        reason=reason,
+        title=title,
+        subject=subject,
+        email=email,
+    )
+
+    return Response({"success": True})
 
 
 @api_view(["POST"])

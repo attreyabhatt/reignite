@@ -13,4 +13,5 @@ urlpatterns = [
     path("extract-image-stream/", views.extract_from_image_with_credits_stream, name="extract_from_image_with_credits_stream"),
     path("analyze-profile/", views.analyze_profile, name="analyze_profile"),
     path("analyze-profile-stream/", views.analyze_profile_stream, name="analyze_profile_stream"),
+    path("report/", views.report_issue, name="report_issue"),
 ]
