@@ -203,3 +203,7 @@ def terms_and_conditions(request):
 
 def refund_policy(request):
     return render(request, "policy/refund_policy.html")
+
+
+def safety_standards(request):
+    return render(request, "policy/safety_standards.html")

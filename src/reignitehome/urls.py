@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import include, path
 from conversation import views
-from reignitehome.views import ajax_reply_home,home,privacy_policy,terms_and_conditions,refund_policy,contact_view,delete_account_request
+from reignitehome.views import ajax_reply_home,home,privacy_policy,terms_and_conditions,refund_policy,contact_view,delete_account_request,safety_standards
 from django.views.generic import TemplateView
 
 
@@ -19,6 +19,7 @@ urlpatterns = [
     path('refund-policy/', refund_policy, name='refund_policy'),
     path('contact/', contact_view, name='contact'),
     path('delete-account/', delete_account_request, name='delete_account_request'),
+    path('safety-standards/', safety_standards, name='safety_standards'),
     
     path(
         "robots.txt",
