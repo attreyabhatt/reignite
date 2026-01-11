@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block head_title %}Delete Account | TryAgainText{% endblock %}
+{% block content %}
+
+<div class="container py-5" style="max-width: 720px;">
+    <h1 class="mb-3">Request Account Deletion</h1>
+    <p class="text-muted">
+        Use this form to request deletion of your account and associated data.
+        We will process your request and confirm by email.
+    </p>
+
+    {% if submitted %}
+        <div class="alert alert-success">
+            Your request has been received. We will email you once deletion is complete.
+        </div>
+    {% else %}
+        {% if errors %}
+            <div class="alert alert-danger" role="alert">
+                <strong>Please fix the following:</strong>
+                <ul class="mb-0">
+                    {% for field, msgs in errors.items %}
+                        {% for msg in msgs %}
+                            <li>{{ msg }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <form method="post" class="card p-4 shadow-sm" novalidate>
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Email address</label>
+                <input
+                    type="email"
+                    class="form-control{% if errors.email %} is-invalid{% endif %}"
+                    id="email"
+                    name="email"
+                    required
+                    value="{{ form.email|default:'' }}"
+                >
+                {% if errors.email %}<div class="invalid-feedback">{{ errors.email.0 }}</div>{% endif %}
+            </div>
+
+            <div class="mb-3">
+                <label for="username" class="form-label">Username (optional)</label>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="username"
+                    name="username"
+                    maxlength="100"
+                    value="{{ form.username|default:'' }}"
+                >
+            </div>
+
+            <div class="mb-3">
+                <label for="details" class="form-label">Additional details (optional)</label>
+                <textarea
+                    class="form-control"
+                    id="details"
+                    name="details"
+                    rows="4"
+                >{{ form.details|default:'' }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-dark w-100">Submit Request</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

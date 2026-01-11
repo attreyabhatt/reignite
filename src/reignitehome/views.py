@@ -139,6 +139,62 @@ def contact_view(request):
     return render(request, 'contact.html', {'submitted': submitted})
 
 
+@require_http_methods(["GET", "POST"])
+def delete_account_request(request):
+    submitted = False
+    errors = {}
+    form = {}
+
+    if request.method == 'POST':
+        email = (request.POST.get('email') or '').strip()
+        username = (request.POST.get('username') or '').strip()
+        details = (request.POST.get('details') or '').strip()
+
+        form = {
+            'email': email,
+            'username': username,
+            'details': details,
+        }
+
+        if not email:
+            errors.setdefault('email', []).append('Email is required.')
+        else:
+            try:
+                validate_email(email)
+            except ValidationError:
+                errors.setdefault('email', []).append('Please enter a valid email.')
+
+        if errors:
+            return render(
+                request,
+                'policy/delete_account.html',
+                {'submitted': submitted, 'errors': errors, 'form': form},
+            )
+
+        subject_lines = [
+            'Account deletion request',
+            f'Username: {username or "Not provided"}',
+            f'Email: {email}',
+        ]
+        if details:
+            subject_lines.append(f'Details: {details}')
+        subject_text = '\n'.join(subject_lines)
+
+        ContactMessage.objects.create(
+            reason='other',
+            title='Account deletion request',
+            subject=subject_text,
+            email=email,
+        )
+        submitted = True
+
+    return render(
+        request,
+        'policy/delete_account.html',
+        {'submitted': submitted, 'errors': errors, 'form': form},
+    )
+
+
 def privacy_policy(request):
     return render(request, "policy/privacy_policy.html")
 
