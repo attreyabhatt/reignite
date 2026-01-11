@@ -70,13 +70,14 @@ def register(request):
         # Create token
         token, created = Token.objects.get_or_create(user=user)
         
-        # Create chat credit - ALWAYS start with 3 credits for new signups
-        # Don't carry over any guest trial credits
-        chat_credit = ChatCredit.objects.create(
+        # Ensure chat credits exist (signal may already create them)
+        chat_credit, created = ChatCredit.objects.get_or_create(
             user=user,
-            balance=3,  # Fresh 3 credits for signup
-            signup_bonus_given=True,
-            total_earned=3
+            defaults={
+                "balance": 3,
+                "signup_bonus_given": True,
+                "total_earned": 3,
+            },
         )
         
         logger.info(f"New user created: {username} with {chat_credit.balance} credits")
