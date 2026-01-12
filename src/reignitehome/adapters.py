@@ -1,29 +1,27 @@
 from allauth.account.adapter import DefaultAccountAdapter
 from django.conf import settings
+from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
 
 
 class AccountAdapter(DefaultAccountAdapter):
-    def __init__(self, request=None):
-        super().__init__(request)
-        self._suppress_subject_prefix = False
-
-    def get_email_subject_prefix(self):
-        if self._suppress_subject_prefix:
-            return ""
-        return super().get_email_subject_prefix()
-
-    def send_mail(self, template_prefix, email, context):
-        request = getattr(self, "request", None) or context.get("request")
-        if (
-            getattr(request, "is_mobile_password_reset", False)
-            and template_prefix.endswith("password_reset_key")
-        ):
+    def send_password_reset_mail(self, user, email, context):
+        request = context.get("request")
+        if getattr(request, "is_mobile_password_reset", False):
             template_prefix = "account/email/mobile_password_reset_key"
             from_email = "FlirtFix <no-reply@tryagaintext.com>"
-            self._suppress_subject_prefix = True
-        else:
-            from_email = settings.DEFAULT_FROM_EMAIL
+            subject = render_to_string(
+                f"{template_prefix}_subject.txt", context
+            ).strip()
+            body = render_to_string(
+                f"{template_prefix}_message.txt", context
+            )
+            EmailMessage(subject, body, from_email, [email]).send()
+            return
 
+        return super().send_password_reset_mail(user, email, context)
+
+    def send_mail(self, template_prefix, email, context):
         msg = self.render_mail(template_prefix, email, context)
-        msg.from_email = from_email
+        msg.from_email = settings.DEFAULT_FROM_EMAIL
         msg.send()
