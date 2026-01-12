@@ -207,6 +207,9 @@ ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_ON_GET = True
 
+# Custom account adapter for mobile/web email branding
+ACCOUNT_ADAPTER = "reignitehome.adapters.AccountAdapter"
+
 # Email (Mailgun)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = config("MAILGUN_SMTP_HOST", default="smtp.mailgun.org")

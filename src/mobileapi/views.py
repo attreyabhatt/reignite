@@ -157,12 +157,8 @@ def password_reset(request):
 
     form = ResetPasswordForm(data={"email": email})
     if form.is_valid():
-        form.save(
-            request,
-            from_email="FlirtFix <no-reply@tryagaintext.com>",
-            subject_template_name="account/email/mobile_password_reset_key_subject.txt",
-            email_template_name="account/email/mobile_password_reset_key_message.txt",
-        )
+        request.is_mobile_password_reset = True
+        form.save(request)
 
     return Response(
         {
