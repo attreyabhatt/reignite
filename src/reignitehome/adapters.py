@@ -1,5 +1,7 @@
 from allauth.account.adapter import DefaultAccountAdapter
 from django.conf import settings
+from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
 
 
 class AccountAdapter(DefaultAccountAdapter):
@@ -11,6 +13,15 @@ class AccountAdapter(DefaultAccountAdapter):
         ):
             template_prefix = "account/email/mobile_password_reset_key"
             from_email = "FlirtFix <no-reply@tryagaintext.com>"
+
+            subject = render_to_string(
+                f"{template_prefix}_subject.txt", context
+            ).strip()
+            body = render_to_string(
+                f"{template_prefix}_message.txt", context
+            )
+            EmailMessage(subject, body, from_email, [email]).send()
+            return
         else:
             from_email = settings.DEFAULT_FROM_EMAIL
 
