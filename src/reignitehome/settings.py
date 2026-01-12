@@ -216,7 +216,7 @@ EMAIL_HOST_PASSWORD = config("MAILGUN_SMTP_PASS")
 EMAIL_USE_TLS = config("MAILGUN_SMTP_USE_TLS", cast=bool, default=True)
 DEFAULT_FROM_EMAIL = config(
     "DEFAULT_FROM_EMAIL",
-    default="FlirtFix <no-reply@tryagaintext.com>",
+    default="TryAgainText <no-reply@tryagaintext.com>",
 )
 
 # Redirect URLs
