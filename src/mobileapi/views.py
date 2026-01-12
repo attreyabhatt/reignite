@@ -145,6 +145,7 @@ def login(request):
 @permission_classes([AllowAny])
 def password_reset(request):
     """Send password reset email without exposing account existence."""
+    django_request = getattr(request, "_request", request)
     email = (request.data.get("email") or "").strip()
 
     if not email:
@@ -157,8 +158,8 @@ def password_reset(request):
 
     form = ResetPasswordForm(data={"email": email})
     if form.is_valid():
-        request.is_mobile_password_reset = True
-        form.save(request)
+        setattr(django_request, "is_mobile_password_reset", True)
+        form.save(django_request)
 
     return Response(
         {
