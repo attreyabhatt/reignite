@@ -5,6 +5,7 @@ urlpatterns = [
     # Authentication
     path("register/", views.register, name="mobile_register"),
     path("login/", views.login, name="mobile_login"),
+    path("password-reset/", views.password_reset, name="mobile_password_reset"),
     path("profile/", views.profile, name="mobile_profile"),
     
     # Generation with credits

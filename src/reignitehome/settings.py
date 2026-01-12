@@ -207,6 +207,18 @@ ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_ON_GET = True
 
+# Email (Mailgun)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = config("MAILGUN_SMTP_HOST", default="smtp.mailgun.org")
+EMAIL_PORT = config("MAILGUN_SMTP_PORT", cast=int, default=587)
+EMAIL_HOST_USER = config("MAILGUN_SMTP_USER")
+EMAIL_HOST_PASSWORD = config("MAILGUN_SMTP_PASS")
+EMAIL_USE_TLS = config("MAILGUN_SMTP_USE_TLS", cast=bool, default=True)
+DEFAULT_FROM_EMAIL = config(
+    "DEFAULT_FROM_EMAIL",
+    default="FlirtFix <no-reply@tryagaintext.com>",
+)
+
 # Redirect URLs
 LOGIN_REDIRECT_URL = '/conversations'
 LOGOUT_REDIRECT_URL = '/'

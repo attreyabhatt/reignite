@@ -5,6 +5,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework import renderers
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from allauth.account.forms import ResetPasswordForm
 from django.http import HttpResponseBadRequest, StreamingHttpResponse
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
@@ -139,6 +140,31 @@ def login(request):
     except Exception as e:
         logger.error(f"Login error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Login failed"})
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def password_reset(request):
+    """Send password reset email without exposing account existence."""
+    email = (request.data.get("email") or "").strip()
+
+    if not email:
+        return Response({"success": False, "error": "Email is required"}, status=400)
+
+    try:
+        validate_email(email)
+    except ValidationError:
+        return Response({"success": False, "error": "Invalid email address"}, status=400)
+
+    form = ResetPasswordForm(data={"email": email})
+    if form.is_valid():
+        form.save(request)
+
+    return Response(
+        {
+            "success": True,
+            "message": "If an account exists for that email, a reset link was sent.",
+        }
+    )
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
