@@ -10,8 +10,10 @@ from django.http import HttpResponseBadRequest, StreamingHttpResponse
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from decimal import Decimal, InvalidOperation
 import json
 import logging
+from functools import lru_cache
 
 from conversation.utils.custom_gpt import generate_custom_response
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
@@ -20,12 +22,69 @@ from .renderers import EventStreamRenderer
 from conversation.models import ChatCredit, TrialIP
 from django.utils import timezone
 from reignitehome.models import ContactMessage
+from pricing.models import CreditPurchase
+from django.conf import settings
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 logger = logging.getLogger(__name__)
 
 
 def _sse_event(payload):
     return f"data: {payload}\n\n"
+
+@lru_cache(maxsize=1)
+def _get_google_play_client():
+    service_account_content = settings.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_CONTENT
+    service_account_path = settings.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+    creds = None
+
+    if service_account_content:
+        try:
+            info = json.loads(service_account_content)
+            creds = Credentials.from_service_account_info(
+                info,
+                scopes=["https://www.googleapis.com/auth/androidpublisher"],
+            )
+        except json.JSONDecodeError:
+            logger.error("Invalid GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_CONTENT")
+            return None
+    elif service_account_path:
+        creds = Credentials.from_service_account_file(
+            service_account_path,
+            scopes=["https://www.googleapis.com/auth/androidpublisher"],
+        )
+    else:
+        return None
+
+    return build("androidpublisher", "v3", credentials=creds, cache_discovery=False)
+
+def _verify_google_play_purchase(product_id, purchase_token):
+    client = _get_google_play_client()
+    if client is None:
+        return False, "google_play_not_configured"
+
+    try:
+        response = (
+            client.purchases()
+            .products()
+            .get(
+                packageName=settings.GOOGLE_PLAY_PACKAGE_NAME,
+                productId=product_id,
+                token=purchase_token,
+            )
+            .execute()
+        )
+    except HttpError as exc:
+        logger.warning("Google Play verification failed: %s", exc)
+        return False, "google_play_verification_failed"
+
+    purchase_state = response.get("purchaseState")
+    if purchase_state != 0:
+        return False, "google_play_not_purchased"
+
+    return True, None
 
 def get_client_ip(request):
     """Get client IP address"""
@@ -140,6 +199,90 @@ def login(request):
     except Exception as e:
         logger.error(f"Login error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Login failed"})
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def google_play_purchase(request):
+    """Record a Google Play purchase and grant credits."""
+    product_id = (request.data.get("product_id") or "").strip()
+    purchase_token = (request.data.get("purchase_token") or "").strip()
+    order_id = (request.data.get("order_id") or "").strip()
+    price = request.data.get("price")
+    currency = (request.data.get("currency") or "").strip()
+
+    if not product_id or not purchase_token:
+        return Response(
+            {"success": False, "error": "Missing product_id or purchase_token"},
+            status=400,
+        )
+
+    credit_map = {
+        "starter_pack_v1": 25,
+        "pro_pack_v1": 75,
+        "ultimate_pack_v1": 200,
+    }
+    credits = credit_map.get(product_id)
+    if not credits:
+        return Response(
+            {"success": False, "error": "Unknown product_id"},
+            status=400,
+        )
+
+    is_valid, verify_error = _verify_google_play_purchase(
+        product_id,
+        purchase_token,
+    )
+    if not is_valid:
+        return Response(
+            {"success": False, "error": verify_error or "verification_failed"},
+            status=400,
+        )
+
+    existing = CreditPurchase.objects.filter(
+        transaction_id=purchase_token,
+        payment_provider="google_play",
+    ).first()
+    if existing:
+        chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
+        return Response(
+            {"success": True, "credits_remaining": chat_credit.balance}
+        )
+
+    amount_paid = Decimal("0.00")
+    if price is not None:
+        try:
+            amount_paid = Decimal(str(price))
+        except (InvalidOperation, TypeError):
+            amount_paid = Decimal("0.00")
+
+    chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
+    chat_credit.add_credits(credits, reason="google_play_purchase")
+
+    CreditPurchase.objects.create(
+        user=request.user,
+        credits_purchased=credits,
+        amount_paid=amount_paid,
+        transaction_id=purchase_token,
+        payment_status="COMPLETED",
+        payment_provider="google_play",
+    )
+
+    if order_id:
+        logger.info(
+            "Google Play purchase recorded: user=%s order_id=%s token=%s currency=%s",
+            request.user.username,
+            order_id,
+            purchase_token,
+            currency or "unknown",
+        )
+
+    return Response(
+        {
+            "success": True,
+            "credits_added": credits,
+            "credits_remaining": chat_credit.balance,
+        }
+    )
 
 @api_view(["POST"])
 @permission_classes([AllowAny])

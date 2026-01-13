@@ -222,6 +222,20 @@ DEFAULT_FROM_EMAIL = config(
     default="TryAgainText <no-reply@tryagaintext.com>",
 )
 
+# Google Play Billing (server verification)
+GOOGLE_PLAY_PACKAGE_NAME = config(
+    "GOOGLE_PLAY_PACKAGE_NAME",
+    default="com.tryagaintext.flirtfix",
+)
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON = config(
+    "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
+    default=str(BASE_DIR / "secrets" / "google-play-service-account.json"),
+)
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_CONTENT = config(
+    "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_CONTENT",
+    default="",
+)
+
 # Redirect URLs
 LOGIN_REDIRECT_URL = '/conversations'
 LOGOUT_REDIRECT_URL = '/'

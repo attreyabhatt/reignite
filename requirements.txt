@@ -13,3 +13,6 @@ tiktoken
 djangorestframework
 django-ipware
 django-cors-headers
+google-api-python-client
+google-auth
+google-auth-httplib2

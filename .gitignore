@@ -9,6 +9,7 @@ media/
 
 # Virtual Environment
 .env
+src/secrets/
 venv/
 env/
 
