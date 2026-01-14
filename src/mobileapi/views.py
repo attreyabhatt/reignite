@@ -214,6 +214,12 @@ def google_play_purchase(request):
         currency = (request.data.get("currency") or "").strip()
 
         if not product_id or not purchase_token:
+            logger.warning(
+                "GP purchase missing fields user=%s product_id=%s order_id=%s",
+                getattr(request.user, "username", "anon"),
+                product_id,
+                order_id,
+            )
             return Response(
                 {"success": False, "error": "Missing product_id or purchase_token"},
                 status=400,
@@ -226,6 +232,11 @@ def google_play_purchase(request):
         }
         credits = credit_map.get(product_id)
         if not credits:
+            logger.warning(
+                "GP purchase unknown product user=%s product_id=%s",
+                getattr(request.user, "username", "anon"),
+                product_id,
+            )
             return Response(
                 {"success": False, "error": "Unknown product_id"},
                 status=400,
@@ -236,6 +247,13 @@ def google_play_purchase(request):
             purchase_token,
         )
         if not is_valid:
+            logger.warning(
+                "GP verify failed user=%s product_id=%s token=%s error=%s",
+                getattr(request.user, "username", "anon"),
+                product_id,
+                purchase_token,
+                verify_error,
+            )
             return Response(
                 {"success": False, "error": verify_error or "verification_failed"},
                 status=400,
@@ -247,6 +265,13 @@ def google_play_purchase(request):
         ).first()
         if existing:
             chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
+            logger.info(
+                "GP purchase already processed user=%s product_id=%s token=%s balance=%s",
+                request.user.username,
+                product_id,
+                purchase_token,
+                chat_credit.balance,
+            )
             return Response(
                 {"success": True, "credits_remaining": chat_credit.balance}
             )
@@ -270,14 +295,16 @@ def google_play_purchase(request):
             payment_provider="google_play",
         )
 
-        if order_id:
-            logger.info(
-                "Google Play purchase recorded: user=%s order_id=%s token=%s currency=%s",
-                request.user.username,
-                order_id,
-                purchase_token,
-                currency or "unknown",
-            )
+        logger.info(
+            "Google Play purchase recorded user=%s product_id=%s order_id=%s token=%s currency=%s credits_added=%s balance=%s",
+            request.user.username,
+            product_id,
+            order_id or "none",
+            purchase_token,
+            currency or "unknown",
+            credits,
+            chat_credit.balance,
+        )
 
         return Response(
             {
@@ -287,7 +314,14 @@ def google_play_purchase(request):
             }
         )
     except Exception as exc:
-        logger.error("Google Play purchase error", exc_info=True)
+        logger.error(
+            "Google Play purchase error user=%s product_id=%s token=%s order_id=%s",
+            getattr(request.user, "username", "anon"),
+            request.data.get("product_id"),
+            request.data.get("purchase_token"),
+            request.data.get("order_id"),
+            exc_info=True,
+        )
         return Response(
             {"success": False, "error": "purchase_failed"},
             status=500,
