@@ -204,85 +204,92 @@ def login(request):
 @permission_classes([IsAuthenticated])
 def google_play_purchase(request):
     """Record a Google Play purchase and grant credits."""
-    product_id = (request.data.get("product_id") or "").strip()
-    purchase_token = (request.data.get("purchase_token") or "").strip()
-    order_id = (request.data.get("order_id") or "").strip()
-    price = request.data.get("price")
-    currency = (request.data.get("currency") or "").strip()
+    try:
+        product_id = (request.data.get("product_id") or "").strip()
+        purchase_token = (request.data.get("purchase_token") or "").strip()
+        order_id = (request.data.get("order_id") or "").strip()
+        price = request.data.get("price")
+        currency = (request.data.get("currency") or "").strip()
 
-    if not product_id or not purchase_token:
-        return Response(
-            {"success": False, "error": "Missing product_id or purchase_token"},
-            status=400,
-        )
+        if not product_id or not purchase_token:
+            return Response(
+                {"success": False, "error": "Missing product_id or purchase_token"},
+                status=400,
+            )
 
-    credit_map = {
-        "starter_pack_v1": 25,
-        "pro_pack_v1": 75,
-        "ultimate_pack_v1": 200,
-    }
-    credits = credit_map.get(product_id)
-    if not credits:
-        return Response(
-            {"success": False, "error": "Unknown product_id"},
-            status=400,
-        )
-
-    is_valid, verify_error = _verify_google_play_purchase(
-        product_id,
-        purchase_token,
-    )
-    if not is_valid:
-        return Response(
-            {"success": False, "error": verify_error or "verification_failed"},
-            status=400,
-        )
-
-    existing = CreditPurchase.objects.filter(
-        transaction_id=purchase_token,
-        payment_provider="google_play",
-    ).first()
-    if existing:
-        chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
-        return Response(
-            {"success": True, "credits_remaining": chat_credit.balance}
-        )
-
-    amount_paid = Decimal("0.00")
-    if price is not None:
-        try:
-            amount_paid = Decimal(str(price))
-        except (InvalidOperation, TypeError):
-            amount_paid = Decimal("0.00")
-
-    chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
-    chat_credit.add_credits(credits, reason="google_play_purchase")
-
-    CreditPurchase.objects.create(
-        user=request.user,
-        credits_purchased=credits,
-        amount_paid=amount_paid,
-        transaction_id=purchase_token,
-        payment_status="COMPLETED",
-        payment_provider="google_play",
-    )
-
-    if order_id:
-        logger.info(
-            "Google Play purchase recorded: user=%s order_id=%s token=%s currency=%s",
-            request.user.username,
-            order_id,
-            purchase_token,
-            currency or "unknown",
-        )
-
-    return Response(
-        {
-            "success": True,
-            "credits_added": credits,
-            "credits_remaining": chat_credit.balance,
+        credit_map = {
+            "starter_pack_v1": 25,
+            "pro_pack_v1": 75,
+            "ultimate_pack_v1": 200,
         }
-    )
+        credits = credit_map.get(product_id)
+        if not credits:
+            return Response(
+                {"success": False, "error": "Unknown product_id"},
+                status=400,
+            )
+
+        is_valid, verify_error = _verify_google_play_purchase(
+            product_id,
+            purchase_token,
+        )
+        if not is_valid:
+            return Response(
+                {"success": False, "error": verify_error or "verification_failed"},
+                status=400,
+            )
+
+        existing = CreditPurchase.objects.filter(
+            transaction_id=purchase_token,
+            payment_provider="google_play",
+        ).first()
+        if existing:
+            chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
+            return Response(
+                {"success": True, "credits_remaining": chat_credit.balance}
+            )
+
+        amount_paid = Decimal("0.00")
+        if price is not None:
+            try:
+                amount_paid = Decimal(str(price))
+            except (InvalidOperation, TypeError):
+                amount_paid = Decimal("0.00")
+
+        chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
+        chat_credit.add_credits(credits, reason="google_play_purchase")
+
+        CreditPurchase.objects.create(
+            user=request.user,
+            credits_purchased=credits,
+            amount_paid=amount_paid,
+            transaction_id=purchase_token,
+            payment_status="COMPLETED",
+            payment_provider="google_play",
+        )
+
+        if order_id:
+            logger.info(
+                "Google Play purchase recorded: user=%s order_id=%s token=%s currency=%s",
+                request.user.username,
+                order_id,
+                purchase_token,
+                currency or "unknown",
+            )
+
+        return Response(
+            {
+                "success": True,
+                "credits_added": credits,
+                "credits_remaining": chat_credit.balance,
+            }
+        )
+    except Exception as exc:
+        logger.error("Google Play purchase error", exc_info=True)
+        return Response(
+            {"success": False, "error": "purchase_failed"},
+            status=500,
+        )
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
