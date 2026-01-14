@@ -6,6 +6,7 @@ urlpatterns = [
     path("register/", views.register, name="mobile_register"),
     path("login/", views.login, name="mobile_login"),
     path("password-reset/", views.password_reset, name="mobile_password_reset"),
+    path("change-password/", views.change_password, name="mobile_change_password"),
     path("google-play/purchase/", views.google_play_purchase, name="google_play_purchase"),
     path("profile/", views.profile, name="mobile_profile"),
     

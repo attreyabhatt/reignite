@@ -24,6 +24,8 @@ from django.utils import timezone
 from reignitehome.models import ContactMessage
 from pricing.models import CreditPurchase
 from django.conf import settings
+from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError as DjangoValidationError
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -347,6 +349,39 @@ def profile(request):
             },
             "chat_credits": chat_credit.balance
         })
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """Change password for logged-in user."""
+    current_password = request.data.get("current_password")
+    new_password = request.data.get("new_password")
+
+    if not current_password or not new_password:
+        return Response(
+            {"success": False, "error": "Missing current or new password"},
+            status=400,
+        )
+
+    user = request.user
+    if not user.check_password(current_password):
+        return Response(
+            {"success": False, "error": "Current password is incorrect"},
+            status=400,
+        )
+
+    try:
+        password_validation.validate_password(new_password, user=user)
+    except DjangoValidationError as exc:
+        return Response(
+            {"success": False, "error": " ".join(exc.messages)},
+            status=400,
+        )
+
+    user.set_password(new_password)
+    user.save()
+
+    return Response({"success": True})
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
