@@ -6,7 +6,7 @@ class CreditPurchase(models.Model):
     credits_purchased = models.PositiveIntegerField()
     amount_paid = models.DecimalField(max_digits=6, decimal_places=2)
     timestamp = models.DateTimeField(auto_now_add=True)
-    transaction_id = models.CharField(max_length=100, blank=True, null=True)  # e.g., Stripe/PayPal ID
+    transaction_id = models.CharField(max_length=255, blank=True, null=True)  # e.g., Stripe/PayPal ID
     payment_status = models.CharField(
         max_length=20,
         choices=[('PENDING', 'Pending'), ('COMPLETED', 'Completed'), ('FAILED', 'Failed')],
