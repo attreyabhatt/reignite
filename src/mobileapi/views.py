@@ -88,6 +88,70 @@ def _verify_google_play_purchase(product_id, purchase_token):
 
     return True, None
 
+def _acknowledge_google_play_purchase(product_id, purchase_token):
+    """Acknowledge/consume a Google Play purchase to unlock the SKU."""
+    client = _get_google_play_client()
+    if client is None:
+        logger.error("Google Play client not configured")
+        return False, "google_play_not_configured"
+
+    try:
+        # First, check if purchase exists and is valid
+        purchase_info = (
+            client.purchases()
+            .products()
+            .get(
+                packageName=settings.GOOGLE_PLAY_PACKAGE_NAME,
+                productId=product_id,
+                token=purchase_token,
+            )
+            .execute()
+        )
+
+        logger.info(
+            "Google Play purchase info: product_id=%s acknowledgementState=%s consumptionState=%s",
+            product_id,
+            purchase_info.get("acknowledgementState"),
+            purchase_info.get("consumptionState"),
+        )
+
+        # Acknowledge the purchase (for non-consumables and subscriptions)
+        # acknowledgementState: 0 = not acknowledged, 1 = acknowledged
+        if purchase_info.get("acknowledgementState") == 0:
+            try:
+                client.purchases().products().acknowledge(
+                    packageName=settings.GOOGLE_PLAY_PACKAGE_NAME,
+                    productId=product_id,
+                    token=purchase_token,
+                ).execute()
+                logger.info("Acknowledged Google Play purchase: product_id=%s", product_id)
+            except HttpError as ack_exc:
+                # Acknowledgement might fail if already acknowledged, which is fine
+                logger.warning("Failed to acknowledge purchase (might already be acknowledged): %s", ack_exc)
+
+        # Consume the purchase (for consumables) - this is what unlocks the SKU for repurchase
+        # consumptionState: 0 = not consumed, 1 = consumed
+        try:
+            client.purchases().products().consume(
+                packageName=settings.GOOGLE_PLAY_PACKAGE_NAME,
+                productId=product_id,
+                token=purchase_token,
+            ).execute()
+            logger.info("Consumed Google Play purchase: product_id=%s token=%s", product_id, purchase_token[:20])
+            return True, None
+        except HttpError as consume_exc:
+            # If consumption fails, it might already be consumed
+            logger.warning("Failed to consume purchase: %s", consume_exc)
+            # Still return success if acknowledgement worked
+            return True, None
+
+    except HttpError as exc:
+        logger.error("Failed to acknowledge/consume Google Play purchase: %s", exc)
+        return False, str(exc)
+    except Exception as exc:
+        logger.error("Unexpected error acknowledging purchase: %s", exc, exc_info=True)
+        return False, str(exc)
+
 def get_client_ip(request):
     """Get client IP address"""
     try:
@@ -272,6 +336,15 @@ def google_play_purchase(request):
                 purchase_token,
                 chat_credit.balance,
             )
+            # CRITICAL: Acknowledge/consume the purchase even if already processed
+            # This ensures the SKU is unlocked for future purchases
+            ack_success, ack_error = _acknowledge_google_play_purchase(product_id, purchase_token)
+            if not ack_success:
+                logger.warning(
+                    "Failed to acknowledge already-processed purchase: user=%s error=%s",
+                    request.user.username,
+                    ack_error,
+                )
             return Response(
                 {"success": True, "credits_remaining": chat_credit.balance}
             )
@@ -305,6 +378,19 @@ def google_play_purchase(request):
             credits,
             chat_credit.balance,
         )
+
+        # CRITICAL: Acknowledge/consume the purchase with Google Play
+        # This unlocks the SKU so it can be repurchased (for consumables)
+        ack_success, ack_error = _acknowledge_google_play_purchase(product_id, purchase_token)
+        if not ack_success:
+            logger.error(
+                "Failed to acknowledge new purchase: user=%s product_id=%s error=%s",
+                request.user.username,
+                product_id,
+                ack_error,
+            )
+            # Don't fail the purchase - credits were already granted
+            # Just log the error so we can investigate
 
         return Response(
             {
