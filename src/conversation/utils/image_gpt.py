@@ -67,7 +67,7 @@ def stream_conversation_from_image_bytes(img_bytes, use_resize=True):
 
 def _run_ocr_call(prompt, data_url, start_time):
     resp = client.chat.completions.create(
-        model="gpt-4.1-nano",
+        model="gpt-4.1-mini",
         messages=[{
             "role": "user",
             "content": [
@@ -90,7 +90,7 @@ def _run_ocr_call(prompt, data_url, start_time):
 
 def _stream_ocr_call(prompt, data_url):
     stream = client.chat.completions.create(
-        model="gpt-4.1-nano",
+        model="gpt-4.1-mini",
         messages=[{
             "role": "user",
             "content": [
@@ -149,16 +149,32 @@ def _build_data_url(img_bytes, mime):
 
 
 def _get_conversation_prompt():
-    return """Extract the conversation from this screenshot.
+    return """# Role & Objective
+    Extract the full conversation from the screenshot and output line-by-line text with **sender labels and timestamps**.
 
-Format each message as:
-you [timestamp]: message
-her [timestamp]: message
-system [timestamp]: message
+    # Extraction Rules
+    - Transcribe ALL visible messages exactly as written (no paraphrasing).
+    - For EACH message, include a timestamp in square brackets right after the sender label if any time is visible for that message in the UI.
+    - Accept valid timestamp forms exactly as shown: e.g., "9:14 PM", "21:14", "Yesterday 7:03 PM", "Mon, Aug 25 ƒ?› 7:03 PM", "08/25/2025 19:03".
+    - If a message has no visible time next to it, but there is a nearby date/time header chip for the group (e.g., "Yesterday ƒ?› 9:14 PM"), apply that header time to the messages in that group when it is clearly implied by the UI.
+    - If no time is visible or confidently implied for a message, leave the timestamp empty as "" (do NOT invent or infer new times).
+    - Keep sender identification as 'you:' and 'her:'. If ambiguous, infer from bubble color/orientation/username.
 
-Rules:
-- Use timestamps if visible (e.g., "9:14 PM"), otherwise leave empty: you []: message
-- "you" = right-side/blue bubbles, "her" = left-side/gray bubbles
-- "system" = date separators, notifications
-- Transcribe exactly as written, top to bottom
-- Output ONLY the formatted lines, no extra text"""
+    # Formatting
+    - One message per line in this exact pattern:
+      you [<timestamp>]: <message text>
+      her [<timestamp>]: <message text>
+    - If timestamp is unknown, leave it empty but keep the brackets:
+      you []: <message text>
+    - Preserve message order top-to-bottom as displayed in the screenshot.
+    - Include system/join/leave or date separator lines only if they clearly carry text; label such lines as:
+      system [<timestamp_or_empty>]: <text>
+      (Use 'system' only for non-user messages like "You accepted the invite", date separators, etc.)
+
+    # Validation
+    - Before finishing, check that every message line matches the pattern:
+      ^(you|her|system) \\[(.*?)\\]: .+$
+    - Confirm that all visible messages have been transcribed.
+
+    # Output
+    - Output ONLY the transcribed lines, no commentary or bullets."""
