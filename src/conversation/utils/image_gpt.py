@@ -27,13 +27,10 @@ def extract_conversation_from_image(screenshot_file):
 
     data_url = _build_data_url(resized_bytes, mime)
     prompt = _get_conversation_prompt()
-
-    effort = "low"
-    verbosity = "low"
     start_time = time.time()
 
     try:
-        output = _run_ocr_call(prompt, data_url, effort, verbosity, start_time)
+        output = _run_ocr_call(prompt, data_url, start_time)
 
         # Failsafe: require labeled lines with a timestamp bracket
         if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
@@ -46,7 +43,7 @@ def extract_conversation_from_image(screenshot_file):
         print(f"[WARN] OCR failed on resized image, retrying original: {str(e)}")
         try:
             data_url_full = _build_data_url(img_bytes, mime)
-            output = _run_ocr_call(prompt, data_url_full, effort, verbosity, time.time())
+            output = _run_ocr_call(prompt, data_url_full, time.time())
 
             if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
                 return ("Failed to extract the conversation with timestamps. Please try uploading the screenshot again. "
@@ -63,69 +60,51 @@ def stream_conversation_from_image_bytes(img_bytes, use_resize=True):
     payload_bytes = _resize_image_bytes(img_bytes) if use_resize else img_bytes
     data_url = _build_data_url(payload_bytes, mime)
     prompt = _get_conversation_prompt()
-    effort = "low"
-    verbosity = "low"
 
-    for delta in _stream_ocr_call(prompt, data_url, effort, verbosity):
+    for delta in _stream_ocr_call(prompt, data_url):
         yield delta
 
 
-
-def _run_ocr_call(prompt, data_url, effort, verbosity, start_time):
-    resp = client.responses.create(
-        model="gpt-5",
-        input=[{
+def _run_ocr_call(prompt, data_url, start_time):
+    resp = client.chat.completions.create(
+        model="gpt-4.1-nano",
+        messages=[{
             "role": "user",
             "content": [
-                {"type": "input_text", "text": prompt},
-                {"type": "input_image", "image_url": data_url}
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": data_url}}
             ]
         }],
-        reasoning={"effort": effort},
-        text={"verbosity": verbosity}
+        max_tokens=1500
     )
 
     usage_info = extract_usage(resp)
-    print(f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}")
+    print(f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | output={usage_info['output_tokens']} | total={usage_info['total_tokens']}")
 
-    output = resp.output_text.strip()
+    output = resp.choices[0].message.content.strip()
     elapsed = time.time() - start_time
     print(f"Response time: {elapsed:.2f} seconds")
 
     return output
 
 
-def _stream_ocr_call(prompt, data_url, effort, verbosity):
-    stream = client.responses.create(
-        model="gpt-5",
-        input=[{
+def _stream_ocr_call(prompt, data_url):
+    stream = client.chat.completions.create(
+        model="gpt-4.1-nano",
+        messages=[{
             "role": "user",
             "content": [
-                {"type": "input_text", "text": prompt},
-                {"type": "input_image", "image_url": data_url}
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": data_url}}
             ]
         }],
-        reasoning={"effort": effort},
-        text={"verbosity": verbosity},
+        max_tokens=1500,
         stream=True
     )
 
-    for event in stream:
-        event_type = getattr(event, "type", None)
-        if event_type == "response.output_text.delta":
-            delta = getattr(event, "delta", None)
-            if delta:
-                yield delta
-        elif event_type == "response.completed":
-            try:
-                usage_info = extract_usage(event.response)
-                print(
-                    f"[DEBUG] Actual usage | input={usage_info['input_tokens']} | "
-                    f"output={usage_info['output_tokens']} | reasoning={usage_info['reasoning_tokens']} | "
-                    f"cached={usage_info['cached_input_tokens']} | total={usage_info['total_tokens']}"
-                )
-            except Exception:
-                pass
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
 
 
 def _resize_image_bytes(img_bytes, max_long_edge=1280, quality=85):
@@ -170,34 +149,16 @@ def _build_data_url(img_bytes, mime):
 
 
 def _get_conversation_prompt():
-    return """
-    # Role & Objective
-    Extract the full conversation from the screenshot and output line-by-line text with **sender labels and timestamps**.
+    return """Extract the conversation from this screenshot.
 
-    # Extraction Rules
-    - Transcribe ALL visible messages exactly as written (no paraphrasing).
-    - For EACH message, include a timestamp in square brackets right after the sender label if any time is visible for that message in the UI.
-    - Accept valid timestamp forms exactly as shown: e.g., "9:14 PM", "21:14", "Yesterday 7:03 PM", "Mon, Aug 25 ƒ?› 7:03 PM", "08/25/2025 19:03".
-    - If a message has no visible time next to it, but there is a nearby date/time header chip for the group (e.g., "Yesterday ƒ?› 9:14 PM"), apply that header time to the messages in that group when it is clearly implied by the UI.
-    - If no time is visible or confidently implied for a message, leave the timestamp empty as "" (do NOT invent or infer new times).
-    - Keep sender identification as 'you:' and 'her:'. If ambiguous, infer from bubble color/orientation/username.
+Format each message as:
+you [timestamp]: message
+her [timestamp]: message
+system [timestamp]: message
 
-    # Formatting
-    - One message per line in this exact pattern:
-      you [<timestamp>]: <message text>
-      her [<timestamp>]: <message text>
-    - If timestamp is unknown, leave it empty but keep the brackets:
-      you []: <message text>
-    - Preserve message order top-to-bottom as displayed in the screenshot.
-    - Include system/join/leave or date separator lines only if they clearly carry text; label such lines as:
-      system [<timestamp_or_empty>]: <text>
-      (Use 'system' only for non-user messages like "You accepted the invite", date separators, etc.)
-
-    # Validation
-    - Before finishing, check that every message line matches the pattern:
-      ^(you|her|system) \\[(.*?)\\]: .+$
-    - Confirm that all visible messages have been transcribed.
-
-    # Output
-    - Output ONLY the transcribed lines, no commentary or bullets.
-    """
+Rules:
+- Use timestamps if visible (e.g., "9:14 PM"), otherwise leave empty: you []: message
+- "you" = right-side/blue bubbles, "her" = left-side/gray bubbles
+- "system" = date separators, notifications
+- Transcribe exactly as written, top to bottom
+- Output ONLY the formatted lines, no extra text"""
