@@ -424,6 +424,36 @@ def google_play_purchase(request):
             status=500,
         )
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def payment_history(request):
+    """Get the user's payment/purchase history."""
+    try:
+        purchases = CreditPurchase.objects.filter(user=request.user).order_by('-timestamp')[:50]
+
+        history = []
+        for purchase in purchases:
+            history.append({
+                "id": purchase.id,
+                "credits_purchased": purchase.credits_purchased,
+                "amount_paid": str(purchase.amount_paid),
+                "timestamp": purchase.timestamp.isoformat(),
+                "transaction_id": purchase.transaction_id or "",
+                "payment_status": purchase.payment_status,
+                "payment_provider": purchase.payment_provider or "",
+            })
+
+        return Response({
+            "success": True,
+            "purchases": history,
+        })
+    except Exception as exc:
+        logger.error("Payment history error user=%s", request.user.username, exc_info=True)
+        return Response(
+            {"success": False, "error": "Failed to fetch payment history"},
+            status=500,
+        )
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def password_reset(request):
