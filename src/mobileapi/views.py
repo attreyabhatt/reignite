@@ -318,6 +318,17 @@ def google_play_purchase(request):
                 purchase_token,
                 verify_error,
             )
+
+            # CRITICAL: Even if verification fails (refunded/cancelled), try to consume it
+            # This removes it from the purchase queue so it stops appearing in restorePurchases()
+            if verify_error == "google_play_not_purchased":
+                logger.info("Attempting to consume refunded/cancelled purchase to clear queue: token=%s", purchase_token[:20])
+                ack_success, ack_error = _acknowledge_google_play_purchase(product_id, purchase_token)
+                if ack_success:
+                    logger.info("Successfully consumed old purchase from queue: token=%s", purchase_token[:20])
+                else:
+                    logger.warning("Failed to consume old purchase: error=%s", ack_error)
+
             return Response(
                 {"success": False, "error": verify_error or "verification_failed"},
                 status=400,
