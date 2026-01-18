@@ -226,19 +226,4 @@ def _get_profile_prompt():
     - If profile is mostly generic or empty: Note this and extract whatever visual details exist
     - If image quality is poor: Do your best but note limitations
     - If multiple photos: Synthesize patterns across all photos
-    ```
-
-    **Key changes I made:**
-
-    1. **Added "Conversation Hooks" section** - This is the money maker. It forces the AI to explicitly identify what's most useful for openers
-
-    2. **More specific extraction categories** - Added concrete examples like "sports teams," "travel destinations," "shows/movies" so the AI knows what to look for
-
-    3. **Structured output format** - The labeled sections make it easier to parse programmatically and feed into your opener generator
-
-    4. **"Best for" reasoning** - Having the AI explain WHY something is a good hook helps ensure quality
-
-    5. **Quote directly** - Tells AI to preserve clever wording from bios (important for authenticity)
-
-    6. **Prioritize uniqueness** - Explicitly tells AI to favor unusual details over generic ones
     """
