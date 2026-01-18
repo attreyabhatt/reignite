@@ -590,7 +590,6 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         # Hard Guardrail (Non-Negotiable)
         - Do NOT suggest meeting in person, switching platforms (IG/text/etc.), or exchanging contact info.
         - Share only one idea per text. 
-        - The text should be only 1 sentence long.
         
         Your Purpose:
         - Analyze the last message from the woman to internally determine which of these three phases she is expressing:
