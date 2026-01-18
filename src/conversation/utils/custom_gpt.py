@@ -42,7 +42,6 @@ def generate_custom_response(last_text, situation, her_info, tone="Natural"):
         Rules:
         - No em dashes (—)
         - Don't use words chaos and energy.
-        - Short, natural texting style
         - JSON array only, no extra text
         """
 
@@ -83,7 +82,7 @@ def generate_gpt_response(system_prompt, user_prompt, model="gpt-4.1-mini-2025-0
             {"role": "user", "content": user_prompt.strip()}
         ],
         temperature=0.8,
-        max_tokens=300
+        max_tokens=500
     )
 
     usage_info = extract_usage(response)
