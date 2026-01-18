@@ -692,20 +692,31 @@ Output ONLY the JSON array, no explanations."""
         
 
         mobile_opener_prompt = f"""
-        # Objective and Tone
-        - Create 3 bold, witty, emotionally intelligent Casanova-style openers, crafting playful, personalized dating app openers to spark curiosity and replies.
-        - Use a flirty, mischievous style—provocative but never needy; avoid generic compliments and pickup lines.
+        You are an expert at creating engaging, authentic dating app conversation starters. Generate 3 unique opening messages based on the following profile information.
 
-        # Approach
-        - Tease, use situational humor, roleplay, and clever challenges based on details from the girl's profile, photos, hobbies, captions, or style.
-        - Keep things casual, fun, and focused on connection—not relationship-building.
 
-        # Guidelines
-        - Openers must be dynamic, concise (1–2 lines), and curiosity-sparking.
-        - Use **simple, conversational language**—avoid overcomplicating.
-        - Only pick 1 unique detail from her information for authenticity.
+        OPENER REQUIREMENTS:
+        1. Personalized: Reference specific details from their profile (interests, bio, photos, or prompts)
+        2. Natural & Conversational: Sound like a real person, not overly formal or rehearsed
+        3. Question or Hook: Include something that invites a response
+        4. Appropriate Length: 1-3 sentences maximum
+        5. Authentic Tone: Avoid cheesy pickup lines, be genuine and friendly
+        6. Show Personality: Let the sender's personality come through
+
+        AVOID:
+        - Generic openers like "Hey, how's your day?"
+        - Overly sexual or aggressive messages
+        - Compliments solely about physical appearance
+        - Copy-paste templates that feel impersonal
+        - Trying too hard to be clever or funny
+
+        Generate 3 diverse openers with different approaches:
+        - Opener 1: Question-based (asks about a specific interest or detail)
+        - Opener 2: Observational (makes a witty or thoughtful observation about their profile)
+        - Opener 3: Shared interest (connects over a common hobby or value)
+
         
-        Her Information : {her_info}
+        PROFILE INFORMATION: : {her_info}
         """
         
         if coach == "marc":

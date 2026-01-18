@@ -149,44 +149,96 @@ def _build_data_url(img_bytes, mime):
 def _get_profile_prompt():
     return """
     # Role & Objective
-    You are a dating profile analyzer. Extract key details from this dating profile screenshot or photo that would be useful for crafting a personalized opener.
+    You are a dating profile analyzer. Extract key details from this dating profile screenshot or photo that would be useful for crafting personalized, engaging conversation openers.
 
     # What to Extract
     Analyze the image and extract the following information if visible:
-    
+
     1. **Visual Details**:
-       - Physical appearance (hair color, style, distinctive features)
-       - Clothing style or accessories
-       - Setting/background (location, activity)
-       - Any pets or objects in the photo
-    
-    2. **Profile Information** (if it's a profile screenshot):
-       - Name (if visible)
-       - Age
-       - Bio text
-       - Interests or hobbies mentioned
-       - Occupation or education
-       - Location
-       - Prompts and answers (Hinge/Bumble style)
-    
-    3. **Personality Indicators**:
-       - What vibe does the photo/profile give? (adventurous, creative, professional, fun-loving, etc.)
-       - Any unique or interesting details that stand out
-       - Activities or interests shown in photos
-    
+    - Distinctive style choices (hair, fashion, accessories)
+    - Setting/background and what it suggests about lifestyle
+    - Activities shown (hiking, cooking, concerts, etc.)
+    - Any pets, books, sports equipment, or hobby-related items
+    - Facial expressions or body language (adventurous pose, relaxed vibe, etc.)
+
+    2. **Profile Text** (if it's a profile screenshot):
+    - Name and age (if visible)
+    - Bio text - pull out exact quotes if particularly clever or unique
+    - Listed interests, hobbies, or passions
+    - Occupation, education, or life stage details
+    - Location or hometown
+    - Profile prompts and their answers (common on Hinge/Bumble)
+    - Any mentions of: travel destinations, favorite foods, music taste, shows/movies, sports teams
+
+    3. **Conversation Hooks** (most important):
+    - Identify 3-5 specific details that would make excellent conversation starters
+    - Look for: unique hobbies, quirky interests, debatable opinions, shared experiences
+    - Note anything unexpected, humorous, or particularly passionate
+    - Flag any contradictions or interesting combinations (e.g., "accountant who loves heavy metal")
+
+    4. **Personality & Vibe**:
+    - Overall energy: adventurous, creative, professional, witty, laid-back, intellectual, outdoorsy, etc.
+    - Communication style in bio (casual, sincere, humorous, sarcastic)
+    - What they seem to value based on what they chose to highlight
+
     # Output Format
-    Provide a concise, natural description in paragraph form that highlights the most interesting and conversation-worthy details. Focus on:
-    - 2-3 visual details that stand out
-    - Any hobbies, interests, or personality traits evident
-    - Unique or quirky elements that could be conversation starters
-    
-    Keep it conversational and under 150 words. This will be used to generate opener messages.
-    
+    Provide your analysis in this structure:
+
+    **Profile Overview:** (2-3 sentences summarizing who they are)
+
+    **Key Details:**
+    - [List 4-6 specific, concrete details]
+
+    **Best Conversation Hooks:** 
+    - [List top 3 details that would make the strongest openers, with brief reasoning]
+
+    **Vibe/Personality:** (1-2 sentences)
+
     # Example Output
-    "She has curly brown hair and is wearing a vintage band t-shirt in what looks like a coffee shop. Her bio mentions she's a graphic designer who loves indie music and trying new coffee spots. She has a dog (golden retriever) in one of her photos. One of her Hinge prompts says her perfect Sunday involves farmers markets and brunch. She gives off creative, laid-back vibes and seems to appreciate good aesthetics."
-    
-    # Instructions
-    - Be specific but concise
-    - Focus on details that would make good conversation starters
-    - Don't make assumptions beyond what's clearly visible
-    - If it's just a photo with no profile text, focus on visual details and implied interests"""
+    **Profile Overview:** 
+    Sarah, 28, graphic designer with curly brown hair and a vintage band t-shirt aesthetic. Profile shows her at a coffee shop, at a dog park with her golden retriever, and at what looks like an outdoor concert.
+
+    **Key Details:**
+    - Wears vintage Fleetwood Mac t-shirt
+    - Works as a graphic designer
+    - Has a golden retriever named Biscuit
+    - Bio mentions: "Always searching for the best cold brew in Seattle"
+    - Hinge prompt: "Perfect Sunday = farmers market + brunch + vinyl shopping"
+    - Another prompt answer: "I'm weirdly competitive about board games"
+
+    **Best Conversation Hooks:**
+    1. Board game competitiveness - relatable, playful, invites banter
+    2. Coffee shop hunting - easy shared interest, can ask for recommendations
+    3. Golden retriever named Biscuit - universal conversation starter, quirky name
+
+    **Vibe/Personality:** 
+    Creative, laid-back with a slightly competitive edge. Values aesthetics and experiences over material things. Seems genuinely passionate about coffee culture and music.
+
+    # Important Guidelines
+    - **Be specific**: Don't say "likes music" - say "Fleetwood Mac t-shirt, mentions vinyl shopping"
+    - **Quote directly**: If the bio has a clever line, include it verbatim in quotes
+    - **Prioritize uniqueness**: Common things (likes travel, loves tacos) are less useful than specific details
+    - **Flag hookability**: Explicitly identify what makes something a good conversation starter
+    - **Avoid assumptions**: Stick to what's clearly visible or stated
+    - **For photo-only**: Focus on visual storytelling - what does their choice of photo suggest about priorities?
+
+    # Edge Cases
+    - If profile is mostly generic or empty: Note this and extract whatever visual details exist
+    - If image quality is poor: Do your best but note limitations
+    - If multiple photos: Synthesize patterns across all photos
+    ```
+
+    **Key changes I made:**
+
+    1. **Added "Conversation Hooks" section** - This is the money maker. It forces the AI to explicitly identify what's most useful for openers
+
+    2. **More specific extraction categories** - Added concrete examples like "sports teams," "travel destinations," "shows/movies" so the AI knows what to look for
+
+    3. **Structured output format** - The labeled sections make it easier to parse programmatically and feed into your opener generator
+
+    4. **"Best for" reasoning** - Having the AI explain WHY something is a good hook helps ensure quality
+
+    5. **Quote directly** - Tells AI to preserve clever wording from bios (important for authenticity)
+
+    6. **Prioritize uniqueness** - Explicitly tells AI to favor unusual details over generic ones
+    """
