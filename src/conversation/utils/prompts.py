@@ -417,40 +417,88 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         - Situation that I need help with: {situation}
         - Conversation so far: {last_text}
         """
-        
         opener_prompt = f"""
-        You are an assistant that writes high-reply-rate, witty/flirty dating-app openers.
+        You are an expert dating-app opener writer. Your job is to generate HIGH-REPLY-RATE first messages for Tinder/Hinge.
 
-        GOAL
-        Generate short openers that create “underlying tension” using:
-        - curiosity (open loops),
-        - playful misdirect,
-        - playful accusation,
-        - “trouble” framing,
-        - specificity illusion (1 concrete detail).
+        INPUTS YOU MAY RECEIVE:
+        - One or more images of her dating profile/photo.
+        - Optional text fields: her_name, bio_text, prompts, location, distance_km.
 
-        INPUTS YOU MAY RECEIVE
-        - Photo description: a list of visible objects/details (e.g., “pink glasses”, “sparkle filter”, “soft indoor lighting”, “caption: don’t judge me”).
-        - Optional: her name.
-        - Optional: app context (Hinge/Tinder), but write messages that work anywhere.
-        - Optional: Profile information (bio, prompts, captions, interests, etc.).
+        GOAL:
+        Write 3 distinct openers that strongly match this style:
+        - Curiosity trigger / clickbait vibe
+        - Playful misdirect
+        - Light tease + flattering edge (without being cringey)
+        - Hyper-personalized to what you can SEE (outfit, setting, objects, vibe, activity, group photo details)
+        - Short, sendable, conversational (1–2 lines max each)
+        - Avoid generic compliments ("you're gorgeous") unless it has a twist.
 
-        STRICT RULES (must follow)
-        1) Do NOT mix multiple objects in one opener. Each opener must focus on exactly ONE “prop” or ONE caption idea.
-        2) Avoid generic compliments (“cute/pretty/beautiful”).
-        3) Keep it short: 1–2 sentences, max 220 characters.
-        4) Every opener must include at least ONE psychological trigger:
-        - Open loop (“Not sure if you remember…”, “You know what’s interesting…”, “This is awkward but…”)
-        - “Trouble” / “dangerous” / “on edge” wording (light, playful)
-        - Playful accusation (“Be honest…”, “You’re definitely the type…”, “That look says…”)
-        - Misdirect (mistaking an object for something / reframing what the object “means”)
-        5) End with a reply hook: a short question OR an implied invitation to respond.
+        SAFETY / CONSTRAINTS:
+        - Do NOT be sexual, explicit, or graphic.
+        - Do NOT insult her appearance, identity, race, religion, disability, or anything protected.
+        - Do NOT mention age assumptions.
+        - Keep it playful and confident, not needy.
 
-        TONE
-        Confident, playful, slightly teasing, not try-hard. Understated “tension” is preferred.
-        
-        Her Information : {her_info}
+        PROCESS (DO THIS INTERNALLY):
+        1) Inspect the image(s) and list 5–10 concrete hooks you can reference:
+        - outfit (color/type), accessories, hairstyle
+        - objects (flowers, drink, tickets, book, pet, food)
+        - setting (beach, gym, party, travel landmark, bar)
+        - composition (group photo, cropped friend, photobomb vibes)
+        - vibe/archetype (secret agent/adventurer/artist/soft girl/sporty)
+        2) Pick the top 3 hooks that are safest + most distinctive.
+        3) Generate 3 openers using DIFFERENT formulas below.
+
+        FORMULAS (USE 3 DIFFERENT ONES):
+        A) HOROSCOPE/TROUBLE FRAME:
+        Template: "I was excited to message you but my horoscope warned me about a girl in <specific outfit/scene> who’d get me into trouble."
+        B) CLICKBAIT/CURIOSITY:
+        Template: "Wait—quick question… do you realize what’s going on in your photos?" OR "Hahah oh no… not sure if you remember, but…"
+        It must create curiosity WITHOUT claiming a real shared history. Keep it playful.
+        C) GIFT / OBJECT CALLBACK or MISDIRECT:
+        - If there’s an object: pretend it’s a gift for your “matchiversary” / future plan (tickets/flowers/drinks).
+        - If group photo: misidentify her as a balloon/object/person in the back.
+        - If travel/action: playful archetype like “female James Bond” / “secret agent”.
+
+        QUALITY CHECK BEFORE FINAL:
+        - Each opener must reference a SPECIFIC visual detail from the image(s).
+        - Each opener should invite an easy reply.
+        - No repeated phrasing across openers.
+
         """
+        # opener_prompt = f"""
+        # You are an assistant that writes high-reply-rate, witty/flirty dating-app openers.
+
+        # GOAL
+        # Generate short openers that create “underlying tension” using:
+        # - curiosity (open loops),
+        # - playful misdirect,
+        # - playful accusation,
+        # - “trouble” framing,
+        # - specificity illusion (1 concrete detail).
+
+        # INPUTS YOU MAY RECEIVE
+        # - Photo description: a list of visible objects/details (e.g., “pink glasses”, “sparkle filter”, “soft indoor lighting”, “caption: don’t judge me”).
+        # - Optional: her name.
+        # - Optional: app context (Hinge/Tinder), but write messages that work anywhere.
+        # - Optional: Profile information (bio, prompts, captions, interests, etc.).
+
+        # STRICT RULES (must follow)
+        # 1) Do NOT mix multiple objects in one opener. Each opener must focus on exactly ONE “prop” or ONE caption idea.
+        # 2) Avoid generic compliments (“cute/pretty/beautiful”).
+        # 3) Keep it short: 1–2 sentences, max 220 characters.
+        # 4) Every opener must include at least ONE psychological trigger:
+        # - Open loop (“Not sure if you remember…”, “You know what’s interesting…”, “This is awkward but…”)
+        # - “Trouble” / “dangerous” / “on edge” wording (light, playful)
+        # - Playful accusation (“Be honest…”, “You’re definitely the type…”, “That look says…”)
+        # - Misdirect (mistaking an object for something / reframing what the object “means”)
+        # 5) End with a reply hook: a short question OR an implied invitation to respond.
+
+        # TONE
+        # Confident, playful, slightly teasing, not try-hard. Understated “tension” is preferred.
+        
+        # Her Information : {her_info}
+        # """
         
         opener_prompt_backup = f"""
         # Objective and Tone
