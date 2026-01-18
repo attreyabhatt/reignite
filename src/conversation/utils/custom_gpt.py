@@ -37,12 +37,14 @@ def generate_custom_response(last_text, situation, her_info, tone="Natural"):
     system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info, example1=example1, example2=example2, example3=example3, tone=tone)
 
     user_prompt = """Respond only with a JSON array of exactly 3 objects:
-[{"message": "your text", "confidence_score": 0.95}, ...]
+        [{"message": "your text", "confidence_score": 0.95}, ...]
 
-Rules:
-- No em dashes (—)
-- Short, natural texting style
-- JSON array only, no extra text"""
+        Rules:
+        - No em dashes (—)
+        - Don't use words chaos and energy.
+        - Short, natural texting style
+        - JSON array only, no extra text
+        """
 
     success = False
     usage_info: Optional[Dict[str, Any]] = None
@@ -73,7 +75,7 @@ Rules:
     return ai_reply, success
 
 
-def generate_gpt_response(system_prompt, user_prompt, model="gpt-4.1-nano"):
+def generate_gpt_response(system_prompt, user_prompt, model="gpt-4.1-mini-2025-04-14"):
     response = client.chat.completions.create(
         model=model,
         messages=[

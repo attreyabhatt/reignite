@@ -22,7 +22,7 @@ def generate_comebacks(conversation: str) -> str:
 
     for key, persona in PERSONAS.items():
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4.1-mini-2025-04-14",
             messages=[
                 {"role": "system", "content": persona["system"]},
                 {"role": "user", "content": (

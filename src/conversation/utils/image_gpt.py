@@ -67,7 +67,7 @@ def stream_conversation_from_image_bytes(img_bytes, use_resize=True):
 
 def _run_ocr_call(prompt, data_url, start_time):
     resp = client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model="gpt-4.1-mini-2025-04-14",
         messages=[{
             "role": "user",
             "content": [
@@ -90,7 +90,7 @@ def _run_ocr_call(prompt, data_url, start_time):
 
 def _stream_ocr_call(prompt, data_url):
     stream = client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model="gpt-4.1-mini-2025-04-14",
         messages=[{
             "role": "user",
             "content": [

@@ -13,7 +13,7 @@ Context:
 Style: Confident, never chasing, low investment, use context from the chat. Frame yourself as the prize."""
 
     response = client.chat.completions.create(
-        model="gpt-4.1-nano",
+        model="gpt-4.1-mini-2025-04-14",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": "Write one short, natural message to revive the conversation."}

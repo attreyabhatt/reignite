@@ -80,7 +80,7 @@ Return ONLY this formatted text report.
 
     try:
         resp = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4.1-mini-2025-04-14",
             messages=[{
                 "role": "user",
                 "content": [
@@ -114,7 +114,7 @@ def stream_profile_analysis_bytes(img_bytes):
     prompt = _get_profile_prompt()
 
     stream = client.chat.completions.create(
-        model="gpt-4.1-nano",
+        model="gpt-4.1-mini-2025-04-14",
         messages=[{
             "role": "user",
             "content": [

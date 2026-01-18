@@ -49,7 +49,7 @@ Rules:
 
     return ai_reply, success
 
-def generate_gpt_response(system_prompt, user_prompt, model="gpt-4.1-nano"):
+def generate_gpt_response(system_prompt, user_prompt, model="gpt-4.1-mini-2025-04-14"):
     response = client.chat.completions.create(
         model=model,
         messages=[

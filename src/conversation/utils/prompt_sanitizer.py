@@ -12,7 +12,7 @@ Prompt to clean:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4.1-mini-2025-04-14",
             messages=[
                 {"role": "system", "content": "You rewrite prompts to be safe while preserving meaning."},
                 {"role": "user", "content": prompt}
