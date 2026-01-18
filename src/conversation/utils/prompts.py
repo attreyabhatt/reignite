@@ -436,7 +436,6 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         SAFETY / CONSTRAINTS:
         - Do NOT be sexual, explicit, or graphic.
         - Do NOT insult her appearance, identity, race, religion, disability, or anything protected.
-        - Do NOT mention age assumptions.
         - Keep it playful and confident, not needy.
 
         PROCESS (DO THIS INTERNALLY):
