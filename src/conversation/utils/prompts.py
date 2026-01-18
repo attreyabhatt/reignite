@@ -464,17 +464,6 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
 
         === HER PROFILE INFORMATION ===
         {her_info}
-
-        === OUTPUT FORMAT ===
-        Return ONLY a JSON array with exactly 3 openers:
-        [
-        {{"message": "opener 1 here", "confidence_score": 0.9}},
-        {{"message": "opener 2 here", "confidence_score": 0.85}},
-        {{"message": "opener 3 here", "confidence_score": 0.8}}
-        ]
-
-        Assign confidence scores (0.7-0.95) based on how well the opener fits her profile.
-        Output ONLY the JSON array, no explanations.
         """
 
         # opener_prompt = f"""
