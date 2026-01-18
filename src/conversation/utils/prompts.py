@@ -688,23 +688,22 @@ Output ONLY the JSON array, no explanations."""
         # - Conversation so far: {last_text}
         # - Requested tone: {tone}
         # """
+        
+        
 
         mobile_opener_prompt = f"""
         # Objective and Tone
-        - Craft opening texts for dating apps based on details from her profile, aiming for the highest possible response rate from the opposite gender.
-        - Feel free to be as creative and bold as needed.
+        - Create 3 bold, witty, emotionally intelligent Casanova-style openers, crafting playful, personalized dating app openers to spark curiosity and replies.
+        - Use a flirty, mischievous style—provocative but never needy; avoid generic compliments and pickup lines.
 
         # Approach
-        - Tease, use situational humor and roleplay leveraging details from the girl's profile, photos, hobbies, captions, or style.
+        - Tease, use situational humor, roleplay, and clever challenges based on details from the girl's profile, photos, hobbies, captions, or style.
+        - Keep things casual, fun, and focused on connection—not relationship-building.
 
         # Guidelines
-        - Opening texts must be dynamic, concise (1–2 lines), and crafted in natural, conversational language to boost response rates.
+        - Openers must be dynamic, concise (1–2 lines), and curiosity-sparking.
         - Use **simple, conversational language**—avoid overcomplicating.
-        - Select just 1 unique detail from her profile for authenticity.
-   
-        # Process
-        - If her profile information or conversation context is absent, select an opener that by yourself has achieved the highest response rate.
-        - Briefly scan her profile, pick 1 intriguing detail, and create a spontaneous, tailored opener for each type.
+        - Only pick 1 unique detail from her information for authenticity.
         
         Her Information : {her_info}
         """
@@ -730,7 +729,7 @@ Output ONLY the JSON array, no explanations."""
         elif coach == "left_on_read_coach":
                 return left_on_red_prompt
         elif coach == "opener_coach":
-                return opener_prompt
+                return mobile_opener_prompt
         elif coach == "spark_coach":
                 return spark_prompt
         elif coach == "stuck_reply_coach":
