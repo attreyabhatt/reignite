@@ -692,31 +692,58 @@ Output ONLY the JSON array, no explanations."""
         
 
         mobile_opener_prompt = f"""
-        You are an expert at creating engaging, authentic dating app conversation starters. Generate 3 unique opening messages based on the following profile information.
+        You are an expert dating conversation coach who helps people make genuine connections. Your openers get responses because they're personalized, natural, and easy to reply to.
 
+        Generate 3 exceptional opening messages for this dating profile.
 
-        OPENER REQUIREMENTS:
-        1. Personalized: Reference specific details from their profile (interests, bio, photos, or prompts)
-        2. Natural & Conversational: Sound like a real person, not overly formal or rehearsed
-        3. Question or Hook: Include something that invites a response
-        4. Appropriate Length: 1-3 sentences maximum
-        5. Authentic Tone: Avoid cheesy pickup lines, be genuine and friendly
-        6. Show Personality: Let the sender's personality come through
+        PROFILE ANALYSIS:
+        {her_info}
 
-        AVOID:
-        - Generic openers like "Hey, how's your day?"
-        - Overly sexual or aggressive messages
-        - Compliments solely about physical appearance
-        - Copy-paste templates that feel impersonal
-        - Trying too hard to be clever or funny
+        CORE PRINCIPLES:
+        1. **Hyper-specific**: Reference exact details, not general observations
+        2. **Question-first thinking**: Every opener must have a clear, easy-to-answer question
+        3. **Conversational flow**: Write like you're texting a friend, not writing an essay
+        4. **Show personality**: Be warm, curious, and slightly playful (but not try-hard)
+        5. **Natural length**: 1-2 sentences maximum per opener
 
-        Generate 3 diverse openers with different approaches:
-        - Opener 1: Question-based (asks about a specific interest or detail)
-        - Opener 2: Observational (makes a witty or thoughtful observation about their profile)
-        - Opener 3: Shared interest (connects over a common hobby or value)
+        OPENER STRATEGY:
+        Create 3 distinct approaches:
 
-        
-        PROFILE INFORMATION: : {her_info}
+        **Opener 1 - Curiosity Question**
+        Focus on one specific visual or profile detail. Ask about the story behind it.
+        Format: [Observation/compliment] + [Specific question]
+        Example: "That neon sculpture behind you is incredible! Was this a permanent exhibit or one of those pop-up installations?"
+
+        **Opener 2 - Observational + Playful**
+        Notice an interesting contrast, combination, or unexpected detail. Add light humor.
+        Format: [Interesting observation] + [Playful question or comment]
+        Example: "Traditional outfit at a futuristic art gallery - I love the vibe clash. Do you always match your outfits to the art, or did the universe just align? 😄"
+
+        **Opener 3 - Common Ground**
+        Find shared interest and invite them to share their expertise/experience.
+        Format: [Share your interest] + [Ask for their take/recommendation]
+        Example: "I'm always hunting for cool art installations - that golden sculpture setup looks amazing. Do you have a favorite gallery or exhibit you'd recommend?"
+
+        CRITICAL RULES:
+        - Keep each opener under 25 words
+        - End with a question mark (makes it easier to respond)
+        - Use ONE emoji maximum per opener (and only if it fits naturally)
+        - Avoid: "I love...", "I noticed...", "It's cool that..." - jump straight to the point
+        - No generic compliments ("you look great", "nice photo")
+        - Make the question SPECIFIC and easy to answer
+
+        BAD EXAMPLE:
+        "I love how your traditional outfit pops against such a modern art background. It's like a perfect mix of old and new."
+        ❌ No question = dead end
+        ❌ States the obvious = boring
+        ❌ Too formal = sounds like a template
+
+        GOOD EXAMPLE:
+        "Traditional outfit meets futuristic art - do you always coordinate your look with where you're going, or was this happy accident? 😄"
+        ✅ Has a question
+        ✅ Playful tone
+        ✅ Easy to respond to
+
         """
         
         if coach == "marc":
