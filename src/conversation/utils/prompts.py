@@ -418,27 +418,84 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         - Conversation so far: {last_text}
         """
 
+        opener_prompt = f"""You are an expert at selecting the best dating app openers based on a girl's profile.
 
-        
-        opener_prompt = f"""
-        # Objective and Tone
-        - Craft opening texts for dating apps based on details from her profile, aiming for the highest possible response rate from the opposite gender.
-        - Feel free to be as creative and bold as needed.
+YOUR TASK:
+Select exactly 3 openers from the lists below that BEST FIT her profile information. Personalize them where indicated.
 
-        # Approach
-        - Tease, use situational humor and roleplay leveraging details from the girl's profile, photos, hobbies, captions, or style.
+=== GENERAL OPENERS (use when no specific prop/detail stands out) ===
+1) How does this work? are we getting married now?
+2) Can I be honest?
+3) Hey [name], you know what's interesting about your pictures?
+4) I like you
+5) Hahah oh shit! Not sure if you remember
+6) I'm the one, you can delete the app now.
+7) Um, hi. I feel you appear attractive and consequently I would like to explore the possibility of enhancing your life by means of exposure to my awesomeness. K, thanks bye.
+8) Hey, [name]. So is this the part where we fall for each other instantly, tie the knot too soon, get divorced and then argue over who gets custody of the dog?
+9) you're adorable...fingers crossed you are not crazy 🤞
+10) You're the type of woman I would save before the kids in a fire
+11) Should I be jealous?
+12) Love that print on your top! Reminds me of the bedsheets I had as a child <3
+13) This is what I notice when I see your pictures. You have this kind of friendly vibe about you, you seem quite open. On the other hand, I think you can be quite introverted and be a bit shy as well. In one of your photos, I also noticed something funny
+14) Hey, trouble.
+15) You seem like my type :)
+16) Hey, future lover
+17) I'm at the food section in a store. Want me to pick you up something?
 
-        # Guidelines
-        - Opening texts must be dynamic, concise (1–2 lines), and crafted in natural, conversational language to boost response rates.
-        - Use **simple, conversational language**—avoid overcomplicating.
-        - Select just 1 unique detail from her profile for authenticity.
+=== PROP OPENERS (use when you see a specific item/detail in her profile) ===
+
+P1) "So sweet that you got me [X] for our matchiversary!"
+   - Replace [X] with ANY potential gift visible in her photos: flowers, champagne, wine glass, book, coffee, food, tickets, jewelry, plants, candles, chocolates, etc.
+   - Example: "So sweet that you got me flowers for our matchiversary!"
+
+P2) "I was so stoked to get to know you, but then my horoscope said that a [girl description] would get me into trouble"
+   - Replace [girl description] with how she's dressed/appears in her photo
+   - Example: "I was so stoked to get to know you, but then my horoscope said that a girl in a red dress would get me into trouble"
+
+P3) "[name], you're like the female James Bond. Can't wait to live out my dream of being a Bond girl"
+   - Use ONLY if it's an adventurous/travel picture (hiking, exotic location, action shot, etc.)
+
+=== SELECTION RULES ===
+1) PRIORITIZE prop openers (P1, P2, P3) if you can identify a relevant detail in her profile
+2) Replace [name] with her actual name if visible in the profile info
+3) If no name is visible, remove [name] or use "Hey" instead
+4) Pick openers that MATCH her vibe (adventurous girl = adventurous opener, cute/sweet = playful opener)
+5) Do NOT repeat similar openers - pick 3 DIVERSE options
+6) Keep the opener exactly as written, only personalizing the bracketed parts
+
+=== HER PROFILE INFORMATION ===
+{her_info}
+
+=== OUTPUT FORMAT ===
+Return ONLY a JSON array with exactly 3 openers:
+[
+  {{"message": "opener 1 here", "confidence_score": 0.9}},
+  {{"message": "opener 2 here", "confidence_score": 0.85}},
+  {{"message": "opener 3 here", "confidence_score": 0.8}}
+]
+
+Assign confidence scores (0.7-0.95) based on how well the opener fits her profile.
+Output ONLY the JSON array, no explanations."""
+
+        # opener_prompt = f"""
+        # # Objective and Tone
+        # - Craft opening texts for dating apps based on details from her profile, aiming for the highest possible response rate from the opposite gender.
+        # - Feel free to be as creative and bold as needed.
+
+        # # Approach
+        # - Tease, use situational humor and roleplay leveraging details from the girl's profile, photos, hobbies, captions, or style.
+
+        # # Guidelines
+        # - Opening texts must be dynamic, concise (1–2 lines), and crafted in natural, conversational language to boost response rates.
+        # - Use **simple, conversational language**—avoid overcomplicating.
+        # - Select just 1 unique detail from her profile for authenticity.
    
-        # Process
-        - If her profile information or conversation context is absent, select an opener that by yourself has achieved the highest response rate.
-        - Briefly scan her profile, pick 1 intriguing detail, and create a spontaneous, tailored opener for each type.
+        # # Process
+        # - If her profile information or conversation context is absent, select an opener that by yourself has achieved the highest response rate.
+        # - Briefly scan her profile, pick 1 intriguing detail, and create a spontaneous, tailored opener for each type.
         
-        Her Information : {her_info}
-        """
+        # Her Information : {her_info}
+        # """
         
         opener_prompt_backup = f"""
          # Objective and Tone
