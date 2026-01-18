@@ -147,17 +147,46 @@ def _build_data_url(img_bytes, mime):
 
 
 def _get_profile_prompt():
-    return """Extract details from this dating profile image for crafting openers.
+    return """
+    # Role & Objective
+    You are a dating profile analyzer. Extract key details from this dating profile screenshot or photo that would be useful for crafting a personalized opener.
 
-EXTRACT (only what's visible):
-- caption_text: exact text on image
-- photo_type: selfie/portrait/group/candid
-- setting: indoor/outdoor + visible elements
-- outfit: clothing type + color
-- accessories: glasses/jewelry/hat + color
-- hair: color + length + style
-- bio_text: verbatim if visible
-- prompt_answers: Q&A pairs if visible
-- props_for_openers: 3-10 single standalone elements (e.g., "pink glasses", "coffee shop", "dog")
-
-Output as plain text with section headers. No emojis, no assumptions."""
+    # What to Extract
+    Analyze the image and extract the following information if visible:
+    
+    1. **Visual Details**:
+       - Physical appearance (hair color, style, distinctive features)
+       - Clothing style or accessories
+       - Setting/background (location, activity)
+       - Any pets or objects in the photo
+    
+    2. **Profile Information** (if it's a profile screenshot):
+       - Name (if visible)
+       - Age
+       - Bio text
+       - Interests or hobbies mentioned
+       - Occupation or education
+       - Location
+       - Prompts and answers (Hinge/Bumble style)
+    
+    3. **Personality Indicators**:
+       - What vibe does the photo/profile give? (adventurous, creative, professional, fun-loving, etc.)
+       - Any unique or interesting details that stand out
+       - Activities or interests shown in photos
+    
+    # Output Format
+    Provide a concise, natural description in paragraph form that highlights the most interesting and conversation-worthy details. Focus on:
+    - 2-3 visual details that stand out
+    - Any hobbies, interests, or personality traits evident
+    - Unique or quirky elements that could be conversation starters
+    
+    Keep it conversational and under 150 words. This will be used to generate opener messages.
+    
+    # Example Output
+    "She has curly brown hair and is wearing a vintage band t-shirt in what looks like a coffee shop. Her bio mentions she's a graphic designer who loves indie music and trying new coffee spots. She has a dog (golden retriever) in one of her photos. One of her Hinge prompts says her perfect Sunday involves farmers markets and brunch. She gives off creative, laid-back vibes and seems to appreciate good aesthetics."
+    
+    # Instructions
+    - Be specific but concise
+    - Focus on details that would make good conversation starters
+    - Don't make assumptions beyond what's clearly visible
+    - If it's just a photo with no profile text, focus on visual details and implied interests"""
