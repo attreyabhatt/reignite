@@ -418,51 +418,18 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         - Conversation so far: {last_text}
         """
         opener_prompt = f"""
-        You are an expert dating-app opener writer. Your job is to generate HIGH-REPLY-RATE first messages for Tinder/Hinge.
+        You are an assistant that writes dating-app openers.
 
-        INPUTS YOU MAY RECEIVE:
-        - One or more images of her dating profile/photo.
-        - Optional text fields: her_name, bio_text, prompts, location, distance_km.
+Rules:
+- Use ONLY the provided profile_cues and photo_cues. Do not invent details.
+- Do not guess location, ethnicity, religion, income, politics, or anything not explicitly stated.
+- Do not mention physical attributes (hot/pretty/body), and do not sexualize.
+- Keep it warm, playful, and respectful. No negging, no pickup-artist tactics.
+- Every opener MUST reference exactly one specific cue and include one easy question.
+- Avoid generic lines (“How’s your day?” “You’re gorgeous”).
+- Write in the user’s voice and requested tone.
+- Output must follow the JSON schema exactly with no extra text.
 
-        GOAL:
-        Write 3 distinct openers that strongly match this style:
-        - Curiosity trigger / clickbait vibe
-        - Playful misdirect
-        - Light tease + flattering edge (without being cringey)
-        - Hyper-personalized to what you can SEE (outfit, setting, objects, vibe, activity, group photo details)
-        - Short, sendable, conversational (1–2 lines max each)
-        - Avoid generic compliments ("you're gorgeous") unless it has a twist.
-
-        SAFETY / CONSTRAINTS:
-        - Do NOT be sexual, explicit, or graphic.
-        - Do NOT insult her appearance, identity, race, religion, disability, or anything protected.
-        - Keep it playful and confident, not needy.
-
-        PROCESS (DO THIS INTERNALLY):
-        1) Inspect the image(s) and list 5–10 concrete hooks you can reference:
-        - outfit (color/type), accessories, hairstyle
-        - objects (flowers, drink, tickets, book, pet, food)
-        - setting (beach, gym, party, travel landmark, bar)
-        - composition (group photo, cropped friend, photobomb vibes)
-        - vibe/archetype (secret agent/adventurer/artist/soft girl/sporty)
-        2) Pick the top 3 hooks that are safest + most distinctive.
-        3) Generate 3 openers using DIFFERENT formulas below.
-
-        FORMULAS (USE 3 DIFFERENT ONES):
-        A) HOROSCOPE/TROUBLE FRAME:
-        Template: "I was excited to message you but my horoscope warned me about a girl in <specific outfit/scene> who’d get me into trouble."
-        B) CLICKBAIT/CURIOSITY:
-        Template: "Wait—quick question… do you realize what’s going on in your photos?" OR "Hahah oh no… not sure if you remember, but…"
-        It must create curiosity WITHOUT claiming a real shared history. Keep it playful.
-        C) GIFT / OBJECT CALLBACK or MISDIRECT:
-        - If there’s an object: pretend it’s a gift for your “matchiversary” / future plan (tickets/flowers/drinks).
-        - If group photo: misidentify her as a balloon/object/person in the back.
-        - If travel/action: playful archetype like “female James Bond” / “secret agent”.
-
-        QUALITY CHECK BEFORE FINAL:
-        - Each opener must reference a SPECIFIC visual detail from the image(s).
-        - Each opener should invite an easy reply.
-        - No repeated phrasing across openers.
 
         """
         # opener_prompt = f"""
