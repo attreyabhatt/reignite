@@ -412,11 +412,15 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         - Identify the correct rule internally (do not explain which one you chose).
         - Output only the 3 chosen variations.
         - Keep each variation short, natural, and in texting style.
-
+        {f'''
+        # CRITICAL - Custom Instructions (MUST FOLLOW)
+        The user has provided the following custom instructions that you MUST incorporate into ALL 3 responses:
+        "{custom_instructions}"
+        These instructions take priority over other guidelines. Make sure each response reflects these instructions.
+        ''' if custom_instructions else ""}
         # Inputs
         - Situation that I need help with: {situation}
         - Conversation so far: {last_text}
-        {f"- User's custom instructions: {custom_instructions}" if custom_instructions else ""}
         """
 
         opener_prompt = f"""You are an expert at selecting the best dating app openers based on a girl's profile.
@@ -638,10 +642,15 @@ Output ONLY the JSON array, no explanations."""
         - Maintain a casual, confident style with light, informal punctuation. Omit semicolons and em-dashes.
         - Mirror her message length: if her text is brief, respond slightly longer but not excessively; if long, choose one thread to reply to. Optionally, suggest, “That’s too much for text—call instead?”
 
+        {f'''
+        # CRITICAL - Custom Instructions (MUST FOLLOW)
+        The user has provided the following custom instructions that you MUST incorporate into ALL 3 responses:
+        "{custom_instructions}"
+        These instructions take priority over other guidelines. Make sure each response reflects these instructions.
+        ''' if custom_instructions else ""}
         # Inputs
         - Conversation so far: {last_text}
         - Requested tone: {tone}
-        {f"- User's custom instructions: {custom_instructions}" if custom_instructions else ""}
         """
 
         # mobile_stuck_reply_prompt = f"""
