@@ -1,7 +1,6 @@
 from openai import OpenAI
 from decouple import config
 import json
-from .left_on_read import is_left_on_read
 client = OpenAI(api_key=config('GPT_API_KEY'))
 from .prompts import get_prompt_for_coach
 from typing import Dict, Any, Optional
@@ -20,7 +19,6 @@ def generate_custom_response(last_text, situation, her_info, tone="Natural", cus
     "sassy_challenge": "shit_test",
     "spark_deeper_conversation": "logan",
     "pivot_conversation": "matthew",
-    "left_on_read": "left_on_read_coach",
     "reviving_old_chat": "marc",
     "recovering_after_cringe": "ken",
     "ask_her_out": "corey",
