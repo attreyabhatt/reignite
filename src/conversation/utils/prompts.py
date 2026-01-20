@@ -1,4 +1,4 @@
-def get_prompt_for_coach(coach, last_text, situation, her_info, example1, example2, example3, tone="Natural"):
+def get_prompt_for_coach(coach, last_text, situation, her_info, example1, example2, example3, tone="Natural", custom_instructions=""):
 
         logan_prompt = f"""
         # Role and Objective
@@ -408,14 +408,15 @@ def get_prompt_for_coach(coach, last_text, situation, her_info, example1, exampl
         Mindset: Bold, playful re-entry like you’re returning from an epic journey.  
         Generate 3 cinematic, funny variations in the style of: “And just like that… I return from the shadows.” / “Sorry, got stuck in traffic… for 2 weeks.” / “Bet you didn’t expect a plot twist this late in the story.”  
 
-        Always:  
-        - Identify the correct rule internally (do not explain which one you chose).  
-        - Output only the 3 chosen variations.  
-        - Keep each variation short, natural, and in texting style.  
-        
+        Always:
+        - Identify the correct rule internally (do not explain which one you chose).
+        - Output only the 3 chosen variations.
+        - Keep each variation short, natural, and in texting style.
+
         # Inputs
         - Situation that I need help with: {situation}
         - Conversation so far: {last_text}
+        {f"- User's custom instructions: {custom_instructions}" if custom_instructions else ""}
         """
 
         opener_prompt = f"""You are an expert at selecting the best dating app openers based on a girl's profile.
@@ -640,8 +641,9 @@ Output ONLY the JSON array, no explanations."""
         # Inputs
         - Conversation so far: {last_text}
         - Requested tone: {tone}
+        {f"- User's custom instructions: {custom_instructions}" if custom_instructions else ""}
         """
-        
+
         # mobile_stuck_reply_prompt = f"""
         # You are a texting assistant designed to help users craft messages that create attraction, comfort, and momentum in online conversations.
 

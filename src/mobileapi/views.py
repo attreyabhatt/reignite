@@ -553,7 +553,8 @@ def generate_text_with_credits(request):
         situation = request.data.get("situation")
         her_info = request.data.get("her_info", "")
         tone = request.data.get("tone", "Natural")  # Default to Natural
-        
+        custom_instructions = request.data.get("custom_instructions", "")
+
         if not last_text or not situation:
             return HttpResponseBadRequest("Missing required fields")
         
@@ -580,27 +581,27 @@ def generate_text_with_credits(request):
                         "message": "No credits remaining. Please upgrade your account."
                     })
                 
-                # Generate response with tone
-                reply, success = generate_custom_response(last_text, situation, her_info, tone=tone)
-                
+                # Generate response with tone and custom instructions
+                reply, success = generate_custom_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
+
                 if success:
                     # Deduct credit
                     chat_credit.balance -= 1
                     chat_credit.total_used += 1
                     chat_credit.save()
                     logger.info(f"Credit deducted. New balance: {chat_credit.balance}")
-                
+
                 return Response({
-                    "success": success, 
+                    "success": success,
                     "reply": reply,
                     "credits_remaining": chat_credit.balance
                 })
-                
+
             except ChatCredit.DoesNotExist:
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 # Create chat credit for user
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)  # 6-1
-                reply, success = generate_custom_response(last_text, situation, her_info, tone=tone)
+                reply, success = generate_custom_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
                 
                 return Response({
                     "success": success, 
@@ -628,9 +629,9 @@ def generate_text_with_credits(request):
                     "message": "Trial expired. Please sign up for more credits."
                 })
             
-            # Generate response with tone
-            reply, success = generate_custom_response(last_text, situation, her_info, tone=tone)
-            
+            # Generate response with tone and custom instructions
+            reply, success = generate_custom_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
+
             if success:
                 # Increment trial credits used
                 trial_ip.credits_used += 1

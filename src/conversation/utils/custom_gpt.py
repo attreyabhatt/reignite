@@ -7,7 +7,7 @@ from .prompts import get_prompt_for_coach
 from typing import Dict, Any, Optional
 import tiktoken
 from .dating.openers import get_openers
-def generate_custom_response(last_text, situation, her_info, tone="Natural"):
+def generate_custom_response(last_text, situation, her_info, tone="Natural", custom_instructions=""):
 
     SITUATION_TO_COACH = {
     "just_matched": "opener_coach",
@@ -34,7 +34,7 @@ def generate_custom_response(last_text, situation, her_info, tone="Natural"):
         example1, example2, example3 = get_openers()
 
     coach_key = SITUATION_TO_COACH.get(situation, "logan")  # fallback to Marc
-    system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info, example1=example1, example2=example2, example3=example3, tone=tone)
+    system_prompt = get_prompt_for_coach(coach_key, last_text, situation, her_info, example1=example1, example2=example2, example3=example3, tone=tone, custom_instructions=custom_instructions)
 
     user_prompt = """Respond only with a JSON array of exactly 3 objects:
         [{"message": "your text", "confidence_score": 0.95}, ...]
