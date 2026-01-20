@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 import tiktoken
 from .dating.openers import get_openers
 def generate_custom_response(last_text, situation, her_info, tone="Natural", custom_instructions=""):
-
+    print(custom_instructions)
     SITUATION_TO_COACH = {
     "just_matched": "opener_coach",
     "spark_interest": "spark_coach",
