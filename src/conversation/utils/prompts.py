@@ -696,6 +696,7 @@ Output ONLY the JSON array, no explanations."""
         ''' if custom_instructions else ""}
         # Inputs
         - Conversation so far: {last_text}
+        - Requested tone: {tone}
         """
 
         # mobile_stuck_reply_prompt = f"""
