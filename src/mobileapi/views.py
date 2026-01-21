@@ -15,7 +15,7 @@ import json
 import logging
 from functools import lru_cache
 
-from conversation.utils.custom_gpt import generate_custom_response
+from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
@@ -1024,3 +1024,109 @@ def analyze_profile_stream(request):
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
     return response
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def generate_openers_from_profile_image(request):
+    """Generate opener messages directly from a profile image (no extraction step)."""
+    try:
+        profile_image = request.FILES.get("profile_image")
+        custom_instructions = (request.data.get("custom_instructions") or "").strip()
+
+        if not profile_image:
+            return HttpResponseBadRequest("No file provided")
+
+        if profile_image.size == 0:
+            return HttpResponseBadRequest("Empty file received")
+
+        if profile_image.size > 10 * 1024 * 1024:  # 10MB limit
+            return HttpResponseBadRequest("File too large (max 10MB)")
+
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic']
+        if profile_image.content_type and profile_image.content_type not in allowed_types:
+            logger.warning(f"Unusual content type: {profile_image.content_type}")
+
+        logger.info(f"Generating openers from image - User authenticated: {request.user.is_authenticated}")
+
+        # Read image bytes
+        img_bytes = profile_image.read()
+
+        # Check credits
+        if request.user.is_authenticated:
+            logger.info(f"Authenticated user: {request.user.username}")
+            try:
+                chat_credit = ChatCredit.objects.get(user=request.user)
+                logger.info(f"User credits: {chat_credit.balance}")
+
+                if chat_credit.balance <= 0:
+                    return Response({
+                        "success": False,
+                        "error": "insufficient_credits",
+                        "message": "No credits remaining. Please upgrade your account."
+                    })
+
+                # Generate openers from image
+                reply, success = generate_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+
+                if success:
+                    chat_credit.balance -= 1
+                    chat_credit.total_used += 1
+                    chat_credit.save()
+                    logger.info(f"Credit deducted. New balance: {chat_credit.balance}")
+
+                return Response({
+                    "success": success,
+                    "reply": reply,
+                    "credits_remaining": chat_credit.balance
+                })
+
+            except ChatCredit.DoesNotExist:
+                logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
+                chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
+                reply, success = generate_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+
+                return Response({
+                    "success": success,
+                    "reply": reply,
+                    "credits_remaining": chat_credit.balance
+                })
+        else:
+            logger.info("Guest user detected")
+            client_ip = get_client_ip(request)
+            logger.info(f"Guest IP: {client_ip}")
+
+            trial_ip, created = TrialIP.objects.get_or_create(
+                ip_address=client_ip,
+                defaults={'trial_used': False, 'credits_used': 0}
+            )
+
+            logger.info(f"Trial IP - Created: {created}, Credits used: {trial_ip.credits_used}")
+
+            if trial_ip.credits_used >= 3:
+                return Response({
+                    "success": False,
+                    "error": "trial_expired",
+                    "message": "Trial expired. Please sign up for more credits."
+                })
+
+            # Generate openers from image
+            reply, success = generate_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+
+            if success:
+                trial_ip.credits_used += 1
+                if trial_ip.credits_used >= 3:
+                    trial_ip.trial_used = True
+                trial_ip.save()
+                logger.info(f"Trial credit used. Remaining: {3 - trial_ip.credits_used}")
+
+            return Response({
+                "success": success,
+                "reply": reply,
+                "is_trial": True,
+                "trial_credits_remaining": 3 - trial_ip.credits_used
+            })
+
+    except Exception as e:
+        logger.error(f"Generate openers from image error: {str(e)}", exc_info=True)
+        return Response({"success": False, "error": "Generation failed", "message": str(e)})

@@ -105,9 +105,9 @@ def ajax_reply(request):
             )
             created = True
 
-        # AI call
+        # AI call (webapp uses marc_prompt for just_matched)
         try:
-            custom_response, success = generate_custom_response(last_text, situation, her_info)
+            custom_response, success = generate_custom_response(last_text, situation, her_info, is_webapp=True)
         except Exception:
             return _json_error("AI engine error. Please try again.", status=500)
         if not success:
@@ -132,9 +132,9 @@ def ajax_reply(request):
         signup_url = reverse('account_signup') + "?next=/conversations/&message=out_of_credits"
         return JsonResponse({'redirect_url': signup_url}, status=403)
 
-    # AI call (no DB save for guests)
+    # AI call (no DB save for guests, webapp uses marc_prompt for just_matched)
     try:
-        custom_response, success = generate_custom_response(last_text, situation, her_info)
+        custom_response, success = generate_custom_response(last_text, situation, her_info, is_webapp=True)
     except Exception:
         return _json_error("AI engine error. Please try again.", status=500)
     if not success:
