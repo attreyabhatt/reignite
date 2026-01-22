@@ -8,6 +8,7 @@ urlpatterns = [
     path("password-reset/", views.password_reset, name="mobile_password_reset"),
     path("change-password/", views.change_password, name="mobile_change_password"),
     path("google-play/purchase/", views.google_play_purchase, name="google_play_purchase"),
+    path("google-play/verify-subscription/", views.verify_subscription, name="verify_subscription"),
     path("payment-history/", views.payment_history, name="mobile_payment_history"),
     path("profile/", views.profile, name="mobile_profile"),
     

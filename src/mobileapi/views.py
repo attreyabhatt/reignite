@@ -14,13 +14,13 @@ from decimal import Decimal, InvalidOperation
 import json
 import logging
 from functools import lru_cache
+from datetime import datetime
 
 from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
 from conversation.models import ChatCredit, TrialIP
-from django.utils import timezone
 from reignitehome.models import ContactMessage
 from pricing.models import CreditPurchase
 from django.conf import settings
@@ -29,8 +29,12 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+# Mobile subscription/fair-use limits
+SUBSCRIPTION_WEEKLY_LIMIT = 400  # fair-use cap for subscribers
 
 
 def _sse_event(payload):
@@ -152,6 +156,104 @@ def _acknowledge_google_play_purchase(product_id, purchase_token):
         logger.error("Unexpected error acknowledging purchase: %s", exc, exc_info=True)
         return False, str(exc)
 
+
+def _reset_weekly_counter(chat_credit):
+    now = timezone.now()
+    reset_at = chat_credit.subscriber_weekly_reset_at
+    if not reset_at or (now - reset_at).days >= 7:
+        chat_credit.subscriber_weekly_actions = 0
+        chat_credit.subscriber_weekly_reset_at = now
+        chat_credit.save(update_fields=["subscriber_weekly_actions", "subscriber_weekly_reset_at"])
+
+
+def _is_subscription_active(chat_credit):
+    """Check if a stored subscription is active and not expired."""
+    if not chat_credit.is_subscribed:
+        return False
+    if chat_credit.subscription_expiry and chat_credit.subscription_expiry < timezone.now():
+        chat_credit.is_subscribed = False
+        chat_credit.subscription_auto_renewing = False
+        chat_credit.subscription_purchase_token = None
+        chat_credit.subscription_product_id = None
+        chat_credit.subscription_platform = None
+        chat_credit.save(update_fields=[
+            "is_subscribed",
+            "subscription_auto_renewing",
+            "subscription_purchase_token",
+            "subscription_product_id",
+            "subscription_platform",
+        ])
+        return False
+    return True
+
+
+def _ensure_subscriber_allowance(chat_credit):
+    """Enforce weekly fair-use cap for subscribers. Returns (allowed, remaining)."""
+    _reset_weekly_counter(chat_credit)
+    if chat_credit.subscriber_weekly_actions >= SUBSCRIPTION_WEEKLY_LIMIT:
+        return False, 0
+    chat_credit.subscriber_weekly_actions += 1
+    chat_credit.save(update_fields=["subscriber_weekly_actions"])
+    remaining = max(0, SUBSCRIPTION_WEEKLY_LIMIT - chat_credit.subscriber_weekly_actions)
+    return True, remaining
+
+
+def _subscription_payload(chat_credit):
+    """Return subscription info payload for mobile clients."""
+    expiry = chat_credit.subscription_expiry.isoformat() if chat_credit.subscription_expiry else None
+    return {
+        "is_subscribed": _is_subscription_active(chat_credit),
+        "subscription_expiry": expiry,
+        "subscription_product_id": chat_credit.subscription_product_id,
+        "subscription_platform": chat_credit.subscription_platform,
+        "subscription_auto_renewing": chat_credit.subscription_auto_renewing,
+        "subscriber_weekly_remaining": max(
+            0,
+            SUBSCRIPTION_WEEKLY_LIMIT - (chat_credit.subscriber_weekly_actions or 0)
+        ),
+        "subscriber_weekly_limit": SUBSCRIPTION_WEEKLY_LIMIT,
+    }
+
+
+def _verify_google_play_subscription(product_id, purchase_token):
+    client = _get_google_play_client()
+    if client is None:
+        return False, "google_play_not_configured", None
+
+    try:
+        resp = (
+            client.purchases()
+            .subscriptions()
+            .get(
+                packageName=settings.GOOGLE_PLAY_PACKAGE_NAME,
+                subscriptionId=product_id,
+                token=purchase_token,
+            )
+            .execute()
+        )
+        logger.info("Play subscription response: %s", resp)
+
+        purchase_state = resp.get("purchaseState")
+        if purchase_state not in (0, None):
+            return False, "google_play_not_purchased", None
+
+        expiry_ms = resp.get("expiryTimeMillis")
+        expiry_dt = None
+        if expiry_ms:
+            expiry_dt = datetime.fromtimestamp(int(expiry_ms) / 1000.0, tz=timezone.utc)
+
+        return True, None, {
+            "expiry": expiry_dt,
+            "auto_renewing": resp.get("autoRenewing", False),
+            "kind": resp.get("kind"),
+        }
+    except HttpError as exc:
+        logger.warning("Google Play subscription verification failed: %s", exc)
+        return False, "google_play_verification_failed", None
+    except Exception as exc:
+        logger.error("Unexpected Play subscription verification error: %s", exc, exc_info=True)
+        return False, "verification_failed", None
+
 def get_client_ip(request):
     """Get client IP address"""
     try:
@@ -208,6 +310,8 @@ def register(request):
         
         logger.info(f"New user created: {username} with {chat_credit.balance} credits")
         
+        subscription_info = _subscription_payload(chat_credit)
+
         return Response({
             "success": True,
             "token": token.key,
@@ -216,7 +320,8 @@ def register(request):
                 "username": user.username,
                 "email": user.email
             },
-            "chat_credits": chat_credit.balance
+            "chat_credits": chat_credit.balance,
+            **subscription_info,
         })
         
     except IntegrityError:
@@ -250,6 +355,8 @@ def login(request):
             user=user,
             defaults={'balance': 10}  # Default credits for existing users
         )
+
+        subscription_info = _subscription_payload(chat_credit)
         
         return Response({
             "success": True,
@@ -259,7 +366,8 @@ def login(request):
                 "username": user.username,
                 "email": user.email
             },
-            "chat_credits": chat_credit.balance
+            "chat_credits": chat_credit.balance,
+            **subscription_info,
         })
         
     except Exception as e:
@@ -424,6 +532,67 @@ def google_play_purchase(request):
             status=500,
         )
 
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def verify_subscription(request):
+    """Verify a Google Play subscription for mobile and store subscription state."""
+    product_id = (request.data.get("product_id") or "").strip()
+    purchase_token = (request.data.get("purchase_token") or "").strip()
+
+    if not product_id or not purchase_token:
+        return Response(
+            {"success": False, "error": "missing_fields"},
+            status=400,
+        )
+
+    try:
+        chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
+        ok, error_code, meta = _verify_google_play_subscription(product_id, purchase_token)
+        now = timezone.now()
+
+        if ok and meta:
+            chat_credit.is_subscribed = True
+            chat_credit.subscription_product_id = product_id
+            chat_credit.subscription_platform = "google_play"
+            chat_credit.subscription_purchase_token = purchase_token
+            chat_credit.subscription_expiry = meta.get("expiry")
+            chat_credit.subscription_auto_renewing = meta.get("auto_renewing", False)
+            chat_credit.subscription_last_checked = now
+            chat_credit.save(update_fields=[
+                "is_subscribed",
+                "subscription_product_id",
+                "subscription_platform",
+                "subscription_purchase_token",
+                "subscription_expiry",
+                "subscription_auto_renewing",
+                "subscription_last_checked",
+            ])
+            payload = _subscription_payload(chat_credit)
+            return Response({"success": True, **payload})
+
+        # mark as not subscribed if verification failed
+        chat_credit.is_subscribed = False
+        chat_credit.subscription_auto_renewing = False
+        chat_credit.subscription_platform = "google_play"
+        chat_credit.subscription_last_checked = now
+        chat_credit.save(update_fields=[
+            "is_subscribed",
+            "subscription_auto_renewing",
+            "subscription_platform",
+            "subscription_last_checked",
+        ])
+        return Response(
+            {"success": False, "error": error_code or "verification_failed"},
+            status=400,
+        )
+    except Exception as exc:
+        logger.error("Subscription verification error: %s", exc, exc_info=True)
+        return Response(
+            {"success": False, "error": "verification_failed"},
+            status=500,
+        )
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def payment_history(request):
@@ -488,6 +657,7 @@ def profile(request):
     try:
         user = request.user
         chat_credit = ChatCredit.objects.get(user=user)
+        subscription_info = _subscription_payload(chat_credit)
         
         return Response({
             "success": True,
@@ -496,11 +666,13 @@ def profile(request):
                 "username": user.username,
                 "email": user.email
             },
-            "chat_credits": chat_credit.balance
+            "chat_credits": chat_credit.balance,
+            **subscription_info,
         })
     except ChatCredit.DoesNotExist:
         # Create chat credit if doesn't exist
         chat_credit = ChatCredit.objects.create(user=user, balance=10)
+        subscription_info = _subscription_payload(chat_credit)
         return Response({
             "success": True,
             "user": {
@@ -508,7 +680,8 @@ def profile(request):
                 "username": user.username,
                 "email": user.email
             },
-            "chat_credits": chat_credit.balance
+            "chat_credits": chat_credit.balance,
+            **subscription_info,
         })
 
 @api_view(["POST"])
@@ -569,23 +742,50 @@ def generate_text_with_credits(request):
         # Check if user is authenticated
         if request.user.is_authenticated:
             logger.info(f"Authenticated user: {request.user.username}")
-            # Check credits
             try:
                 chat_credit = ChatCredit.objects.get(user=request.user)
                 logger.info(f"User credits: {chat_credit.balance}")
-                
+
+                # Subscription path
+                if _is_subscription_active(chat_credit):
+                    allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                    if not allowed:
+                        return Response(
+                            {
+                                "success": False,
+                                "error": "fair_use_exceeded",
+                                "message": "You hit the weekly fair-use limit. Try again soon.",
+                                **_subscription_payload(chat_credit),
+                            },
+                            status=429,
+                        )
+
+                    reply, success = generate_custom_response(
+                        last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions
+                    )
+
+                    return Response({
+                        "success": success,
+                        "reply": reply,
+                        **_subscription_payload(chat_credit),
+                    })
+
+                # Non-subscribed fallback: use remaining credits as free actions
                 if chat_credit.balance <= 0:
                     return Response({
-                        "success": False, 
-                        "error": "insufficient_credits",
-                        "message": "No credits remaining. Please upgrade your account."
+                        "success": False,
+                        "error": "subscription_required",
+                        "message": "No credits remaining. Start your subscription to continue.",
+                        **_subscription_payload(chat_credit),
                     })
                 
                 # Generate response with tone and custom instructions
-                reply, success = generate_custom_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
+                reply, success = generate_custom_response(
+                    last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions
+                )
 
                 if success:
-                    # Deduct credit
+                    # Deduct credit (legacy/free actions)
                     chat_credit.balance -= 1
                     chat_credit.total_used += 1
                     chat_credit.save()
@@ -594,7 +794,8 @@ def generate_text_with_credits(request):
                 return Response({
                     "success": success,
                     "reply": reply,
-                    "credits_remaining": chat_credit.balance
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
                 })
 
             except ChatCredit.DoesNotExist:
@@ -606,7 +807,8 @@ def generate_text_with_credits(request):
                 return Response({
                     "success": success, 
                     "reply": reply,
-                    "credits_remaining": chat_credit.balance
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
                 })
         else:
             logger.info("Guest user detected")
@@ -678,25 +880,41 @@ def extract_from_image_with_credits(request):
         if request.user.is_authenticated:
             try:
                 chat_credit = ChatCredit.objects.get(user=request.user)
-                if chat_credit.balance <= 0:
+                if _is_subscription_active(chat_credit):
+                    allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                    if not allowed:
+                        return Response(
+                            {
+                                "success": False,
+                                "error": "fair_use_exceeded",
+                                "conversation": "You hit the weekly fair-use limit. Try again soon.",
+                                **_subscription_payload(chat_credit),
+                            },
+                            status=429,
+                        )
+
+                elif chat_credit.balance <= 0:
                     return Response({
                         "success": False, 
-                        "error": "insufficient_credits",
-                        "conversation": "No credits remaining. Please upgrade your account."
+                        "error": "subscription_required",
+                        "conversation": "No credits remaining. Start your subscription to continue.",
+                        **_subscription_payload(chat_credit),
                     })
                 
                 # Extract conversation
                 conversation = extract_conversation_from_image(screenshot)
                 
                 if conversation and conversation.strip():
-                    # Deduct credit
-                    chat_credit.balance -= 1
-                    chat_credit.total_used += 1
-                    chat_credit.save()
+                    if not _is_subscription_active(chat_credit):
+                        # Deduct credit only for non-subscribers using legacy/free balance
+                        chat_credit.balance -= 1
+                        chat_credit.total_used += 1
+                        chat_credit.save()
                     
                     return Response({
                         "conversation": conversation,
-                        "credits_remaining": chat_credit.balance
+                        "credits_remaining": chat_credit.balance,
+                        **_subscription_payload(chat_credit),
                     })
                 else:
                     return Response({
@@ -709,7 +927,8 @@ def extract_from_image_with_credits(request):
                 
                 return Response({
                     "conversation": conversation or "Failed to extract conversation.",
-                    "credits_remaining": chat_credit.balance
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
                 })
         else:
             # Handle guest users
@@ -783,13 +1002,22 @@ def extract_from_image_with_credits_stream(request):
     if request.user.is_authenticated:
         try:
             chat_credit = ChatCredit.objects.get(user=request.user)
-            if chat_credit.balance <= 0:
+            is_sub_active = _is_subscription_active(chat_credit)
+            if is_sub_active:
+                allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                if not allowed:
+                    return StreamingHttpResponse(
+                        _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit)),
+                        content_type="text/event-stream",
+                    )
+            elif chat_credit.balance <= 0:
                 return StreamingHttpResponse(
-                    _error_stream("insufficient_credits", "No credits remaining. Please upgrade your account."),
+                    _error_stream("subscription_required", "No credits remaining. Start your subscription to continue.", _subscription_payload(chat_credit)),
                     content_type="text/event-stream",
                 )
         except ChatCredit.DoesNotExist:
             chat_credit = ChatCredit.objects.create(user=request.user, balance=9)
+            is_sub_active = _is_subscription_active(chat_credit)
 
         def gen():
             output_parts = []
@@ -811,9 +1039,10 @@ def extract_from_image_with_credits_stream(request):
                     yield _sse_event(json.dumps({"type": "error", "error": "ocr_failed", "message": "Failed to extract conversation. Please try a clearer screenshot."}))
                     return
 
-                chat_credit.balance -= 1
-                chat_credit.total_used += 1
-                chat_credit.save()
+                if not is_sub_active:
+                    chat_credit.balance -= 1
+                    chat_credit.total_used += 1
+                    chat_credit.save()
 
                 yield _sse_event(
                     json.dumps(
@@ -821,6 +1050,7 @@ def extract_from_image_with_credits_stream(request):
                             "type": "done",
                             "conversation": full,
                             "credits_remaining": chat_credit.balance,
+                            **_subscription_payload(chat_credit),
                         }
                     )
                 )
@@ -891,6 +1121,7 @@ def extract_from_image_with_credits_stream(request):
 def analyze_profile(request):
     """Analyze profile image/screenshot to extract information"""
     try:
+        chat_credit = None
         profile_image = request.FILES.get("profile_image")
         
         if not profile_image:
@@ -909,7 +1140,30 @@ def analyze_profile(request):
             logger.warning(f"Unusual content type: {profile_image.content_type}")
         
         logger.info("Analyzing profile image...")
-        
+        # Apply subscription/fair-use gating for authenticated users
+        if request.user.is_authenticated:
+            try:
+                chat_credit = ChatCredit.objects.get(user=request.user)
+            except ChatCredit.DoesNotExist:
+                chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
+
+            if _is_subscription_active(chat_credit):
+                allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                if not allowed:
+                    return Response({
+                        "success": False,
+                        "error": "fair_use_exceeded",
+                        "profile_info": "You hit the weekly fair-use limit. Try again soon.",
+                        **_subscription_payload(chat_credit),
+                    }, status=429)
+            elif chat_credit.balance <= 0:
+                return Response({
+                    "success": False,
+                    "error": "subscription_required",
+                    "profile_info": "Start your subscription to continue.",
+                    **_subscription_payload(chat_credit),
+                })
+
         # Analyze the profile image
         analysis = analyze_profile_image(profile_image)
         
@@ -919,11 +1173,20 @@ def analyze_profile(request):
                 "success": False,
                 "profile_info": "Could not analyze the image. Please try a clearer screenshot or photo."
             })
+
+        if request.user.is_authenticated:
+            if chat_credit is None:
+                chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
+            if not _is_subscription_active(chat_credit) and chat_credit.balance > 0:
+                chat_credit.balance -= 1
+                chat_credit.total_used += 1
+                chat_credit.save()
         
         logger.info("Profile analysis successful")
         return Response({
             "success": True,
-            "profile_info": analysis
+            "profile_info": analysis,
+            **(_subscription_payload(ChatCredit.objects.get(user=request.user)) if request.user.is_authenticated else {}),
         })
         
     except Exception as e:
@@ -979,6 +1242,8 @@ def report_issue(request):
 @renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
 def analyze_profile_stream(request):
     """Stream profile analysis"""
+    chat_credit = None
+    is_sub_active = False
     profile_image = request.FILES.get("profile_image")
 
     if not profile_image:
@@ -996,6 +1261,26 @@ def analyze_profile_stream(request):
 
     img_bytes = profile_image.read()
 
+    if request.user.is_authenticated:
+        try:
+            chat_credit = ChatCredit.objects.get(user=request.user)
+            is_sub_active = _is_subscription_active(chat_credit)
+            if is_sub_active:
+                allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                if not allowed:
+                    return StreamingHttpResponse(
+                        _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit)),
+                        content_type="text/event-stream",
+                    )
+            elif chat_credit.balance <= 0:
+                return StreamingHttpResponse(
+                    _error_stream("subscription_required", "No credits remaining. Start your subscription to continue.", _subscription_payload(chat_credit)),
+                    content_type="text/event-stream",
+                )
+        except ChatCredit.DoesNotExist:
+            chat_credit = ChatCredit.objects.create(user=request.user, balance=9)
+            is_sub_active = _is_subscription_active(chat_credit)
+
     def gen():
         output_parts = []
         try:
@@ -1010,9 +1295,14 @@ def analyze_profile_stream(request):
                 )
                 return
 
+            if request.user.is_authenticated and chat_credit and not is_sub_active and chat_credit.balance > 0:
+                chat_credit.balance -= 1
+                chat_credit.total_used += 1
+                chat_credit.save()
+
             yield _sse_event(
                 json.dumps(
-                    {"type": "done", "success": True, "profile_info": full}
+                    {"type": "done", "success": True, "profile_info": full, **(_subscription_payload(chat_credit) if chat_credit else {})}
                 )
             )
         except Exception as exc:
@@ -1059,17 +1349,27 @@ def generate_openers_from_profile_image(request):
                 chat_credit = ChatCredit.objects.get(user=request.user)
                 logger.info(f"User credits: {chat_credit.balance}")
 
-                if chat_credit.balance <= 0:
+                if _is_subscription_active(chat_credit):
+                    allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                    if not allowed:
+                        return Response({
+                            "success": False,
+                            "error": "fair_use_exceeded",
+                            "message": "You hit the weekly fair-use limit. Try again soon.",
+                            **_subscription_payload(chat_credit),
+                        }, status=429)
+                elif chat_credit.balance <= 0:
                     return Response({
                         "success": False,
-                        "error": "insufficient_credits",
-                        "message": "No credits remaining. Please upgrade your account."
+                        "error": "subscription_required",
+                        "message": "No credits remaining. Start your subscription to continue.",
+                        **_subscription_payload(chat_credit),
                     })
 
                 # Generate openers from image
                 reply, success = generate_openers_from_image(img_bytes, custom_instructions=custom_instructions)
 
-                if success:
+                if success and not _is_subscription_active(chat_credit):
                     chat_credit.balance -= 1
                     chat_credit.total_used += 1
                     chat_credit.save()
@@ -1078,7 +1378,8 @@ def generate_openers_from_profile_image(request):
                 return Response({
                     "success": success,
                     "reply": reply,
-                    "credits_remaining": chat_credit.balance
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
                 })
 
             except ChatCredit.DoesNotExist:
@@ -1089,7 +1390,8 @@ def generate_openers_from_profile_image(request):
                 return Response({
                     "success": success,
                     "reply": reply,
-                    "credits_remaining": chat_credit.balance
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
                 })
         else:
             logger.info("Guest user detected")

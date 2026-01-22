@@ -37,6 +37,17 @@ class ChatCredit(models.Model):
     total_earned = models.PositiveIntegerField(default=3)  # Track total credits earned
     total_used = models.PositiveIntegerField(default=0)  # Track total credits used
     last_updated = models.DateTimeField(auto_now=True)
+    # Mobile subscription state (does not affect web credit logic)
+    is_subscribed = models.BooleanField(default=False)
+    subscription_product_id = models.CharField(max_length=200, blank=True, null=True)
+    subscription_platform = models.CharField(max_length=50, blank=True, null=True)
+    subscription_expiry = models.DateTimeField(blank=True, null=True)
+    subscription_auto_renewing = models.BooleanField(default=False)
+    subscription_purchase_token = models.TextField(blank=True, null=True)
+    subscription_last_checked = models.DateTimeField(blank=True, null=True)
+    # Fair-use tracking for subscribers
+    subscriber_weekly_actions = models.PositiveIntegerField(default=0)
+    subscriber_weekly_reset_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.balance} credits"
