@@ -14,7 +14,7 @@ from decimal import Decimal, InvalidOperation
 import json
 import logging
 from functools import lru_cache
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
@@ -213,6 +213,16 @@ def _subscription_payload(chat_credit):
         ),
         "subscriber_weekly_limit": SUBSCRIPTION_WEEKLY_LIMIT,
     }
+
+
+def _reset_trial_if_stale(trial_ip):
+    """Reset guest trial if more than a day old to avoid stale lockouts."""
+    now = timezone.now()
+    if trial_ip.first_seen and (now - trial_ip.first_seen) >= timedelta(days=1):
+        trial_ip.credits_used = 0
+        trial_ip.trial_used = False
+        trial_ip.first_seen = now
+        trial_ip.save(update_fields=["credits_used", "trial_used", "first_seen"])
 
 
 def _verify_google_play_subscription(product_id, purchase_token):
@@ -826,7 +836,9 @@ def generate_text_with_credits(request):
                 ip_address=client_ip,
                 defaults={'trial_used': False, 'credits_used': 0}
             )
-            
+            _reset_trial_if_stale(trial_ip)
+
+            _reset_trial_if_stale(trial_ip)
             logger.info(f"Trial IP - Created: {created}, Credits used: {trial_ip.credits_used}")
             
             # Check if guest has used all 3 trial credits
@@ -1346,6 +1358,7 @@ def generate_openers_from_profile_image(request):
                 ip_address=client_ip,
                 defaults={'trial_used': False, 'credits_used': 0}
             )
+            _reset_trial_if_stale(trial_ip)
 
             logger.info(f"Trial IP - Created: {created}, Credits used: {trial_ip.credits_used}")
 
