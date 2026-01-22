@@ -14,7 +14,7 @@ from decimal import Decimal, InvalidOperation
 import json
 import logging
 from functools import lru_cache
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 
 from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
@@ -295,7 +295,7 @@ def _verify_google_play_subscription(product_id, purchase_token):
         expiry_ms = resp.get("expiryTimeMillis")
         expiry_dt = None
         if expiry_ms:
-            expiry_dt = datetime.fromtimestamp(int(expiry_ms) / 1000.0, tz=timezone.utc)
+            expiry_dt = datetime.fromtimestamp(int(expiry_ms) / 1000.0, tz=dt_timezone.utc)
 
         return True, None, {
             "expiry": expiry_dt,
