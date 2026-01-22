@@ -732,6 +732,13 @@ def change_password(request):
 def generate_text_with_credits(request):
     """Generate text with credit system"""
     try:
+        auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
+        logger.info(
+            "MOBILE generate_text_with_credits | auth_header=%s | is_authenticated=%s | user=%s",
+            auth_header_present,
+            request.user.is_authenticated,
+            getattr(request.user, "username", "guest"),
+        )
         last_text = request.data.get("last_text")
         situation = request.data.get("situation")
         her_info = request.data.get("her_info", "")
@@ -838,12 +845,11 @@ def generate_text_with_credits(request):
                 defaults={'trial_used': False, 'credits_used': 0}
             )
             _reset_trial_if_stale(trial_ip)
-
-            _reset_trial_if_stale(trial_ip)
             logger.info(f"Trial IP - Created: {created}, Credits used: {trial_ip.credits_used}")
             
             # Check if guest has used all 3 trial credits
             if trial_ip.credits_used >= 3:
+                logger.info("Guest trial expired for IP=%s (credits_used=%s)", client_ip, trial_ip.credits_used)
                 return Response({
                     "success": False,
                     "error": "trial_expired",
@@ -878,6 +884,13 @@ def generate_text_with_credits(request):
 def extract_from_image_with_credits(request):
     """Extract from image with credit system"""
     try:
+        auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
+        logger.info(
+            "MOBILE extract_from_image_with_credits | auth_header=%s | is_authenticated=%s | user=%s",
+            auth_header_present,
+            request.user.is_authenticated,
+            getattr(request.user, "username", "guest"),
+        )
         screenshot = request.FILES.get("screenshot")
         
         if not screenshot:
@@ -1272,6 +1285,13 @@ def analyze_profile_stream(request):
 def generate_openers_from_profile_image(request):
     """Generate opener messages directly from a profile image (no extraction step)."""
     try:
+        auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
+        logger.info(
+            "MOBILE generate_openers_from_profile_image | auth_header=%s | is_authenticated=%s | user=%s",
+            auth_header_present,
+            request.user.is_authenticated,
+            getattr(request.user, "username", "guest"),
+        )
         profile_image = request.FILES.get("profile_image")
         custom_instructions = (request.data.get("custom_instructions") or "").strip()
 
@@ -1365,6 +1385,7 @@ def generate_openers_from_profile_image(request):
             logger.info(f"Trial IP - Created: {created}, Credits used: {trial_ip.credits_used}")
 
             if trial_ip.credits_used >= 3:
+                logger.info("Guest trial expired for IP=%s (credits_used=%s)", client_ip, trial_ip.credits_used)
                 return Response({
                     "success": False,
                     "error": "trial_expired",
