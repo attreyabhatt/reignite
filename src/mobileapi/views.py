@@ -746,6 +746,12 @@ def generate_text_with_credits(request):
                 chat_credit = ChatCredit.objects.get(user=request.user)
                 logger.info(f"User credits: {chat_credit.balance}")
 
+                # Safety: if user has never used credits and has none, grant the mobile free allotment once
+                if (not _is_subscription_active(chat_credit)) and chat_credit.balance <= 0 and chat_credit.total_used == 0:
+                    chat_credit.balance = max(chat_credit.balance, 3)
+                    chat_credit.total_earned += (chat_credit.balance or 0)
+                    chat_credit.save(update_fields=["balance", "total_earned"])
+
                 # Subscription path
                 if _is_subscription_active(chat_credit):
                     allowed, remaining = _ensure_subscriber_allowance(chat_credit)
@@ -1280,6 +1286,12 @@ def generate_openers_from_profile_image(request):
             try:
                 chat_credit = ChatCredit.objects.get(user=request.user)
                 logger.info(f"User credits: {chat_credit.balance}")
+
+                # Safety: grant one-time free allotment if none left and never used (mobile only)
+                if (not _is_subscription_active(chat_credit)) and chat_credit.balance <= 0 and chat_credit.total_used == 0:
+                    chat_credit.balance = max(chat_credit.balance, 3)
+                    chat_credit.total_earned += (chat_credit.balance or 0)
+                    chat_credit.save(update_fields=["balance", "total_earned"])
 
                 if _is_subscription_active(chat_credit):
                     allowed, remaining = _ensure_subscriber_allowance(chat_credit)
