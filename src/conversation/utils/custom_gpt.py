@@ -33,7 +33,7 @@ def generate_openers_from_image(image_bytes, custom_instructions=""):
     Return ONLY a JSON array with exactly 3 openers:
     [{"message": "opener 1", "confidence_score": 0.9}, {"message": "opener 2", "confidence_score": 0.85}, {"message": "opener 3", "confidence_score": 0.8}]
 
-    Rules:
+    # CRITICAL Rules - Custom Instructions (MUST FOLLOW) :
     - No em dashes (—)
     - Don't use words chaos and energy
     - JSON array only, no extra text

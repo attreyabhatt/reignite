@@ -892,37 +892,18 @@ def extract_from_image_with_credits(request):
                             },
                             status=429,
                         )
+                # For non-subscribers, OCR is free (do not check or deduct credits)
 
-                elif chat_credit.balance <= 0:
-                    return Response({
-                        "success": False, 
-                        "error": "subscription_required",
-                        "conversation": "No credits remaining. Start your subscription to continue.",
-                        **_subscription_payload(chat_credit),
-                    })
-                
-                # Extract conversation
                 conversation = extract_conversation_from_image(screenshot)
-                
-                if conversation and conversation.strip():
-                    if not _is_subscription_active(chat_credit):
-                        # Deduct credit only for non-subscribers using legacy/free balance
-                        chat_credit.balance -= 1
-                        chat_credit.total_used += 1
-                        chat_credit.save()
-                    
-                    return Response({
-                        "conversation": conversation,
-                        "credits_remaining": chat_credit.balance,
-                        **_subscription_payload(chat_credit),
-                    })
-                else:
-                    return Response({
-                        "conversation": "Failed to extract conversation. Please try again with a clearer screenshot."
-                    })
-                
+
+                return Response({
+                    "conversation": conversation,
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
+                })
+
             except ChatCredit.DoesNotExist:
-                chat_credit = ChatCredit.objects.create(user=request.user, balance=9)  # 10-1
+                chat_credit = ChatCredit.objects.create(user=request.user, balance=9)  # legacy field retained
                 conversation = extract_conversation_from_image(screenshot)
                 
                 return Response({
@@ -931,33 +912,11 @@ def extract_from_image_with_credits(request):
                     **_subscription_payload(chat_credit),
                 })
         else:
-            # Handle guest users
-            client_ip = get_client_ip(request)
-            trial_ip, created = TrialIP.objects.get_or_create(
-                ip_address=client_ip,
-                defaults={'trial_used': False, 'credits_used': 0}
-            )
-            
-            # Check if guest has used all 3 trial credits
-            if trial_ip.credits_used >= 3:
-                return Response({
-                    "conversation": "Trial expired. Please sign up for more credits.",
-                    "trial_expired": True
-                })
-            
+            # Guests: OCR is free and does not consume trial credits
             conversation = extract_conversation_from_image(screenshot)
-            
-            if conversation and conversation.strip():
-                # Increment trial credits used
-                trial_ip.credits_used += 1
-                if trial_ip.credits_used >= 3:
-                    trial_ip.trial_used = True
-                trial_ip.save()
-            
             return Response({
                 "conversation": conversation or "Failed to extract conversation.",
                 "is_trial": True,
-                "trial_credits_remaining": 3 - trial_ip.credits_used
             })
             
     except Exception as e:
@@ -1010,11 +969,7 @@ def extract_from_image_with_credits_stream(request):
                         _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit)),
                         content_type="text/event-stream",
                     )
-            elif chat_credit.balance <= 0:
-                return StreamingHttpResponse(
-                    _error_stream("subscription_required", "No credits remaining. Start your subscription to continue.", _subscription_payload(chat_credit)),
-                    content_type="text/event-stream",
-                )
+            # For non-subscribers, OCR streaming is free (no credit gate)
         except ChatCredit.DoesNotExist:
             chat_credit = ChatCredit.objects.create(user=request.user, balance=9)
             is_sub_active = _is_subscription_active(chat_credit)
@@ -1039,11 +994,6 @@ def extract_from_image_with_credits_stream(request):
                     yield _sse_event(json.dumps({"type": "error", "error": "ocr_failed", "message": "Failed to extract conversation. Please try a clearer screenshot."}))
                     return
 
-                if not is_sub_active:
-                    chat_credit.balance -= 1
-                    chat_credit.total_used += 1
-                    chat_credit.save()
-
                 yield _sse_event(
                     json.dumps(
                         {
@@ -1061,18 +1011,7 @@ def extract_from_image_with_credits_stream(request):
 
         response = StreamingHttpResponse(gen(), content_type="text/event-stream")
     else:
-        client_ip = get_client_ip(request)
-        trial_ip, created = TrialIP.objects.get_or_create(
-            ip_address=client_ip,
-            defaults={'trial_used': False, 'credits_used': 0}
-        )
-
-        if trial_ip.credits_used >= 3:
-            return StreamingHttpResponse(
-                _error_stream("trial_expired", "Trial expired. Please sign up for more credits.", {"trial_expired": True}),
-                content_type="text/event-stream",
-            )
-
+        # Guests: OCR streaming is free and does not consume trial credits
         def gen():
             output_parts = []
             try:
@@ -1089,19 +1028,12 @@ def extract_from_image_with_credits_stream(request):
                         yield _sse_event(json.dumps({"type": "delta", "text": delta}))
                     full = "".join(output_parts).strip()
 
-                if full:
-                    trial_ip.credits_used += 1
-                    if trial_ip.credits_used >= 3:
-                        trial_ip.trial_used = True
-                    trial_ip.save()
-
                 yield _sse_event(
                     json.dumps(
                         {
                             "type": "done",
                             "conversation": full or "Failed to extract conversation.",
                             "is_trial": True,
-                            "trial_credits_remaining": 3 - trial_ip.credits_used
                         }
                     )
                 )
