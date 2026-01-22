@@ -758,19 +758,58 @@ Output ONLY the JSON array, no explanations."""
         2. Create personalized openers that reference these details
         3. Be playful, confident, and intriguing - never generic or boring
 
-        ## Message Style Guidelines:
-        - Keep messages concise (1-2 sentences max)
-        - Be witty and playful, not creepy or overly complimentary
-        - Reference specific things you notice in her profile
-        - Create curiosity and make her want to respond
-        - Avoid generic pickup lines or "hey" messages
-        - No em-dashes, no semicolons
-        - Use emojis sparingly (max 1 per message if at all)
+        ## Style that have worked most effectively:
+        
+        1) How does this work? are we getting married now?
+        tag - clickbait
+        2) Can I be honest?
+        tag - clickbait
+        3) Hey <name>, you know what’s interesting about your pictures?
+        tag - clickbait
+        4) I like you
+        tag - direct
 
-        ## Message Types to Mix:
-        - Type 1: Short push-pull ("adorable... fingers crossed you're not crazy")
-        - Type 2: Playful observation with a twist ("I see you're into hiking - bet I can find a trail you haven't conquered yet")
-        - Type 3: Bold assumption or roleplay ("So this is where we fall for each other and argue about who gets the dog in the divorce?")
+        5) Hahah oh shit! Not sure if you remember
+        tag - clickbait
+
+        6) I’m the one, you can delete the app now.
+        tag - direct
+
+        7) Um, hi. I feel you appear attractive and consequently I would like to explore the possibility of enhancing your life by means of exposure to my awesomeness. K, thanks bye.
+        tag- witty
+
+        8) Hey, [name]. So is this the part where we fall for each other instantly, tie the knot too soon, get divorced and then argue over who gets custody of the dog?
+        tag- rolepay
+        8) you're adorable...fingers crossed you are not crazy 🤞
+        tag - direct
+        10) Should I be jealous?
+        tag - clickbait
+
+        11) Love that print on your top! Reminds me of the bedsheets I had as a child <3
+        tag- witty
+
+        12) This is what I notice when I see your pictures. You have this kind of friendly vibe about you, you seem quite open. On the other hand, I think you can be quite introverted and be a bit shy as well. In one of your photos, I also noticed something funny
+        tag- honest
+
+        12) Hey, trouble.
+        tag - short
+        13) You seem like my type :)
+        tag - direct
+        14) Hey, future lover
+        tag - short
+        15) I’m at the food section in a store. Want me to pick you up something?
+        tag - witty
+
+        16) So sweet that you got me flowers for our matchiversary! 
+        Instructions - The flowers can be replaced by anything used as a potential gift. Look for champagne glasses, books, tickets, ANYTHING that can be used as a gift in her information.
+        tag - witty
+        17) I was so stoked to get to know you, but then my horoscope said that a girl in a blue dress would get me into trouble
+        tag - tease
+        Instructions - You can change blue dress to anything she is wearing or doing.
+
+        18) Love that print on your top! Reminds me of the bedsheets I had as a child <3
+        tag - tease
+
 
         {f'''
         # CRITICAL - Custom Instructions (MUST FOLLOW)
