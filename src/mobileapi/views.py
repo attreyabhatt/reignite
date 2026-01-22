@@ -20,7 +20,7 @@ from conversation.utils.custom_gpt import generate_custom_response, generate_ope
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
-from conversation.models import ChatCredit, TrialIP
+from conversation.models import ChatCredit, TrialIP, GuestTrial
 from reignitehome.models import ContactMessage
 from pricing.models import CreditPurchase
 from django.conf import settings
@@ -223,6 +223,31 @@ def _reset_trial_if_stale(trial_ip):
         trial_ip.trial_used = False
         trial_ip.first_seen = now
         trial_ip.save(update_fields=["credits_used", "trial_used", "first_seen"])
+
+
+def _get_guest_id(request):
+    return (request.META.get("HTTP_X_GUEST_ID") or "").strip()
+
+
+def _get_or_create_guest_trial(request):
+    guest_id = _get_guest_id(request)
+    client_ip = get_client_ip(request)
+    if guest_id:
+        guest_trial, created = GuestTrial.objects.get_or_create(
+            guest_id=guest_id,
+            defaults={"ip_address": client_ip, "credits_used": 0, "trial_used": False},
+        )
+        if guest_trial.ip_address != client_ip:
+            guest_trial.ip_address = client_ip
+            guest_trial.save(update_fields=["ip_address", "last_seen"])
+        return guest_trial, created, guest_id, client_ip
+
+    # Fallback for older clients without guest id
+    trial_ip, created = TrialIP.objects.get_or_create(
+        ip_address=client_ip,
+        defaults={'trial_used': False, 'credits_used': 0}
+    )
+    return trial_ip, created, "", client_ip
 
 
 def _verify_google_play_subscription(product_id, purchase_token):
@@ -836,19 +861,14 @@ def generate_text_with_credits(request):
         else:
             logger.info("Guest user detected")
             # Handle guest users with IP-based trial
-            client_ip = get_client_ip(request)
-            logger.info(f"Guest IP: {client_ip}")
-            
-            trial_ip, created = TrialIP.objects.get_or_create(
-                ip_address=client_ip,
-                defaults={'trial_used': False, 'credits_used': 0}
-            )
+            trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
+            logger.info(f"Guest IP: {client_ip} guest_id={guest_id}")
             _reset_trial_if_stale(trial_ip)
-            print(f"[MOBILE] guest TrialIP created={created} ip={client_ip} credits_used={trial_ip.credits_used}")
+            print(f"[MOBILE] guest Trial created={created} guest_id={guest_id} ip={client_ip} credits_used={trial_ip.credits_used}")
             
             # Check if guest has used all 3 trial credits
             if trial_ip.credits_used >= 3:
-                print(f"[MOBILE] guest trial_expired ip={client_ip} credits_used={trial_ip.credits_used}")
+                print(f"[MOBILE] guest trial_expired guest_id={guest_id} ip={client_ip} credits_used={trial_ip.credits_used}")
                 return Response({
                     "success": False,
                     "error": "trial_expired",

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ChatCredit, Conversation, CopyEvent
+from .models import ChatCredit, Conversation, CopyEvent, GuestTrial, TrialIP
 
 @admin.register(ChatCredit)
 class ChatCreditAdmin(admin.ModelAdmin):
@@ -25,3 +25,16 @@ class CopyEventAdmin(admin.ModelAdmin):
         return obj.user.username if obj.user else "guest"
     get_username.short_description = 'User'
 
+
+@admin.register(GuestTrial)
+class GuestTrialAdmin(admin.ModelAdmin):
+    list_display = ('guest_id', 'ip_address', 'credits_used', 'trial_used', 'last_seen')
+    search_fields = ('guest_id', 'ip_address')
+    list_filter = ('trial_used', 'last_seen')
+
+
+@admin.register(TrialIP)
+class TrialIPAdmin(admin.ModelAdmin):
+    list_display = ('ip_address', 'credits_used', 'trial_used', 'first_seen')
+    search_fields = ('ip_address',)
+    list_filter = ('trial_used', 'first_seen')

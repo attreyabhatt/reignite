@@ -13,6 +13,18 @@ class TrialIP(models.Model):
     def __str__(self):
         return f"{self.ip_address} - Trial: {'Used' if self.trial_used else 'Available'}"
 
+
+class GuestTrial(models.Model):
+    guest_id = models.CharField(max_length=64, unique=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    first_seen = models.DateTimeField(auto_now_add=True)
+    last_seen = models.DateTimeField(auto_now=True)
+    trial_used = models.BooleanField(default=False)
+    credits_used = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.guest_id} - Trial: {'Used' if self.trial_used else 'Available'}"
+
 class ContactMessage(models.Model):
     REASON_CHOICES = [
         ('bug', 'Bug Report'),
