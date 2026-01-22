@@ -36,6 +36,13 @@ logger = logging.getLogger(__name__)
 # Mobile subscription/fair-use limits
 SUBSCRIPTION_WEEKLY_LIMIT = 400  # fair-use cap for subscribers
 
+def _mask_token(token):
+    if not token:
+        return ""
+    if len(token) <= 12:
+        return f"{token[:4]}...{token[-4:]}"
+    return f"{token[:8]}...{token[-4:]}"
+
 
 def _sse_event(payload):
     return f"data: {payload}\n\n"
@@ -62,6 +69,7 @@ def _get_google_play_client():
             scopes=["https://www.googleapis.com/auth/androidpublisher"],
         )
     else:
+        logger.error("Google Play client not configured: missing service account settings")
         return None
 
     return build("androidpublisher", "v3", credentials=creds, cache_discovery=False)
@@ -253,9 +261,21 @@ def _get_or_create_guest_trial(request):
 def _verify_google_play_subscription(product_id, purchase_token):
     client = _get_google_play_client()
     if client is None:
+        logger.error(
+            "Google Play verify subscription aborted: client not configured product_id=%s token=%s package=%s",
+            product_id,
+            _mask_token(purchase_token),
+            getattr(settings, "GOOGLE_PLAY_PACKAGE_NAME", None),
+        )
         return False, "google_play_not_configured", None
 
     try:
+        logger.info(
+            "Google Play verify subscription start product_id=%s token=%s package=%s",
+            product_id,
+            _mask_token(purchase_token),
+            settings.GOOGLE_PLAY_PACKAGE_NAME,
+        )
         resp = (
             client.purchases()
             .subscriptions()
@@ -283,7 +303,15 @@ def _verify_google_play_subscription(product_id, purchase_token):
             "kind": resp.get("kind"),
         }
     except HttpError as exc:
-        logger.warning("Google Play subscription verification failed: %s", exc)
+        logger.warning(
+            "Google Play subscription verification failed product_id=%s token=%s package=%s status=%s content=%s error=%s",
+            product_id,
+            _mask_token(purchase_token),
+            settings.GOOGLE_PLAY_PACKAGE_NAME,
+            getattr(exc, "status_code", None),
+            getattr(exc, "content", None),
+            exc,
+        )
         return False, "google_play_verification_failed", None
     except Exception as exc:
         logger.error("Unexpected Play subscription verification error: %s", exc, exc_info=True)
@@ -583,10 +611,24 @@ def verify_subscription(request):
 
     try:
         chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
+        logger.info(
+            "Verify subscription request user=%s product_id=%s token=%s package=%s",
+            request.user.username,
+            product_id,
+            _mask_token(purchase_token),
+            getattr(settings, "GOOGLE_PLAY_PACKAGE_NAME", None),
+        )
         ok, error_code, meta = _verify_google_play_subscription(product_id, purchase_token)
         now = timezone.now()
 
         if ok and meta:
+            logger.info(
+                "Verify subscription success user=%s product_id=%s expiry=%s auto_renewing=%s",
+                request.user.username,
+                product_id,
+                meta.get("expiry"),
+                meta.get("auto_renewing", False),
+            )
             chat_credit.is_subscribed = True
             chat_credit.subscription_product_id = product_id
             chat_credit.subscription_platform = "google_play"
@@ -607,6 +649,13 @@ def verify_subscription(request):
             return Response({"success": True, **payload})
 
         # mark as not subscribed if verification failed
+        logger.warning(
+            "Verify subscription failed user=%s product_id=%s token=%s error=%s",
+            request.user.username,
+            product_id,
+            _mask_token(purchase_token),
+            error_code,
+        )
         chat_credit.is_subscribed = False
         chat_credit.subscription_auto_renewing = False
         chat_credit.subscription_platform = "google_play"
