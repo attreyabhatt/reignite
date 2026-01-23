@@ -122,7 +122,7 @@ def generate_custom_response(last_text, situation, her_info, tone="Natural", cus
     user_prompt = """Respond only with a JSON array of exactly 3 objects:
         [{"message": "your text", "confidence_score": 0.95}, ...]
 
-        Rules:
+        # CRITICAL - Custom Instructions (MUST FOLLOW):
         - No em dashes (—)
         - Don't use words chaos and energy.
         - JSON array only, no extra text
