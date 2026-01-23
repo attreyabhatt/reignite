@@ -25,6 +25,21 @@ class GuestTrial(models.Model):
     def __str__(self):
         return f"{self.guest_id} - Trial: {'Used' if self.trial_used else 'Available'}"
 
+class RecommendedOpener(models.Model):
+    text = models.TextField()
+    why_it_works = models.TextField(blank=True)
+    image = models.ImageField(upload_to='recommended_openers/', blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return self.text[:60]
+
 class ContactMessage(models.Model):
     REASON_CHOICES = [
         ('bug', 'Bug Report'),

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ChatCredit, Conversation, CopyEvent, GuestTrial, TrialIP
+from .models import ChatCredit, Conversation, CopyEvent, GuestTrial, TrialIP, RecommendedOpener
 
 @admin.register(ChatCredit)
 class ChatCreditAdmin(admin.ModelAdmin):
@@ -38,3 +38,11 @@ class TrialIPAdmin(admin.ModelAdmin):
     list_display = ('ip_address', 'credits_used', 'trial_used', 'first_seen')
     search_fields = ('ip_address',)
     list_filter = ('trial_used', 'first_seen')
+
+
+@admin.register(RecommendedOpener)
+class RecommendedOpenerAdmin(admin.ModelAdmin):
+    list_display = ('text', 'is_active', 'sort_order', 'updated_at')
+    list_filter = ('is_active',)
+    search_fields = ('text', 'why_it_works')
+    ordering = ('sort_order', 'id')

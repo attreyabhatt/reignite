@@ -11,6 +11,7 @@ from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from decimal import Decimal, InvalidOperation
+import random
 import json
 import logging
 from functools import lru_cache
@@ -20,7 +21,7 @@ from conversation.utils.custom_gpt import generate_custom_response, generate_ope
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
-from conversation.models import ChatCredit, TrialIP, GuestTrial
+from conversation.models import ChatCredit, TrialIP, GuestTrial, RecommendedOpener
 from reignitehome.models import ContactMessage
 from pricing.models import CreditPurchase
 from django.conf import settings
@@ -256,6 +257,17 @@ def _get_or_create_guest_trial(request):
         defaults={'trial_used': False, 'credits_used': 0}
     )
     return trial_ip, created, "", client_ip
+
+
+def _select_recommended_openers(count):
+    qs = list(RecommendedOpener.objects.filter(is_active=True).order_by("sort_order", "id"))
+    if not qs:
+        return []
+    if count is None or count <= 0:
+        return qs
+    if len(qs) <= count:
+        return qs
+    return random.sample(qs, count)
 
 
 def _verify_google_play_subscription(product_id, purchase_token):
@@ -1439,19 +1451,20 @@ def generate_openers_from_profile_image(request):
                 })
         else:
             logger.info("Guest user detected")
-            client_ip = get_client_ip(request)
-            logger.info(f"Guest IP: {client_ip}")
-
-            trial_ip, created = TrialIP.objects.get_or_create(
-                ip_address=client_ip,
-                defaults={'trial_used': False, 'credits_used': 0}
-            )
+            trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
+            logger.info(f"Guest IP: {client_ip} guest_id={guest_id}")
             _reset_trial_if_stale(trial_ip)
 
-            print(f"[MOBILE] guest TrialIP created={created} ip={client_ip} credits_used={trial_ip.credits_used}")
+            print(
+                f"[MOBILE] guest Trial created={created} guest_id={guest_id} "
+                f"ip={client_ip} credits_used={trial_ip.credits_used}"
+            )
 
             if trial_ip.credits_used >= 3:
-                print(f"[MOBILE] guest trial_expired ip={client_ip} credits_used={trial_ip.credits_used}")
+                print(
+                    f"[MOBILE] guest trial_expired guest_id={guest_id} "
+                    f"ip={client_ip} credits_used={trial_ip.credits_used}"
+                )
                 return Response({
                     "success": False,
                     "error": "trial_expired",
@@ -1478,3 +1491,122 @@ def generate_openers_from_profile_image(request):
     except Exception as e:
         logger.error(f"Generate openers from image error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Generation failed", "message": str(e)})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def recommended_openers(request):
+    """Return recommended openers and count towards free use/subscription limits."""
+    try:
+        count_raw = request.data.get("count", 3)
+        try:
+            count = int(count_raw)
+        except (TypeError, ValueError):
+            count = 3
+
+        openers = _select_recommended_openers(count)
+        if not openers:
+            return Response(
+                {"success": False, "error": "no_openers", "message": "No openers available"},
+                status=404,
+            )
+
+        if request.user.is_authenticated:
+            chat_credit = ChatCredit.objects.get(user=request.user)
+
+            # Safety: ensure every non-subscriber gets at least 3 free generations total
+            if not _is_subscription_active(chat_credit) and chat_credit.total_used < 3 and chat_credit.balance <= 0:
+                top_up = 3 - chat_credit.total_used
+                chat_credit.balance += top_up
+                chat_credit.total_earned += top_up
+                chat_credit.save(update_fields=["balance", "total_earned"])
+
+            if _is_subscription_active(chat_credit):
+                allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                if not allowed:
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "fair_use_exceeded",
+                            "message": "You hit the weekly fair-use limit. Try again soon.",
+                            **_subscription_payload(chat_credit),
+                        },
+                        status=429,
+                    )
+            elif chat_credit.balance <= 0:
+                return Response({
+                    "success": False,
+                    "error": "subscription_required",
+                    "message": "No credits remaining. Start your subscription to continue.",
+                    **_subscription_payload(chat_credit),
+                })
+
+            if not _is_subscription_active(chat_credit):
+                chat_credit.balance -= 1
+                chat_credit.total_used += 1
+                chat_credit.save()
+
+            return Response(
+                {
+                    "success": True,
+                    "openers": [
+                        {
+                            "id": opener.id,
+                            "message": opener.text,
+                            "why_it_works": opener.why_it_works,
+                            "image_url": opener.image.url if opener.image else None,
+                        }
+                        for opener in openers
+                    ],
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
+                }
+            )
+
+        # Guest path
+        trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
+        _reset_trial_if_stale(trial_ip)
+        logger.info(
+            "[MOBILE] recommended_openers guest created=%s guest_id=%s ip=%s credits_used=%s",
+            created,
+            guest_id,
+            client_ip,
+            trial_ip.credits_used,
+        )
+
+        if trial_ip.credits_used >= 3:
+            return Response({
+                "success": False,
+                "error": "trial_expired",
+                "message": "Trial expired. Please sign up for more credits."
+            })
+
+        trial_ip.credits_used += 1
+        if trial_ip.credits_used >= 3:
+            trial_ip.trial_used = True
+        trial_ip.save()
+
+        return Response(
+            {
+                "success": True,
+                "openers": [
+                    {
+                        "id": opener.id,
+                        "message": opener.text,
+                        "why_it_works": opener.why_it_works,
+                        "image_url": opener.image.url if opener.image else None,
+                    }
+                    for opener in openers
+                ],
+                "is_trial": True,
+                "trial_credits_remaining": 3 - trial_ip.credits_used,
+            }
+        )
+    except ChatCredit.DoesNotExist:
+        return Response(
+            {"success": False, "error": "profile_required"},
+            status=400,
+        )
+    except Exception as exc:
+        logger.error("Recommended openers error: %s", exc, exc_info=True)
+        return Response({"success": False, "error": "generation_failed"}, status=500)
