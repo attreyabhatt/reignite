@@ -1513,39 +1513,6 @@ def recommended_openers(request):
 
         if request.user.is_authenticated:
             chat_credit = ChatCredit.objects.get(user=request.user)
-
-            # Safety: ensure every non-subscriber gets at least 3 free generations total
-            if not _is_subscription_active(chat_credit) and chat_credit.total_used < 3 and chat_credit.balance <= 0:
-                top_up = 3 - chat_credit.total_used
-                chat_credit.balance += top_up
-                chat_credit.total_earned += top_up
-                chat_credit.save(update_fields=["balance", "total_earned"])
-
-            if _is_subscription_active(chat_credit):
-                allowed, remaining = _ensure_subscriber_allowance(chat_credit)
-                if not allowed:
-                    return Response(
-                        {
-                            "success": False,
-                            "error": "fair_use_exceeded",
-                            "message": "You hit the weekly fair-use limit. Try again soon.",
-                            **_subscription_payload(chat_credit),
-                        },
-                        status=429,
-                    )
-            elif chat_credit.balance <= 0:
-                return Response({
-                    "success": False,
-                    "error": "subscription_required",
-                    "message": "No credits remaining. Start your subscription to continue.",
-                    **_subscription_payload(chat_credit),
-                })
-
-            if not _is_subscription_active(chat_credit):
-                chat_credit.balance -= 1
-                chat_credit.total_used += 1
-                chat_credit.save()
-
             return Response(
                 {
                     "success": True,
@@ -1558,34 +1525,11 @@ def recommended_openers(request):
                         }
                         for opener in openers
                     ],
-                    "credits_remaining": chat_credit.balance,
                     **_subscription_payload(chat_credit),
                 }
             )
 
-        # Guest path
-        trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
-        _reset_trial_if_stale(trial_ip)
-        logger.info(
-            "[MOBILE] recommended_openers guest created=%s guest_id=%s ip=%s credits_used=%s",
-            created,
-            guest_id,
-            client_ip,
-            trial_ip.credits_used,
-        )
-
-        if trial_ip.credits_used >= 3:
-            return Response({
-                "success": False,
-                "error": "trial_expired",
-                "message": "Trial expired. Please sign up for more credits."
-            })
-
-        trial_ip.credits_used += 1
-        if trial_ip.credits_used >= 3:
-            trial_ip.trial_used = True
-        trial_ip.save()
-
+        # Guest path (no credit usage)
         return Response(
             {
                 "success": True,
@@ -1598,8 +1542,6 @@ def recommended_openers(request):
                     }
                     for opener in openers
                 ],
-                "is_trial": True,
-                "trial_credits_remaining": 3 - trial_ip.credits_used,
             }
         )
     except ChatCredit.DoesNotExist:
