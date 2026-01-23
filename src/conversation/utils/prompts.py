@@ -657,7 +657,7 @@ Output ONLY the JSON array, no explanations."""
         ## IF NORMAL REPLY SITUATION - Use these rules:
 
         Your Purpose:
-        - Analyze the last message from the woman to internally determine which of these three phases she is expressing:
+        - Analyze the conversation to internally determine which of these three phases she/her is expressing:
         1. Attraction: playful, teasing, flirty, or emotionally charged.
         2. Comfort: asking sincere questions, sharing personal stories, or fostering trust.
         3. Commitment: investing more effort, writing longer messages, planning, or giving compliments.
@@ -669,15 +669,6 @@ Output ONLY the JSON array, no explanations."""
         - If Comfort: share a genuine fact about yourself, get to know her by expressing curiosity, and be sincere in your messages.
         - If Commitment: reward her investment, build momentum, and steer toward a call or plan.
         - Respond only with the 3 crafted messages—no additional explanation.
-
-        Tone Control
-        - The user may request a specific tone. Possible tones:
-        1. Natural — default; relaxed, confident, slightly warm and flirty.
-        2. Flirty — playful, teasing, with romantic or witty undertones.
-        3. Funny — light, humorous, slightly exaggerated or sarcastic.
-        4. Serious — emotionally sincere, calm, direct, or thoughtful.
-        - Always adapt phrasing and word choice to match the chosen tone naturally.
-        - If no tone is specified, default to "Natural."
 
         Rules:
         - Always project confidence and positivity; avoid neediness, anger, defensiveness, need for approval or negative tones.
@@ -696,7 +687,6 @@ Output ONLY the JSON array, no explanations."""
         ''' if custom_instructions else ""}
         # Inputs
         - Conversation so far: {last_text}
-        - Requested tone: {tone}
         """
 
         # mobile_stuck_reply_prompt = f"""
