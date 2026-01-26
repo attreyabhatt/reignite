@@ -18,6 +18,7 @@ from functools import lru_cache
 from datetime import datetime, timedelta, timezone as dt_timezone
 
 from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
+from conversation.utils.mobile.custom_mobile import generate_mobile_response, generate_mobile_openers_from_image
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
@@ -869,7 +870,7 @@ def generate_text_with_credits(request):
                             status=429,
                         )
 
-                    reply, success = generate_custom_response(
+                    reply, success = generate_mobile_response(
                         last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions
                     )
 
@@ -911,7 +912,7 @@ def generate_text_with_credits(request):
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 # Create chat credit for user
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)  # 6-1
-                reply, success = generate_custom_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
+                reply, success = generate_mobile_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
                 
                 return Response({
                     "success": success, 
@@ -937,7 +938,7 @@ def generate_text_with_credits(request):
                 })
             
             # Generate response with tone and custom instructions
-            reply, success = generate_custom_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
+            reply, success = generate_mobile_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
 
             if success:
                 # Increment trial credits used
@@ -1423,7 +1424,7 @@ def generate_openers_from_profile_image(request):
                     })
 
                 # Generate openers from image
-                reply, success = generate_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+                reply, success = generate_mobile_openers_from_image(img_bytes, custom_instructions=custom_instructions)
 
                 if success and not _is_subscription_active(chat_credit):
                     chat_credit.balance -= 1
@@ -1441,7 +1442,7 @@ def generate_openers_from_profile_image(request):
             except ChatCredit.DoesNotExist:
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
-                reply, success = generate_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+                reply, success = generate_mobile_openers_from_image(img_bytes, custom_instructions=custom_instructions)
 
                 return Response({
                     "success": success,
@@ -1472,7 +1473,7 @@ def generate_openers_from_profile_image(request):
                 })
 
             # Generate openers from image
-            reply, success = generate_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+            reply, success = generate_mobile_openers_from_image(img_bytes, custom_instructions=custom_instructions)
 
             if success:
                 trial_ip.credits_used += 1
