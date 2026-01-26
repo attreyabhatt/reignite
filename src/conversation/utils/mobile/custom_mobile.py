@@ -49,14 +49,9 @@ def generate_mobile_openers_from_image(image_bytes: bytes, custom_instructions: 
         response = client.models.generate_content(
             model=GEMINI_PRO,
             contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(system_prompt),
-                        image_part,
-                        types.Part.from_text(user_prompt),
-                    ]
-                )
+                system_prompt,
+                image_part,
+                user_prompt,
             ]
         )
 
@@ -156,15 +151,7 @@ def _generate_gemini_response(
     """
     response = client.models.generate_content(
         model=model,
-        contents=[
-            types.Content(
-                role="user",
-                parts=[
-                    types.Part.from_text(system_prompt.strip()),
-                    types.Part.from_text(user_prompt.strip()),
-                ]
-            )
-        ]
+        contents=system_prompt.strip() + "\n\n" + user_prompt.strip()
     )
 
     usage_info = _extract_usage(response)
