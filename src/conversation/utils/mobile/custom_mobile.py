@@ -11,7 +11,6 @@ from typing import Tuple, Optional, Dict, Any
 
 from .prompts_mobile import (
     get_mobile_opener_prompt,
-    get_mobile_opener_user_prompt,
     get_mobile_reply_prompt,
     get_mobile_reply_user_prompt,
 )
@@ -22,9 +21,17 @@ client = genai.Client(api_key=config('GEMINI_API_KEY'))
 # Model constants
 GEMINI_PRO = "gemini-3-pro-preview"      # For openers and replies
 
-# JSON generation config for strict output
-JSON_CONFIG = types.GenerateContentConfig(
-    response_mime_type="application/json"
+# Config for image-based generation (openers) - with thinking and high resolution
+IMAGE_CONFIG = types.GenerateContentConfig(
+    response_mime_type="application/json",
+    thinking_config=types.ThinkingConfig(thinking_level="high"),
+    media_resolution="high"
+)
+
+# Config for text-only generation (replies) - with thinking
+TEXT_CONFIG = types.GenerateContentConfig(
+    response_mime_type="application/json",
+    thinking_config=types.ThinkingConfig(thinking_level="high")
 )
 
 
@@ -72,8 +79,7 @@ def generate_mobile_openers_from_image(image_bytes: bytes, custom_instructions: 
     Returns:
         Tuple of (JSON array string of openers, success boolean)
     """
-    system_prompt = get_mobile_opener_prompt(custom_instructions)
-    user_prompt = get_mobile_opener_user_prompt()
+    prompt = get_mobile_opener_prompt(custom_instructions)
 
     success = False
     try:
@@ -86,11 +92,10 @@ def generate_mobile_openers_from_image(image_bytes: bytes, custom_instructions: 
         response = client.models.generate_content(
             model=GEMINI_PRO,
             contents=[
-                system_prompt,
+                prompt,
                 image_part,
-                user_prompt,
             ],
-            config=JSON_CONFIG
+            config=IMAGE_CONFIG
         )
 
         ai_reply = _validate_and_clean_json(response.text)
@@ -173,7 +178,7 @@ def _generate_gemini_response(
     response = client.models.generate_content(
         model=model,
         contents=system_prompt.strip() + "\n\n" + user_prompt.strip(),
-        config=JSON_CONFIG
+        config=TEXT_CONFIG
     )
 
     usage_info = _extract_usage(response)
