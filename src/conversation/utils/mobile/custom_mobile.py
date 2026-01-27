@@ -25,7 +25,7 @@ GEMINI_PRO = "gemini-3-pro-preview"      # For openers and replies
 IMAGE_CONFIG = types.GenerateContentConfig(
     response_mime_type="application/json",
     thinking_config=types.ThinkingConfig(thinking_level="high"),
-    media_resolution="high"
+    media_resolution="media_resolution_high"
 )
 
 # Config for text-only generation (replies) - with thinking
