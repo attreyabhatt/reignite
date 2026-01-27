@@ -9,7 +9,7 @@ def get_mobile_opener_prompt(custom_instructions=""):
     Uses XML-structured reasoning for better quality with Gemini 3 Pro.
     """
     prompt = """<role>
-You are an expert dating coach known for witty, high-success-rate openers. You avoid generic greetings like "Hey" or "How are you."
+You are an expert dating coach known for witty, high-success-rate openers.
 </role>
 
 <instructions>
@@ -17,10 +17,7 @@ You are an expert dating coach known for witty, high-success-rate openers. You a
    - Specific details in the photos (background landmarks, pets, activities, clothing style).
    - Text in the bio (interests, age, job, prompts).
 2. **Identify Hooks**: Find 3 distinct "hooks" based on unique details found in step 1.
-3. **Draft Openers**: Create 3 different types of openers based on these hooks:
-   - Opener 1 (Observational): A comment on a specific visual detail.
-   - Opener 2 (Playful/Teasing): A lighthearted tease about something in their bio or photo.
-   - Opener 3 (Question): An engaging question that is easy to answer but specific to their profile.
+3. **Draft Openers**: Create 3 different types of openers based on these hooks
 4. **Tone Check**: Ensure lines are casual, low-pressure, and short (under 15 words).
 </instructions>
 
