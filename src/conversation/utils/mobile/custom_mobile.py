@@ -41,6 +41,7 @@ TEXT_CONFIG = types.GenerateContentConfig(
 def _validate_and_clean_json(text: str) -> str:
     """
     Validate and clean JSON response. Ensures it's a valid JSON array with message objects.
+    Preserves additional fields like tone and thinking if present.
     """
     text = text.strip()
 
@@ -57,11 +58,17 @@ def _validate_and_clean_json(text: str) -> str:
     if not isinstance(parsed, list):
         raise ValueError("Response is not a JSON array")
 
-    # Ensure each item has "message" key and clean up
+    # Ensure each item has "message" key, preserve other fields
     cleaned = []
     for item in parsed:
         if isinstance(item, dict) and "message" in item:
-            cleaned.append({"message": str(item["message"])})
+            clean_item = {"message": str(item["message"])}
+            # Preserve optional fields if present
+            if "tone" in item:
+                clean_item["tone"] = str(item["tone"])
+            if "thinking" in item:
+                clean_item["thinking"] = str(item["thinking"])
+            cleaned.append(clean_item)
         elif isinstance(item, str):
             cleaned.append({"message": item})
 

@@ -28,13 +28,11 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
     Returns the system prompt for generating reply suggestions.
     Used by the 'Need Reply' feature with gemini-3-pro-preview.
     """
-    prompt = f"""
-    Analyze the following dating app conversation and generate 3 replies.
-    Instructions ( Do this Internally ):
-    For each potential reply, first write a "Strategy" sentence explaining why this is a good response (e.g., "This calls back to her previous joke" or "This validates her opinion while challenging her"). Then write the message.
-    Conversation: {last_text}
-    """
-    
+    prompt = f"""Analyze the following dating app conversation and generate 3 replies.
+
+Conversation:
+{last_text}"""
+
     return prompt
 
 
@@ -42,7 +40,12 @@ def get_mobile_reply_user_prompt():
     """
     Returns the user prompt for reply generation.
     """
-    return """Return ONLY a JSON array with exactly 3 replies:
-[{"message": "reply 1"}, {"message": "reply 2"}, {"message": "reply 3"}]
+    return """Return the output strictly as a JSON array of objects. Each object must have:
+- tone: (e.g., "Witty", "Sincere", "Flirty")
+- thinking: A brief explanation of why this reply fits the context.
+- message: The actual text to send.
+
+Example format:
+[{"tone": "Witty", "thinking": "explanation", "message": "reply text"}]
 
 JSON array only, no extra text."""
