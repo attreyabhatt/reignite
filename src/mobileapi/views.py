@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 
 from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
 from conversation.utils.mobile.custom_mobile import generate_mobile_response, generate_mobile_openers_from_image
+from conversation.utils.mobile.image_mobile import extract_conversation_from_image_mobile
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
@@ -1006,7 +1007,7 @@ def extract_from_image_with_credits(request):
                         )
                 # For non-subscribers, OCR is free (do not check or deduct credits)
 
-                conversation = extract_conversation_from_image(screenshot)
+                conversation = extract_conversation_from_image_mobile(screenshot)
 
                 return Response({
                     "conversation": conversation,
@@ -1016,7 +1017,7 @@ def extract_from_image_with_credits(request):
 
             except ChatCredit.DoesNotExist:
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=9)  # legacy field retained
-                conversation = extract_conversation_from_image(screenshot)
+                conversation = extract_conversation_from_image_mobile(screenshot)
                 
                 return Response({
                     "conversation": conversation or "Failed to extract conversation.",
@@ -1025,7 +1026,7 @@ def extract_from_image_with_credits(request):
                 })
         else:
             # Guests: OCR is free and does not consume trial credits
-            conversation = extract_conversation_from_image(screenshot)
+            conversation = extract_conversation_from_image_mobile(screenshot)
             return Response({
                 "conversation": conversation or "Failed to extract conversation.",
                 "is_trial": True,
