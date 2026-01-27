@@ -10,13 +10,6 @@ def get_mobile_opener_prompt(custom_instructions=""):
     """
     prompt = """Generate 3 unique openers for a dating app based on the profile image provided."""
 
-    if custom_instructions:
-        prompt += f"""
-
-Custom Instructions (MUST FOLLOW if given):
-"{custom_instructions}"
-"""
-
     return prompt
 
 
@@ -40,12 +33,6 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
 Conversation:
 {last_text}"""
 
-    if custom_instructions:
-        prompt += f"""
-
-Custom Instructions (MUST FOLLOW):
-"{custom_instructions}"
-"""
 
     return prompt
 
