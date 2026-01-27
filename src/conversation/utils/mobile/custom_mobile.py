@@ -20,7 +20,8 @@ from .prompts_mobile import (
 client = genai.Client(api_key=config('GEMINI_API_KEY'))
 
 # Model constants
-GEMINI_PRO = "gemini-3-pro-preview"      # For openers and replies
+GEMINI_PRO = "gemini-3-pro-preview"      # For openers
+GEMINI_FLASH = "gemini-3-flash-preview"  # For replies
 
 # Config for image-based generation (openers) - with thinking and high resolution
 IMAGE_CONFIG = types.GenerateContentConfig(
@@ -155,7 +156,7 @@ def generate_mobile_response(
     usage_info: Optional[Dict[str, Any]] = None
 
     try:
-        response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=GEMINI_PRO)
+        response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=GEMINI_FLASH)
         ai_reply = _validate_and_clean_json(response.text)
         success = True
     except Exception as e:
