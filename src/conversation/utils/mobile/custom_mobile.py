@@ -20,8 +20,57 @@ from .prompts_mobile import (
 client = genai.Client(api_key=config('GEMINI_API_KEY'))
 
 # Model constants
-GEMINI_PRO = "gemini-3-pro-preview"      # For openers (vision capable)
-GEMINI_FLASH = "gemini-3-flash-preview"  # For replies (fast text generation)
+GEMINI_PRO = "gemini-3-pro-preview"      # For openers and replies
+
+# Config for image-based generation (openers) - with thinking and high resolution
+IMAGE_CONFIG = types.GenerateContentConfig(
+    response_mime_type="application/json",
+    thinking_config=types.ThinkingConfig(thinking_level="high"),
+    media_resolution="media_resolution_high",
+    temperature=1.0,
+    top_p=0.95
+)
+
+# Config for text-only generation (replies) - with thinking
+TEXT_CONFIG = types.GenerateContentConfig(
+    response_mime_type="application/json",
+    thinking_config=types.ThinkingConfig(thinking_level="high"),
+    temperature=1.0,
+    top_p=0.95
+)
+
+
+def _validate_and_clean_json(text: str) -> str:
+    """
+    Validate and clean JSON response. Ensures it's a valid JSON array with message objects.
+    """
+    text = text.strip()
+
+    # Remove markdown code blocks if present
+    if text.startswith("```"):
+        lines = text.split("\n")
+        lines = [l for l in lines if not l.startswith("```")]
+        text = "\n".join(lines).strip()
+
+    # Parse and validate
+    parsed = json.loads(text)
+
+    # Ensure it's a list
+    if not isinstance(parsed, list):
+        raise ValueError("Response is not a JSON array")
+
+    # Ensure each item has "message" key and clean up
+    cleaned = []
+    for item in parsed:
+        if isinstance(item, dict) and "message" in item:
+            cleaned.append({"message": str(item["message"])})
+        elif isinstance(item, str):
+            cleaned.append({"message": item})
+
+    if not cleaned:
+        raise ValueError("No valid messages in response")
+
+    return json.dumps(cleaned)
 
 
 def generate_mobile_openers_from_image(image_bytes: bytes, custom_instructions: str = "") -> Tuple[str, bool]:
@@ -52,19 +101,12 @@ def generate_mobile_openers_from_image(image_bytes: bytes, custom_instructions: 
                 system_prompt,
                 image_part,
                 user_prompt,
-            ]
+            ],
+            config=IMAGE_CONFIG
         )
 
-        ai_reply = response.text.strip()
-
-        if ai_reply:
-            success = True
-        else:
-            ai_reply = json.dumps([
-                {"message": "Sorry, I couldn't analyze the profile image."},
-                {"message": "Try uploading a clearer screenshot."},
-                {"message": "Make sure the profile details are visible."}
-            ])
+        ai_reply = _validate_and_clean_json(response.text)
+        success = True
 
         # Log usage if available
         usage = getattr(response, "usage_metadata", None)
@@ -89,7 +131,7 @@ def generate_mobile_response(
     custom_instructions: str = ""
 ) -> Tuple[str, bool]:
     """
-    Generate reply suggestions for mobile app using Gemini Flash.
+    Generate reply suggestions for mobile app using Gemini Pro.
 
     Args:
         last_text: The conversation text
@@ -108,18 +150,9 @@ def generate_mobile_response(
     usage_info: Optional[Dict[str, Any]] = None
 
     try:
-        response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=GEMINI_FLASH)
-
-        ai_reply = response.text.strip()
-
-        if ai_reply:
-            success = True
-        else:
-            ai_reply = json.dumps([
-                {"message": "Sorry, I couldn't generate a comeback this time."},
-                {"message": "Want to try rephrasing the situation?"},
-                {"message": "Or paste a bit more context from the chat."}
-            ])
+        response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=GEMINI_PRO)
+        ai_reply = _validate_and_clean_json(response.text)
+        success = True
     except Exception as e:
         print("Gemini API error:", e)
         ai_reply = json.dumps([
@@ -136,7 +169,7 @@ def generate_mobile_response(
 def _generate_gemini_response(
     system_prompt: str,
     user_prompt: str,
-    model: str = GEMINI_FLASH
+    model: str = GEMINI_PRO
 ) -> Tuple[Any, Optional[Dict[str, Any]]]:
     """
     Core Gemini API wrapper for text-only generation.
@@ -144,14 +177,15 @@ def _generate_gemini_response(
     Args:
         system_prompt: The system/context prompt
         user_prompt: The user's request
-        model: The model to use (defaults to GEMINI_FLASH)
+        model: The model to use (defaults to GEMINI_PRO)
 
     Returns:
         Tuple of (response object, usage info dict)
     """
     response = client.models.generate_content(
         model=model,
-        contents=system_prompt.strip() + "\n\n" + user_prompt.strip()
+        contents=system_prompt.strip() + "\n\n" + user_prompt.strip(),
+        config=TEXT_CONFIG
     )
 
     usage_info = _extract_usage(response)
@@ -176,7 +210,7 @@ def _extract_usage(response) -> Dict[str, Any]:
 
     input_tokens = getattr(usage, "prompt_token_count", 0)
     output_tokens = getattr(usage, "candidates_token_count", 0)
-    total_tokens = getattr(usage, "total_token_count", input_tokens + output_tokens)
+    total_tokens = input_tokens + output_tokens
 
     return {
         "input_tokens": input_tokens,

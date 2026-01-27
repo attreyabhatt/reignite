@@ -6,9 +6,17 @@ Mobile-specific prompts for Gemini-powered AI generation.
 def get_mobile_opener_prompt(custom_instructions=""):
     """
     Returns the system prompt for generating openers from profile images.
-    Used by the 'New Match/Openers' feature with gemini-3-pro-preview.
+    Uses XML-structured reasoning for better quality with Gemini 3 Pro.
     """
-    prompt = """Generate 3 openers for a dating app based on the provided screenshot."""
+    prompt = """Generate 3 unique openers for a dating app based on the profile image provided."""
+
+    if custom_instructions:
+        prompt += f"""
+
+Custom Instructions (MUST FOLLOW if given):
+"{custom_instructions}"
+"""
+
     return prompt
 
 
@@ -25,7 +33,7 @@ JSON array only, no extra text."""
 def get_mobile_reply_prompt(last_text, custom_instructions=""):
     """
     Returns the system prompt for generating reply suggestions.
-    Used by the 'Need Reply' feature with gemini-3-flash-preview.
+    Used by the 'Need Reply' feature with gemini-3-pro-preview.
     """
     prompt = f"""Generate 3 replies for a dating app based on the conversation below.
 
