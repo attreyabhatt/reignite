@@ -33,6 +33,12 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
 Conversation:
 {last_text}"""
 
+    if custom_instructions and custom_instructions.strip():
+        prompt += f"""
+
+User's custom instructions:
+{custom_instructions.strip()}"""
+
     return prompt
 
 
