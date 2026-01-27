@@ -891,7 +891,7 @@ def generate_text_with_credits(request):
                     })
                 
                 # Generate response with tone and custom instructions
-                reply, success = generate_custom_response(
+                reply, success = generate_mobile_response(
                     last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions
                 )
 
