@@ -28,12 +28,13 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
     Returns the system prompt for generating reply suggestions.
     Used by the 'Need Reply' feature with gemini-3-pro-preview.
     """
-    prompt = f"""Generate 3 replies for a dating app based on the conversation below.
-
-Conversation:
-{last_text}"""
-
-
+    prompt = f"""
+    Analyze the following dating app conversation and generate 3 replies.
+    Instructions ( Do this Internally ):
+    For each potential reply, first write a "Strategy" sentence explaining why this is a good response (e.g., "This calls back to her previous joke" or "This validates her opinion while challenging her"). Then write the message.
+    Conversation: {last_text}
+    """
+    
     return prompt
 
 
