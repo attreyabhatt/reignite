@@ -189,7 +189,10 @@ def _generate_gemini_response(
     """
     response = client.models.generate_content(
         model=model,
-        contents=system_prompt.strip() + "\n\n" + user_prompt.strip(),
+        contents=[
+            system_prompt,
+            user_prompt,
+        ],
         config=TEXT_CONFIG
     )
 
