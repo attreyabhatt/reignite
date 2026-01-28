@@ -79,17 +79,23 @@ def _validate_and_clean_json(text: str) -> str:
     return json.dumps(cleaned)
 
 
-def generate_mobile_openers_from_image(image_bytes: bytes, custom_instructions: str = "") -> Tuple[str, bool]:
+def generate_mobile_openers_from_image(
+    image_bytes: bytes,
+    custom_instructions: str = "",
+    use_pro_model: bool = True
+) -> Tuple[str, bool]:
     """
-    Generate opener suggestions from profile image using Gemini Pro (vision).
+    Generate opener suggestions from profile image.
 
     Args:
         image_bytes: Raw bytes of the profile image
         custom_instructions: Optional user-provided instructions
+        use_pro_model: If True, use Gemini Pro (paid users). If False, use Flash (free/guests).
 
     Returns:
         Tuple of (JSON array string of openers, success boolean)
     """
+    model = GEMINI_PRO if use_pro_model else GEMINI_FLASH
     system_prompt = get_mobile_opener_prompt(custom_instructions)
     user_prompt = get_mobile_opener_user_prompt()
 
@@ -102,7 +108,7 @@ def generate_mobile_openers_from_image(image_bytes: bytes, custom_instructions: 
         )
 
         response = client.models.generate_content(
-            model=GEMINI_PRO,
+            model=model,
             contents=[
                 system_prompt,
                 image_part,

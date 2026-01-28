@@ -72,9 +72,13 @@ class ChatCredit(models.Model):
     subscription_auto_renewing = models.BooleanField(default=False)
     subscription_purchase_token = models.TextField(blank=True, null=True)
     subscription_last_checked = models.DateTimeField(blank=True, null=True)
-    # Fair-use tracking for subscribers
+    # Fair-use tracking for subscribers (legacy weekly)
     subscriber_weekly_actions = models.PositiveIntegerField(default=0)
     subscriber_weekly_reset_at = models.DateTimeField(blank=True, null=True)
+    # Daily fair-use tracking for mobile subscribers
+    subscriber_daily_openers = models.PositiveIntegerField(default=0)
+    subscriber_daily_replies = models.PositiveIntegerField(default=0)
+    subscriber_daily_reset_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.balance} credits"

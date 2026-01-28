@@ -37,7 +37,32 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 # Mobile subscription/fair-use limits
-SUBSCRIPTION_WEEKLY_LIMIT = 400  # fair-use cap for subscribers
+# Model constants (must match custom_mobile.py)
+GEMINI_PRO = "gemini-3-pro-preview"
+GEMINI_FLASH = "gemini-3-flash-preview"
+
+
+def _log_ai_action(action_type: str, model: str, is_subscribed: bool, is_signed_up: bool, username: str = None):
+    """
+    Log AI action with formatted debug info.
+
+    Args:
+        action_type: "openers" or "replies"
+        model: The model being used (GEMINI_PRO or GEMINI_FLASH)
+        is_subscribed: Whether user has active subscription
+        is_signed_up: Whether user is signed up (not guest)
+        username: Username if signed up, None for guests
+    """
+    model_name = "gemini-pro" if model == GEMINI_PRO else "gemini-flash"
+    subscription_status = "subscribed" if is_subscribed else "not subscribed"
+    user_status = f"signed up ({username})" if is_signed_up else "guest user"
+
+    log_line = f"[AI DEBUG] {model_name} | {action_type} | {subscription_status} | {user_status}"
+    print(log_line)
+    logger.info(log_line)
+SUBSCRIPTION_WEEKLY_LIMIT = 400  # legacy weekly fair-use cap
+SUBSCRIPTION_DAILY_OPENER_LIMIT = 8   # daily limit for openers (Gemini Pro)
+SUBSCRIPTION_DAILY_REPLY_LIMIT = 40   # daily limit for replies (Gemini Flash)
 
 def _mask_token(token):
     if not token:
@@ -49,6 +74,15 @@ def _mask_token(token):
 
 def _sse_event(payload):
     return f"data: {payload}\n\n"
+
+
+def _error_stream(error_code, message, extra=None):
+    """Generate SSE error stream response."""
+    payload = {"type": "error", "error": error_code, "message": message}
+    if extra:
+        payload.update(extra)
+    yield _sse_event(json.dumps(payload))
+
 
 @lru_cache(maxsize=1)
 def _get_google_play_client():
@@ -209,8 +243,46 @@ def _ensure_subscriber_allowance(chat_credit):
     return True, remaining
 
 
+def _reset_daily_counters(chat_credit):
+    """Reset daily counters if a new day has started (UTC)."""
+    now = timezone.now()
+    reset_at = chat_credit.subscriber_daily_reset_at
+    if not reset_at or reset_at.date() < now.date():
+        chat_credit.subscriber_daily_openers = 0
+        chat_credit.subscriber_daily_replies = 0
+        chat_credit.subscriber_daily_reset_at = now
+        chat_credit.save(update_fields=[
+            "subscriber_daily_openers",
+            "subscriber_daily_replies",
+            "subscriber_daily_reset_at"
+        ])
+
+
+def _ensure_opener_allowance(chat_credit):
+    """Enforce daily limit for openers (Gemini Pro). Returns (allowed, remaining)."""
+    _reset_daily_counters(chat_credit)
+    if chat_credit.subscriber_daily_openers >= SUBSCRIPTION_DAILY_OPENER_LIMIT:
+        return False, 0
+    chat_credit.subscriber_daily_openers += 1
+    chat_credit.save(update_fields=["subscriber_daily_openers"])
+    remaining = max(0, SUBSCRIPTION_DAILY_OPENER_LIMIT - chat_credit.subscriber_daily_openers)
+    return True, remaining
+
+
+def _ensure_reply_allowance(chat_credit):
+    """Enforce daily limit for replies (Gemini Flash). Returns (allowed, remaining)."""
+    _reset_daily_counters(chat_credit)
+    if chat_credit.subscriber_daily_replies >= SUBSCRIPTION_DAILY_REPLY_LIMIT:
+        return False, 0
+    chat_credit.subscriber_daily_replies += 1
+    chat_credit.save(update_fields=["subscriber_daily_replies"])
+    remaining = max(0, SUBSCRIPTION_DAILY_REPLY_LIMIT - chat_credit.subscriber_daily_replies)
+    return True, remaining
+
+
 def _subscription_payload(chat_credit):
     """Return subscription info payload for mobile clients."""
+    _reset_daily_counters(chat_credit)  # Ensure counters are fresh
     expiry = chat_credit.subscription_expiry.isoformat() if chat_credit.subscription_expiry else None
     return {
         "is_subscribed": _is_subscription_active(chat_credit),
@@ -218,6 +290,12 @@ def _subscription_payload(chat_credit):
         "subscription_product_id": chat_credit.subscription_product_id,
         "subscription_platform": chat_credit.subscription_platform,
         "subscription_auto_renewing": chat_credit.subscription_auto_renewing,
+        # Daily limits (new)
+        "daily_openers_remaining": max(0, SUBSCRIPTION_DAILY_OPENER_LIMIT - (chat_credit.subscriber_daily_openers or 0)),
+        "daily_openers_limit": SUBSCRIPTION_DAILY_OPENER_LIMIT,
+        "daily_replies_remaining": max(0, SUBSCRIPTION_DAILY_REPLY_LIMIT - (chat_credit.subscriber_daily_replies or 0)),
+        "daily_replies_limit": SUBSCRIPTION_DAILY_REPLY_LIMIT,
+        # Legacy weekly fields (for backward compatibility)
         "subscriber_weekly_remaining": max(
             0,
             SUBSCRIPTION_WEEKLY_LIMIT - (chat_credit.subscriber_weekly_actions or 0)
@@ -830,7 +908,7 @@ def generate_text_with_credits(request):
         situation = request.data.get("situation")
         her_info = request.data.get("her_info", "")
         tone = request.data.get("tone", "Natural")  # Default to Natural
-        custom_instructions = request.data.get("custom_instructions", "")
+        custom_instructions = request.data.get("custom_instructions", "")[:250]  # Max 250 chars
 
         if not last_text or not situation:
             return HttpResponseBadRequest("Missing required fields")
@@ -859,18 +937,19 @@ def generate_text_with_credits(request):
 
                 # Subscription path
                 if _is_subscription_active(chat_credit):
-                    allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                    allowed, remaining = _ensure_reply_allowance(chat_credit)
                     if not allowed:
                         return Response(
                             {
                                 "success": False,
                                 "error": "fair_use_exceeded",
-                                "message": "You hit the weekly fair-use limit. Try again soon.",
+                                "message": "You hit the daily reply limit. Try again tomorrow.",
                                 **_subscription_payload(chat_credit),
                             },
                             status=429,
                         )
 
+                    _log_ai_action("replies", GEMINI_FLASH, True, True, request.user.username)
                     reply, success = generate_mobile_response(
                         last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions
                     )
@@ -889,8 +968,9 @@ def generate_text_with_credits(request):
                         "message": "No credits remaining. Start your subscription to continue.",
                         **_subscription_payload(chat_credit),
                     })
-                
+
                 # Generate response with tone and custom instructions
+                _log_ai_action("replies", GEMINI_FLASH, False, True, request.user.username)
                 reply, success = generate_mobile_response(
                     last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions
                 )
@@ -913,10 +993,11 @@ def generate_text_with_credits(request):
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 # Create chat credit for user
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)  # 6-1
+                _log_ai_action("replies", GEMINI_FLASH, False, True, request.user.username)
                 reply, success = generate_mobile_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
-                
+
                 return Response({
-                    "success": success, 
+                    "success": success,
                     "reply": reply,
                     "credits_remaining": chat_credit.balance,
                     **_subscription_payload(chat_credit),
@@ -937,8 +1018,9 @@ def generate_text_with_credits(request):
                     "error": "trial_expired",
                     "message": "Trial expired. Please sign up for more credits."
                 })
-            
+
             # Generate response with tone and custom instructions
+            _log_ai_action("replies", GEMINI_FLASH, False, False)
             reply, success = generate_mobile_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
 
             if success:
@@ -1060,12 +1142,6 @@ def extract_from_image_with_credits_stream(request):
         logger.warning(f"Unusual content type: {screenshot.content_type}")
 
     img_bytes = screenshot.read()
-
-    def _error_stream(error_code, message, extra=None):
-        payload = {"type": "error", "error": error_code, "message": message}
-        if extra:
-            payload.update(extra)
-        yield _sse_event(json.dumps(payload))
 
     def _has_labeled_lines(text):
         lowered = text.lower()
@@ -1373,7 +1449,7 @@ def generate_openers_from_profile_image(request):
             f"user={getattr(request.user, 'username', 'guest')}"
         )
         profile_image = request.FILES.get("profile_image")
-        custom_instructions = (request.data.get("custom_instructions") or "").strip()
+        custom_instructions = (request.data.get("custom_instructions") or "").strip()[:250]  # Max 250 chars
 
         if not profile_image:
             return HttpResponseBadRequest("No file provided")
@@ -1407,13 +1483,14 @@ def generate_openers_from_profile_image(request):
                     chat_credit.total_earned += top_up
                     chat_credit.save(update_fields=["balance", "total_earned"])
 
-                if _is_subscription_active(chat_credit):
-                    allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                is_subscriber = _is_subscription_active(chat_credit)
+                if is_subscriber:
+                    allowed, remaining = _ensure_opener_allowance(chat_credit)
                     if not allowed:
                         return Response({
                             "success": False,
                             "error": "fair_use_exceeded",
-                            "message": "You hit the weekly fair-use limit. Try again soon.",
+                            "message": "You hit the daily opener limit. Try again tomorrow.",
                             **_subscription_payload(chat_credit),
                         }, status=429)
                 elif chat_credit.balance <= 0:
@@ -1424,10 +1501,14 @@ def generate_openers_from_profile_image(request):
                         **_subscription_payload(chat_credit),
                     })
 
-                # Generate openers from image
-                reply, success = generate_mobile_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+                # Generate openers from image (Pro for subscribers, Flash for free users)
+                model_used = GEMINI_PRO if is_subscriber else GEMINI_FLASH
+                _log_ai_action("openers", model_used, is_subscriber, True, request.user.username)
+                reply, success = generate_mobile_openers_from_image(
+                    img_bytes, custom_instructions=custom_instructions, use_pro_model=is_subscriber
+                )
 
-                if success and not _is_subscription_active(chat_credit):
+                if success and not is_subscriber:
                     chat_credit.balance -= 1
                     chat_credit.total_used += 1
                     chat_credit.save()
@@ -1443,7 +1524,11 @@ def generate_openers_from_profile_image(request):
             except ChatCredit.DoesNotExist:
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
-                reply, success = generate_mobile_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+                # New user, not a subscriber, use Flash model
+                _log_ai_action("openers", GEMINI_FLASH, False, True, request.user.username)
+                reply, success = generate_mobile_openers_from_image(
+                    img_bytes, custom_instructions=custom_instructions, use_pro_model=False
+                )
 
                 return Response({
                     "success": success,
@@ -1473,8 +1558,11 @@ def generate_openers_from_profile_image(request):
                     "message": "Trial expired. Please sign up for more credits."
                 })
 
-            # Generate openers from image
-            reply, success = generate_mobile_openers_from_image(img_bytes, custom_instructions=custom_instructions)
+            # Generate openers from image (Flash for guests)
+            _log_ai_action("openers", GEMINI_FLASH, False, False)
+            reply, success = generate_mobile_openers_from_image(
+                img_bytes, custom_instructions=custom_instructions, use_pro_model=False
+            )
 
             if success:
                 trial_ip.credits_used += 1
