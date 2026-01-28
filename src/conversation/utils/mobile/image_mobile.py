@@ -73,7 +73,10 @@ def _run_ocr_call(prompt, img_bytes, mime, start_time):
 
     response = client.models.generate_content(
         model=GEMINI_FLASH,
-        contents=[prompt, image_part]
+        contents=[prompt, image_part],
+        config=types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_level="low")
+        )
     )
 
     # Log usage
