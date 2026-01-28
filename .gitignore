@@ -16,6 +16,9 @@ env/
 # IDE-specific files (example for PyCharm)
 .idea/
 
+# Claude-related files
+.claude/
+
 # Operating System files
 .DS_Store
 Thumbs.db
