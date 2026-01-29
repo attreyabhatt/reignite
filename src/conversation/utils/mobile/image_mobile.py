@@ -1,6 +1,7 @@
 """
 Mobile-specific OCR extraction using Gemini Flash.
 Mirrors the structure of image_gpt.py but uses Google's Gemini models.
+Includes failsafe fallback to GPT-4.1-mini when Gemini fails.
 """
 
 import base64
@@ -11,15 +12,23 @@ from decouple import config
 import time
 from PIL import Image
 
+from .openai_mobile import extract_conversation_from_image_openai
+
 # Initialize Gemini client
 client = genai.Client(api_key=config('GEMINI_API_KEY'))
 
 GEMINI_FLASH = "gemini-3-flash-preview"
+GPT_MODEL = "gpt-4.1-mini-2025-04-14"
 
 
 def extract_conversation_from_image_mobile(screenshot_file):
     """
-    Extract conversation text from a screenshot using Gemini Flash.
+    Extract conversation text from a screenshot using Gemini Flash with GPT-4.1-mini fallback.
+
+    Fallback chain:
+    1. Gemini Flash (resized image)
+    2. Gemini Flash (original image)
+    3. GPT-4.1-mini (fallback)
 
     Args:
         screenshot_file: Uploaded file object with .read() method
@@ -40,31 +49,58 @@ def extract_conversation_from_image_mobile(screenshot_file):
     print(f"[DEBUG] File size: {len(resized_bytes)} bytes")
 
     prompt = _get_conversation_prompt()
-    start_time = time.time()
+    model_used = None
 
+    # Attempt 1: Gemini Flash with resized image
     try:
+        start_time = time.time()
         output = _run_ocr_call(prompt, resized_bytes, mime, start_time)
 
         # Failsafe: require labeled lines with a timestamp bracket
         if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
             raise ValueError("OCR output missing labeled lines")
 
+        model_used = GEMINI_FLASH
+        print(f"[AI-ACTION] action=ocr model_used={model_used} status=success")
         return output
 
     except Exception as e:
-        # Retry with original bytes if resized attempt fails
-        print(f"[WARN] OCR failed on resized image, retrying original: {str(e)}")
-        try:
-            output = _run_ocr_call(prompt, img_bytes, mime, time.time())
+        print(f"[FAILSAFE] action=ocr attempt=1 model={GEMINI_FLASH} status=failed error={type(e).__name__}: {str(e)}")
 
-            if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
-                return ("Failed to extract the conversation with timestamps. Please try uploading the screenshot again. "
-                        "If it keeps happening, try a clearer, uncropped screenshot.")
+    # Attempt 2: Gemini Flash with original image
+    try:
+        start_time = time.time()
+        output = _run_ocr_call(prompt, img_bytes, mime, start_time)
 
-            return output
-        except Exception as exc:
-            print(f"[ERROR] Gemini API error: {str(exc)}")
-            return f"Failed to process image: {str(exc)}"
+        if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
+            raise ValueError("OCR output missing labeled lines")
+
+        model_used = GEMINI_FLASH
+        print(f"[AI-ACTION] action=ocr model_used={model_used} status=success (original_image)")
+        return output
+
+    except Exception as e:
+        print(f"[FAILSAFE] action=ocr attempt=2 model={GEMINI_FLASH} status=failed error={type(e).__name__}: {str(e)}")
+
+    # Attempt 3: GPT-4.1-mini fallback
+    try:
+        print(f"[FAILSAFE] action=ocr attempt=3 model={GPT_MODEL} status=attempting")
+        output = extract_conversation_from_image_openai(img_bytes, mime)
+
+        if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
+            raise ValueError("OCR output missing labeled lines")
+
+        model_used = GPT_MODEL
+        print(f"[AI-ACTION] action=ocr model_used={model_used} status=success")
+        return output
+
+    except Exception as e:
+        print(f"[FAILSAFE] action=ocr attempt=3 model={GPT_MODEL} status=failed error={type(e).__name__}: {str(e)}")
+
+    # All models failed
+    print(f"[AI-ACTION] action=ocr model_used=none status=all_failed attempts=3")
+    return ("Failed to extract the conversation with timestamps. Please try uploading the screenshot again. "
+            "If it keeps happening, try a clearer, uncropped screenshot.")
 
 
 def _run_ocr_call(prompt, img_bytes, mime, start_time):
