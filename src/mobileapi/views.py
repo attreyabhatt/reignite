@@ -894,6 +894,80 @@ def change_password(request):
     return Response({"success": True})
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    """Delete user account and all associated data (Phase 2)."""
+    password = request.data.get("password")
+
+    if not password:
+        return Response(
+            {"success": False, "error": "Password is required"},
+            status=400,
+        )
+
+    user = request.user
+
+    # Verify password
+    if not user.check_password(password):
+        return Response(
+            {"success": False, "error": "Invalid password"},
+            status=400,
+        )
+
+    username = user.username
+    user_id = user.id
+
+    try:
+        # Log deletion for audit trail
+        logger.info(
+            f"Account deletion initiated: user_id={user_id} username={username}"
+        )
+
+        # Delete all related data
+        # Django's CASCADE will handle most relationships, but we'll be explicit
+        from conversation.models import Conversation, CopyEvent, ChatCredit
+        from pricing.models import CreditPurchase
+
+        # Delete conversations
+        conversations_count = Conversation.objects.filter(user=user).count()
+        Conversation.objects.filter(user=user).delete()
+
+        # Delete copy events
+        copy_events_count = CopyEvent.objects.filter(user=user).count()
+        CopyEvent.objects.filter(user=user).delete()
+
+        # Delete credit purchases
+        purchases_count = CreditPurchase.objects.filter(user=user).count()
+        CreditPurchase.objects.filter(user=user).delete()
+
+        # Delete chat credit
+        ChatCredit.objects.filter(user=user).delete()
+
+        # Delete auth token
+        Token.objects.filter(user=user).delete()
+
+        # Delete user account (this will cascade to any remaining related objects)
+        user.delete()
+
+        logger.info(
+            f"Account deleted successfully: user_id={user_id} username={username} "
+            f"conversations={conversations_count} copy_events={copy_events_count} "
+            f"purchases={purchases_count}"
+        )
+
+        return Response({"success": True})
+
+    except Exception as exc:
+        logger.error(
+            f"Account deletion failed: user_id={user_id} username={username} error={exc}",
+            exc_info=True,
+        )
+        return Response(
+            {"success": False, "error": "Account deletion failed. Please try again."},
+            status=500,
+        )
+
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def generate_text_with_credits(request):
     """Generate text with credit system"""
