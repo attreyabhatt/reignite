@@ -10,7 +10,7 @@ def get_mobile_opener_prompt(custom_instructions=""):
     """
     prompt = """Generate 3 unique openers for a dating app based on the profile image provided.
 
-No em dashes. No dashes. Do not put single quotes around words unless necessary."""
+"""
 
     return prompt
 
@@ -35,7 +35,7 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
 Conversation:
 {last_text}
 
-No em dashes. No dashes. Do not put single quotes around words unless necessary."""
+"""
 
     if custom_instructions and custom_instructions.strip():
         prompt += f"""
