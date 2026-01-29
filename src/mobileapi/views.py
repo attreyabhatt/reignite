@@ -1007,7 +1007,6 @@ def generate_text_with_credits(request):
             # Handle guest users with IP-based trial
             trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
             logger.info(f"Guest IP: {client_ip} guest_id={guest_id}")
-            _reset_trial_if_stale(trial_ip)
             print(f"[MOBILE] guest Trial created={created} guest_id={guest_id} ip={client_ip} credits_used={trial_ip.credits_used}")
             
             # Check if guest has used all 3 trial credits
@@ -1540,7 +1539,6 @@ def generate_openers_from_profile_image(request):
             logger.info("Guest user detected")
             trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
             logger.info(f"Guest IP: {client_ip} guest_id={guest_id}")
-            _reset_trial_if_stale(trial_ip)
 
             print(
                 f"[MOBILE] guest Trial created={created} guest_id={guest_id} "
