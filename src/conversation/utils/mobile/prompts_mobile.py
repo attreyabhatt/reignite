@@ -8,7 +8,9 @@ def get_mobile_opener_prompt(custom_instructions=""):
     Returns the system prompt for generating openers from profile images.
     Uses XML-structured reasoning for better quality with Gemini 3 Pro.
     """
-    prompt = """Generate 3 unique openers for a dating app based on the profile image provided."""
+    prompt = """Generate 3 unique openers for a dating app based on the profile image provided.
+
+No em dashes. No dashes. Do not put single quotes around words unless necessary."""
 
     return prompt
 
@@ -31,7 +33,9 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
     prompt = f"""Generate 3 unique replies for a dating app based on the conversation provided.
 
 Conversation:
-{last_text}"""
+{last_text}
+
+No em dashes. No dashes. Do not put single quotes around words unless necessary."""
 
     if custom_instructions and custom_instructions.strip():
         prompt += f"""
