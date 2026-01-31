@@ -15,10 +15,13 @@ from .prompts_mobile import (
     get_mobile_opener_user_prompt,
     get_mobile_reply_prompt,
     get_mobile_reply_user_prompt,
+    get_mobile_reply_from_image_prompt,
+    get_mobile_reply_from_image_user_prompt,
 )
 from .openai_mobile import (
     generate_openers_from_image_openai,
     generate_replies_openai,
+    generate_replies_from_image_openai,
 )
 
 # Initialize Gemini client with the new unified SDK
@@ -40,6 +43,14 @@ IMAGE_CONFIG = types.GenerateContentConfig(
 # Config for text-only generation (replies) - with thinking
 TEXT_CONFIG = types.GenerateContentConfig(
     thinking_config=types.ThinkingConfig(thinking_level="high"),
+    temperature=1.0,
+    top_p=0.95
+)
+
+# Config for conversation screenshot-based generation (replies from image)
+CONVERSATION_IMAGE_CONFIG = types.GenerateContentConfig(
+    thinking_config=types.ThinkingConfig(thinking_level="high"),
+    media_resolution="media_resolution_low",
     temperature=1.0,
     top_p=0.95
 )
@@ -363,3 +374,108 @@ def _extract_usage(response) -> Dict[str, Any]:
         "output_tokens": output_tokens,
         "total_tokens": total_tokens
     }
+
+
+def _call_gemini_replies_from_image(image_bytes: bytes, custom_instructions: str, model: str) -> str:
+    """
+    Call Gemini for reply generation from conversation screenshot.
+
+    Args:
+        image_bytes: Raw bytes of the conversation screenshot
+        custom_instructions: Optional user-provided instructions
+        model: Gemini model to use (GEMINI_PRO or GEMINI_FLASH)
+
+    Returns:
+        Validated JSON string of replies
+
+    Raises:
+        Exception: If API call or validation fails
+    """
+    system_prompt = get_mobile_reply_from_image_prompt(custom_instructions)
+    user_prompt = get_mobile_reply_from_image_user_prompt()
+
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+
+    response = client.models.generate_content(
+        model=model,
+        contents=[system_prompt, image_part, user_prompt],
+        config=CONVERSATION_IMAGE_CONFIG
+    )
+
+    ai_reply = _validate_and_clean_json(response.text)
+
+    usage = getattr(response, "usage_metadata", None)
+    if usage:
+        print(f"[DEBUG] Gemini image reply usage | model={model} | input={getattr(usage, 'prompt_token_count', 0)} | output={getattr(usage, 'candidates_token_count', 0)}")
+
+    return ai_reply
+
+
+def _call_openai_replies_from_image(image_bytes: bytes, custom_instructions: str) -> str:
+    """
+    Call OpenAI GPT-4.1-mini for reply generation from image (fallback).
+
+    Args:
+        image_bytes: Raw bytes of the conversation screenshot
+        custom_instructions: Optional user-provided instructions
+
+    Returns:
+        Validated JSON string of replies
+
+    Raises:
+        Exception: If API call or validation fails
+    """
+    ai_reply = generate_replies_from_image_openai(image_bytes, custom_instructions)
+    return _validate_and_clean_json(ai_reply)
+
+
+def generate_mobile_replies_from_image(
+    image_bytes: bytes,
+    custom_instructions: str = "",
+    use_pro_model: bool = True
+) -> Tuple[str, bool]:
+    """
+    Generate reply suggestions from conversation screenshot with cascading fallback.
+
+    Fallback chain:
+    - Paid users (use_pro_model=True): Gemini Pro -> Gemini Flash -> GPT-4.1-mini
+    - Free users (use_pro_model=False): Gemini Flash -> GPT-4.1-mini
+
+    Args:
+        image_bytes: Raw bytes of the conversation screenshot
+        custom_instructions: Optional user-provided instructions
+        use_pro_model: If True, use Gemini Pro first (paid users). If False, start with Flash (free/guests).
+
+    Returns:
+        Tuple of (JSON array string of replies, success boolean)
+    """
+    success = False
+    ai_reply = None
+    model_used = None
+
+    if use_pro_model:
+        models = [GEMINI_PRO, GEMINI_FLASH, GPT_MODEL]
+    else:
+        models = [GEMINI_FLASH, GPT_MODEL]
+
+    for i, model in enumerate(models, 1):
+        try:
+            if model.startswith('gemini'):
+                ai_reply = _call_gemini_replies_from_image(image_bytes, custom_instructions, model)
+            else:
+                ai_reply = _call_openai_replies_from_image(image_bytes, custom_instructions)
+            success = True
+            model_used = model
+            break
+        except Exception as e:
+            print(f"[FAILSAFE] action=image_replies attempt={i} model={model} status=failed error={type(e).__name__}: {str(e)}")
+            continue
+
+    if success:
+        print(f"[AI-ACTION] action=image_replies model_used={model_used} status=success")
+    else:
+        print(f"[AI-ACTION] action=image_replies model_used=none status=all_failed attempts={len(models)}")
+        ai_reply = json.dumps([{"message": "We hit a hiccup generating replies. Try again in a moment."}])
+
+    print(ai_reply)
+    return ai_reply, success

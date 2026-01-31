@@ -134,6 +134,68 @@ def generate_replies_openai(
     return ai_reply
 
 
+def generate_replies_from_image_openai(
+    image_bytes: bytes,
+    custom_instructions: str = ""
+) -> str:
+    """
+    Generate reply suggestions from conversation screenshot using GPT-4.1-mini.
+    Fallback for when Gemini models fail.
+
+    Args:
+        image_bytes: Raw bytes of the conversation screenshot
+        custom_instructions: Optional user-provided instructions
+
+    Returns:
+        JSON array string of replies
+
+    Raises:
+        Exception: If API call fails (caller should handle)
+    """
+    base64_image = base64.b64encode(image_bytes).decode('utf-8')
+
+    system_prompt = """Generate 3 unique replies for a dating app based on the screenshot provided.
+No em dashes. No dashes. Do not put single quotes around words unless necessary."""
+
+    if custom_instructions and custom_instructions.strip():
+        system_prompt += f"\n\nUser's custom instructions:\n{custom_instructions.strip()}"
+
+    user_prompt = """Return ONLY a JSON array with exactly 3 replies:
+[{"message": "reply 1"}, {"message": "reply 2"}, {"message": "reply 3"}]
+
+JSON array only, no extra text."""
+
+    response = client.chat.completions.create(
+        model=GPT_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}",
+                            "detail": "high"
+                        }
+                    }
+                ]
+            }
+        ],
+        temperature=1.0,
+        max_tokens=500
+    )
+
+    ai_reply = response.choices[0].message.content.strip()
+
+    usage = getattr(response, "usage", None)
+    if usage:
+        print(f"[DEBUG] OpenAI image reply usage | input={usage.prompt_tokens} | output={usage.completion_tokens}")
+
+    return ai_reply
+
+
 def extract_conversation_from_image_openai(
     img_bytes: bytes,
     mime: str = "image/jpeg"

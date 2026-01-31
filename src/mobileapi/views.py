@@ -18,7 +18,7 @@ from functools import lru_cache
 from datetime import datetime, timedelta, timezone as dt_timezone
 
 from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
-from conversation.utils.mobile.custom_mobile import generate_mobile_response, generate_mobile_openers_from_image
+from conversation.utils.mobile.custom_mobile import generate_mobile_response, generate_mobile_openers_from_image, generate_mobile_replies_from_image
 from conversation.utils.mobile.image_mobile import extract_conversation_from_image_mobile
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
@@ -1652,6 +1652,151 @@ def generate_openers_from_profile_image(request):
 
     except Exception as e:
         logger.error(f"Generate openers from image error: {str(e)}", exc_info=True)
+        return Response({"success": False, "error": "Generation failed", "message": str(e)})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def generate_replies_from_conversation_image(request):
+    """Generate reply messages directly from a conversation screenshot (no OCR step)."""
+    try:
+        auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
+        print(
+            f"[MOBILE] generate_replies_from_conversation_image path={request.path} "
+            f"auth_header={auth_header_present} is_authenticated={request.user.is_authenticated} "
+            f"user={getattr(request.user, 'username', 'guest')}"
+        )
+        conversation_image = request.FILES.get("conversation_image")
+        custom_instructions = (request.data.get("custom_instructions") or "").strip()[:250]
+
+        if not conversation_image:
+            return HttpResponseBadRequest("No file provided")
+
+        if conversation_image.size == 0:
+            return HttpResponseBadRequest("Empty file received")
+
+        if conversation_image.size > 10 * 1024 * 1024:  # 10MB limit
+            return HttpResponseBadRequest("File too large (max 10MB)")
+
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic']
+        if conversation_image.content_type and conversation_image.content_type not in allowed_types:
+            logger.warning(f"Unusual content type: {conversation_image.content_type}")
+
+        logger.info(f"Generating replies from image - User authenticated: {request.user.is_authenticated}")
+
+        # Read image bytes
+        img_bytes = conversation_image.read()
+
+        # Check credits
+        if request.user.is_authenticated:
+            logger.info(f"Authenticated user: {request.user.username}")
+            try:
+                chat_credit = ChatCredit.objects.get(user=request.user)
+                logger.info(f"User credits: {chat_credit.balance}")
+
+                # Safety: ensure every non-subscriber gets at least 3 free generations total
+                if not _is_subscription_active(chat_credit) and chat_credit.total_used < 3 and chat_credit.balance <= 0:
+                    top_up = 3 - chat_credit.total_used
+                    chat_credit.balance += top_up
+                    chat_credit.total_earned += top_up
+                    chat_credit.save(update_fields=["balance", "total_earned"])
+
+                is_subscriber = _is_subscription_active(chat_credit)
+                if is_subscriber:
+                    allowed, remaining = _ensure_reply_allowance(chat_credit)
+                    if not allowed:
+                        return Response({
+                            "success": False,
+                            "error": "fair_use_exceeded",
+                            "message": "You hit the daily reply limit. Try again tomorrow.",
+                            **_subscription_payload(chat_credit),
+                        }, status=429)
+                elif chat_credit.balance <= 0:
+                    return Response({
+                        "success": False,
+                        "error": "subscription_required",
+                        "message": "No credits remaining. Start your subscription to continue.",
+                        **_subscription_payload(chat_credit),
+                    })
+
+                # Generate replies from image (Pro for subscribers, Flash for free users)
+                model_used = GEMINI_PRO if is_subscriber else GEMINI_FLASH
+                _log_ai_action("image_replies", model_used, is_subscriber, True, request.user.username)
+                reply, success = generate_mobile_replies_from_image(
+                    img_bytes, custom_instructions=custom_instructions, use_pro_model=is_subscriber
+                )
+
+                if success and not is_subscriber:
+                    chat_credit.balance -= 1
+                    chat_credit.total_used += 1
+                    chat_credit.save()
+                    logger.info(f"Credit deducted. New balance: {chat_credit.balance}")
+
+                return Response({
+                    "success": success,
+                    "reply": reply,
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
+                })
+
+            except ChatCredit.DoesNotExist:
+                logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
+                chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
+                # New user, not a subscriber, use Flash model
+                _log_ai_action("image_replies", GEMINI_FLASH, False, True, request.user.username)
+                reply, success = generate_mobile_replies_from_image(
+                    img_bytes, custom_instructions=custom_instructions, use_pro_model=False
+                )
+
+                return Response({
+                    "success": success,
+                    "reply": reply,
+                    "credits_remaining": chat_credit.balance,
+                    **_subscription_payload(chat_credit),
+                })
+        else:
+            logger.info("Guest user detected")
+            trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
+            logger.info(f"Guest IP: {client_ip} guest_id={guest_id}")
+
+            print(
+                f"[MOBILE] guest Trial created={created} guest_id={guest_id} "
+                f"ip={client_ip} credits_used={trial_ip.credits_used}"
+            )
+
+            if trial_ip.credits_used >= 3:
+                print(
+                    f"[MOBILE] guest trial_expired guest_id={guest_id} "
+                    f"ip={client_ip} credits_used={trial_ip.credits_used}"
+                )
+                return Response({
+                    "success": False,
+                    "error": "trial_expired",
+                    "message": "Trial expired. Please sign up for more credits."
+                })
+
+            # Generate replies from image (Flash for guests)
+            _log_ai_action("image_replies", GEMINI_FLASH, False, False)
+            reply, success = generate_mobile_replies_from_image(
+                img_bytes, custom_instructions=custom_instructions, use_pro_model=False
+            )
+
+            if success:
+                trial_ip.credits_used += 1
+                if trial_ip.credits_used >= 3:
+                    trial_ip.trial_used = True
+                trial_ip.save()
+                logger.info(f"Trial credit used. Remaining: {3 - trial_ip.credits_used}")
+
+            return Response({
+                "success": success,
+                "reply": reply,
+                "is_trial": True,
+                "trial_credits_remaining": 3 - trial_ip.credits_used
+            })
+
+    except Exception as e:
+        logger.error(f"Generate replies from image error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Generation failed", "message": str(e)})
 
 

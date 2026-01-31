@@ -16,6 +16,7 @@ urlpatterns = [
     # Generation with credits
     path("generate/", views.generate_text_with_credits, name="generate_text_with_credits"),
     path("generate-openers-from-image/", views.generate_openers_from_profile_image, name="generate_openers_from_image"),
+    path("generate-replies-from-image/", views.generate_replies_from_conversation_image, name="generate_replies_from_image"),
     path("recommended-openers/", views.recommended_openers, name="recommended_openers"),
     path("extract-image/", views.extract_from_image_with_credits, name="extract_from_image_with_credits"),
     path("extract-image-stream/", views.extract_from_image_with_credits_stream, name="extract_from_image_with_credits_stream"),
