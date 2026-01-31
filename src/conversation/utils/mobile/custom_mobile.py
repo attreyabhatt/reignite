@@ -431,20 +431,16 @@ def _call_openai_replies_from_image(image_bytes: bytes, custom_instructions: str
 
 def generate_mobile_replies_from_image(
     image_bytes: bytes,
-    custom_instructions: str = "",
-    use_pro_model: bool = True
+    custom_instructions: str = ""
 ) -> Tuple[str, bool]:
     """
     Generate reply suggestions from conversation screenshot with cascading fallback.
 
-    Fallback chain:
-    - Paid users (use_pro_model=True): Gemini Pro -> Gemini Flash -> GPT-4.1-mini
-    - Free users (use_pro_model=False): Gemini Flash -> GPT-4.1-mini
+    Fallback chain: Gemini Flash -> GPT-4.1-mini (same for all users)
 
     Args:
         image_bytes: Raw bytes of the conversation screenshot
         custom_instructions: Optional user-provided instructions
-        use_pro_model: If True, use Gemini Pro first (paid users). If False, start with Flash (free/guests).
 
     Returns:
         Tuple of (JSON array string of replies, success boolean)
@@ -453,10 +449,7 @@ def generate_mobile_replies_from_image(
     ai_reply = None
     model_used = None
 
-    if use_pro_model:
-        models = [GEMINI_PRO, GEMINI_FLASH, GPT_MODEL]
-    else:
-        models = [GEMINI_FLASH, GPT_MODEL]
+    models = [GEMINI_FLASH, GPT_MODEL]
 
     for i, model in enumerate(models, 1):
         try:

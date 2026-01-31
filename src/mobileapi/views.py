@@ -1719,11 +1719,10 @@ def generate_replies_from_conversation_image(request):
                         **_subscription_payload(chat_credit),
                     })
 
-                # Generate replies from image (Pro for subscribers, Flash for free users)
-                model_used = GEMINI_PRO if is_subscriber else GEMINI_FLASH
-                _log_ai_action("image_replies", model_used, is_subscriber, True, request.user.username)
+                # Generate replies from image (Flash for all users)
+                _log_ai_action("image_replies", GEMINI_FLASH, is_subscriber, True, request.user.username)
                 reply, success = generate_mobile_replies_from_image(
-                    img_bytes, custom_instructions=custom_instructions, use_pro_model=is_subscriber
+                    img_bytes, custom_instructions=custom_instructions
                 )
 
                 if success and not is_subscriber:
@@ -1742,10 +1741,10 @@ def generate_replies_from_conversation_image(request):
             except ChatCredit.DoesNotExist:
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
-                # New user, not a subscriber, use Flash model
+                # New user, use Flash model
                 _log_ai_action("image_replies", GEMINI_FLASH, False, True, request.user.username)
                 reply, success = generate_mobile_replies_from_image(
-                    img_bytes, custom_instructions=custom_instructions, use_pro_model=False
+                    img_bytes, custom_instructions=custom_instructions
                 )
 
                 return Response({
@@ -1775,10 +1774,10 @@ def generate_replies_from_conversation_image(request):
                     "message": "Trial expired. Please sign up for more credits."
                 })
 
-            # Generate replies from image (Flash for guests)
+            # Generate replies from image (Flash for all)
             _log_ai_action("image_replies", GEMINI_FLASH, False, False)
             reply, success = generate_mobile_replies_from_image(
-                img_bytes, custom_instructions=custom_instructions, use_pro_model=False
+                img_bytes, custom_instructions=custom_instructions
             )
 
             if success:
