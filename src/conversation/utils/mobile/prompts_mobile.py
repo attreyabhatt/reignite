@@ -37,7 +37,7 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
     Used by the 'Need Reply' feature with gemini-3-pro-preview.
     """
     # hidden custom instruction from the mobile app also being sent here
-    prompt = f"""Generate 3 unique replies for a dating app based on the conversation provided.
+    prompt = f"""Generate 3 unique replies for a dating app based on the screenshot of the conversation provided.
 
 Conversation:
 {last_text}

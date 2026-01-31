@@ -261,9 +261,6 @@ def _call_openai_replies(last_text: str, custom_instructions: str) -> str:
 
 def generate_mobile_response(
     last_text: str,
-    situation: str,
-    her_info: str = "",
-    tone: str = "Natural",
     custom_instructions: str = ""
 ) -> Tuple[str, bool]:
     """
@@ -273,9 +270,6 @@ def generate_mobile_response(
 
     Args:
         last_text: The conversation text
-        situation: The situation type (e.g., "mobile_stuck_reply_prompt")
-        her_info: Information about her (optional)
-        tone: The desired tone (Natural, Flirty, Funny, Serious)
         custom_instructions: Optional user-provided instructions
 
     Returns:
@@ -323,7 +317,7 @@ def generate_mobile_response(
 def _generate_gemini_response(
     system_prompt: str,
     user_prompt: str,
-    model: str = GEMINI_PRO
+    model: str = GEMINI_FLASH
 ) -> Tuple[Any, Optional[Dict[str, Any]]]:
     """
     Core Gemini API wrapper for text-only generation.
@@ -331,7 +325,7 @@ def _generate_gemini_response(
     Args:
         system_prompt: The system/context prompt
         user_prompt: The user's request
-        model: The model to use (defaults to GEMINI_PRO)
+        model: The model to use (defaults to GEMINI_FLASH)
 
     Returns:
         Tuple of (response object, usage info dict)
