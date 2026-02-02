@@ -31,6 +31,8 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
     Used by the 'Need Reply' feature with gemini-3-pro-preview.
     """
     prompt = f"""Generate 3 unique replies for a dating app based on the conversation provided.
+    You also need to figure based on the conversation if the replies you generate should be short or long.
+    You also need to figure out which tone you should be using for this conversation.
 
 Conversation:
 {last_text}
