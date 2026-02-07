@@ -29,20 +29,24 @@ GEMINI_PRO = "gemini-3-pro-preview"      # For openers (paid users)
 GEMINI_FLASH = "gemini-3-flash-preview"  # For replies and free users
 GPT_MODEL = "gpt-4.1-mini-2025-04-14"    # Fallback model
 
-# Config for image-based generation (openers) - with thinking and high resolution
-IMAGE_CONFIG = types.GenerateContentConfig(
-    thinking_config=types.ThinkingConfig(thinking_level="high"),
-    media_resolution="media_resolution_high",
-    temperature=1.0,
-    top_p=0.95
-)
+# Config factories — thinking level is now caller-supplied
 
-# Config for text-only generation (replies) - with thinking
-TEXT_CONFIG = types.GenerateContentConfig(
-    thinking_config=types.ThinkingConfig(thinking_level="high"),
-    temperature=1.0,
-    top_p=0.95
-)
+def _make_text_config(thinking_level="high"):
+    """Build a text-only Gemini config with the given thinking level."""
+    return types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
+        temperature=1.0,
+        top_p=0.95,
+    )
+
+def _make_image_config(thinking_level="high"):
+    """Build an image Gemini config with the given thinking level."""
+    return types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
+        media_resolution="media_resolution_high",
+        temperature=1.0,
+        top_p=0.95,
+    )
 
 
 def _validate_and_clean_json(text: str) -> str:
@@ -85,7 +89,7 @@ def _validate_and_clean_json(text: str) -> str:
     return json.dumps(cleaned)
 
 
-def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: str) -> str:
+def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: str, thinking_level: str = "high") -> str:
     """
     Call Gemini for opener generation.
 
@@ -93,6 +97,7 @@ def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: st
         image_bytes: Raw bytes of the profile image
         custom_instructions: Optional user-provided instructions
         model: Gemini model to use (GEMINI_PRO or GEMINI_FLASH)
+        thinking_level: Thinking level (low/medium/high)
 
     Returns:
         Validated JSON string of openers
@@ -116,7 +121,7 @@ def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: st
             image_part,
             user_prompt,
         ],
-        config=IMAGE_CONFIG
+        config=_make_image_config(thinking_level)
     )
 
     ai_reply = _validate_and_clean_json(response.text)
@@ -150,12 +155,15 @@ def _call_openai_openers(image_bytes: bytes, custom_instructions: str) -> str:
 def generate_mobile_openers_from_image(
     image_bytes: bytes,
     custom_instructions: str = "",
-    use_pro_model: bool = True
+    use_pro_model: bool = True,
+    thinking_level: str = "high",
+    use_gpt_only: bool = False,
 ) -> Tuple[str, bool]:
     """
     Generate opener suggestions from profile image with cascading fallback.
 
     Fallback chain:
+    - use_gpt_only=True: GPT-4.1-mini only (skip Gemini)
     - Paid users (use_pro_model=True): Gemini Pro -> Gemini Flash -> GPT-4.1-mini
     - Free users (use_pro_model=False): Gemini Flash -> GPT-4.1-mini
 
@@ -163,6 +171,8 @@ def generate_mobile_openers_from_image(
         image_bytes: Raw bytes of the profile image
         custom_instructions: Optional user-provided instructions
         use_pro_model: If True, use Gemini Pro first (paid users). If False, start with Flash (free/guests).
+        thinking_level: Thinking level for Gemini (low/medium/high)
+        use_gpt_only: If True, skip Gemini cascade and go straight to GPT
 
     Returns:
         Tuple of (JSON array string of openers, success boolean)
@@ -172,7 +182,9 @@ def generate_mobile_openers_from_image(
     model_used = None
 
     # Build model cascade based on user tier
-    if use_pro_model:
+    if use_gpt_only:
+        models = [GPT_MODEL]
+    elif use_pro_model:
         models = [GEMINI_PRO, GEMINI_FLASH, GPT_MODEL]
     else:
         models = [GEMINI_FLASH, GPT_MODEL]
@@ -181,7 +193,7 @@ def generate_mobile_openers_from_image(
     for i, model in enumerate(models, 1):
         try:
             if model.startswith('gemini'):
-                ai_reply = _call_gemini_openers(image_bytes, custom_instructions, model)
+                ai_reply = _call_gemini_openers(image_bytes, custom_instructions, model, thinking_level=thinking_level)
             else:
                 ai_reply = _call_openai_openers(image_bytes, custom_instructions)
 
@@ -207,13 +219,15 @@ def generate_mobile_openers_from_image(
     return ai_reply, success
 
 
-def _call_gemini_replies(last_text: str, custom_instructions: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = GEMINI_FLASH, thinking_level: str = "high") -> Tuple[str, Optional[Dict[str, Any]]]:
     """
-    Call Gemini Flash for reply generation.
+    Call Gemini for reply generation.
 
     Args:
         last_text: The conversation text
         custom_instructions: Optional user-provided instructions
+        model: Gemini model to use
+        thinking_level: Thinking level (low/medium/high)
 
     Returns:
         Tuple of (validated JSON string, usage info dict)
@@ -224,7 +238,7 @@ def _call_gemini_replies(last_text: str, custom_instructions: str) -> Tuple[str,
     system_prompt = get_mobile_reply_prompt(last_text, custom_instructions)
     user_prompt = get_mobile_reply_user_prompt()
 
-    response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=GEMINI_FLASH)
+    response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=model, thinking_level=thinking_level)
     ai_reply = _validate_and_clean_json(response.text)
 
     return ai_reply, usage_info
@@ -253,12 +267,15 @@ def generate_mobile_response(
     situation: str,
     her_info: str = "",
     tone: str = "Natural",
-    custom_instructions: str = ""
+    custom_instructions: str = "",
+    thinking_level: str = "high",
+    use_gpt_only: bool = False,
 ) -> Tuple[str, bool]:
     """
     Generate reply suggestions for mobile app with cascading fallback.
 
-    Fallback chain: Gemini Flash -> GPT-4.1-mini
+    Fallback chain (default): Gemini Flash -> GPT-4.1-mini
+    When use_gpt_only=True: GPT-4.1-mini only (skip Gemini)
 
     Args:
         last_text: The conversation text
@@ -266,6 +283,8 @@ def generate_mobile_response(
         her_info: Information about her (optional)
         tone: The desired tone (Natural, Flirty, Funny, Serious)
         custom_instructions: Optional user-provided instructions
+        thinking_level: Thinking level for Gemini (low/medium/high)
+        use_gpt_only: If True, skip Gemini cascade and go straight to GPT
 
     Returns:
         Tuple of (JSON array string of replies, success boolean)
@@ -275,13 +294,16 @@ def generate_mobile_response(
     model_used = None
     usage_info: Optional[Dict[str, Any]] = None
 
-    models = [GEMINI_FLASH, GPT_MODEL]
+    if use_gpt_only:
+        models = [GPT_MODEL]
+    else:
+        models = [GEMINI_FLASH, GPT_MODEL]
 
     # Try each model in sequence
     for i, model in enumerate(models, 1):
         try:
             if model.startswith('gemini'):
-                ai_reply, usage_info = _call_gemini_replies(last_text, custom_instructions)
+                ai_reply, usage_info = _call_gemini_replies(last_text, custom_instructions, model=model, thinking_level=thinking_level)
             else:
                 ai_reply = _call_openai_replies(last_text, custom_instructions)
 
@@ -312,7 +334,8 @@ def generate_mobile_response(
 def _generate_gemini_response(
     system_prompt: str,
     user_prompt: str,
-    model: str = GEMINI_PRO
+    model: str = GEMINI_PRO,
+    thinking_level: str = "high"
 ) -> Tuple[Any, Optional[Dict[str, Any]]]:
     """
     Core Gemini API wrapper for text-only generation.
@@ -321,6 +344,7 @@ def _generate_gemini_response(
         system_prompt: The system/context prompt
         user_prompt: The user's request
         model: The model to use (defaults to GEMINI_PRO)
+        thinking_level: Thinking level (low/medium/high)
 
     Returns:
         Tuple of (response object, usage info dict)
@@ -331,7 +355,7 @@ def _generate_gemini_response(
             system_prompt,
             user_prompt,
         ],
-        config=TEXT_CONFIG
+        config=_make_text_config(thinking_level)
     )
 
     usage_info = _extract_usage(response)

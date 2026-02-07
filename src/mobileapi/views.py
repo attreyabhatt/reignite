@@ -23,7 +23,7 @@ from conversation.utils.mobile.image_mobile import extract_conversation_from_ima
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
-from conversation.models import ChatCredit, TrialIP, GuestTrial, RecommendedOpener
+from conversation.models import ChatCredit, TrialIP, GuestTrial, RecommendedOpener, MobileAppConfig, LockedReply
 from reignitehome.models import ContactMessage
 from pricing.models import CreditPurchase
 from django.conf import settings
@@ -60,9 +60,9 @@ def _log_ai_action(action_type: str, model: str, is_subscribed: bool, is_signed_
     log_line = f"[AI DEBUG] {model_name} | {action_type} | {subscription_status} | {user_status}"
     print(log_line)
     logger.info(log_line)
-SUBSCRIPTION_WEEKLY_LIMIT = 400  # legacy weekly fair-use cap
-SUBSCRIPTION_DAILY_OPENER_LIMIT = 8   # daily limit for openers (Gemini Pro)
-SUBSCRIPTION_DAILY_REPLY_LIMIT = 40   # daily limit for replies (Gemini Flash)
+def _get_config():
+    """Load admin-configurable settings from the MobileAppConfig singleton."""
+    return MobileAppConfig.load()
 
 def _mask_token(token):
     if not token:
@@ -233,18 +233,19 @@ def _is_subscription_active(chat_credit):
 
 
 def _ensure_subscriber_allowance(chat_credit):
-    """Enforce weekly fair-use cap for subscribers. Returns (allowed, remaining)."""
+    """Enforce weekly fair-use cap for subscribers (legacy). Returns (allowed, remaining)."""
+    cfg = _get_config()
     _reset_weekly_counter(chat_credit)
-    if chat_credit.subscriber_weekly_actions >= SUBSCRIPTION_WEEKLY_LIMIT:
+    if chat_credit.subscriber_weekly_actions >= cfg.subscriber_weekly_limit:
         return False, 0
     chat_credit.subscriber_weekly_actions += 1
     chat_credit.save(update_fields=["subscriber_weekly_actions"])
-    remaining = max(0, SUBSCRIPTION_WEEKLY_LIMIT - chat_credit.subscriber_weekly_actions)
+    remaining = max(0, cfg.subscriber_weekly_limit - chat_credit.subscriber_weekly_actions)
     return True, remaining
 
 
 def _reset_daily_counters(chat_credit):
-    """Reset daily counters if a new day has started (UTC)."""
+    """Reset subscriber daily counters if a new day has started (UTC)."""
     now = timezone.now()
     reset_at = chat_credit.subscriber_daily_reset_at
     if not reset_at or reset_at.date() < now.date():
@@ -258,31 +259,99 @@ def _reset_daily_counters(chat_credit):
         ])
 
 
-def _ensure_opener_allowance(chat_credit):
-    """Enforce daily limit for openers (Gemini Pro). Returns (allowed, remaining)."""
-    _reset_daily_counters(chat_credit)
-    if chat_credit.subscriber_daily_openers >= SUBSCRIPTION_DAILY_OPENER_LIMIT:
+def _reset_free_daily_counter(chat_credit):
+    """Reset free user daily counter if a new day has started (UTC)."""
+    now = timezone.now()
+    reset_at = chat_credit.free_daily_reset_at
+    if not reset_at or reset_at.date() < now.date():
+        chat_credit.free_daily_credits_used = 0
+        chat_credit.free_daily_reset_at = now
+        chat_credit.save(update_fields=[
+            "free_daily_credits_used",
+            "free_daily_reset_at"
+        ])
+
+
+def _ensure_free_credit_allowance(chat_credit, cfg):
+    """Check free user daily shared pool. Returns (allowed, remaining)."""
+    _reset_free_daily_counter(chat_credit)
+    if chat_credit.free_daily_credits_used >= cfg.free_daily_credit_limit:
         return False, 0
-    chat_credit.subscriber_daily_openers += 1
-    chat_credit.save(update_fields=["subscriber_daily_openers"])
-    remaining = max(0, SUBSCRIPTION_DAILY_OPENER_LIMIT - chat_credit.subscriber_daily_openers)
+    chat_credit.free_daily_credits_used += 1
+    chat_credit.save(update_fields=["free_daily_credits_used"])
+    remaining = max(0, cfg.free_daily_credit_limit - chat_credit.free_daily_credits_used)
     return True, remaining
 
 
-def _ensure_reply_allowance(chat_credit):
-    """Enforce daily limit for replies (Gemini Flash). Returns (allowed, remaining)."""
+def _get_subscriber_reply_tier(chat_credit, cfg):
+    """Select model + thinking level for subscriber replies based on daily usage.
+    Returns (model, thinking_level). thinking_level is None for GPT fallback."""
     _reset_daily_counters(chat_credit)
-    if chat_credit.subscriber_daily_replies >= SUBSCRIPTION_DAILY_REPLY_LIMIT:
-        return False, 0
-    chat_credit.subscriber_daily_replies += 1
+    used = chat_credit.subscriber_daily_replies
+    chat_credit.subscriber_daily_replies = used + 1
     chat_credit.save(update_fields=["subscriber_daily_replies"])
-    remaining = max(0, SUBSCRIPTION_DAILY_REPLY_LIMIT - chat_credit.subscriber_daily_replies)
-    return True, remaining
+    if used < cfg.sub_reply_tier1:          # 1-50: Flash High
+        return GEMINI_FLASH, "high"
+    elif used < cfg.sub_reply_tier2:        # 51-100: Flash Low
+        return GEMINI_FLASH, "low"
+    else:                                    # 100+: GPT fallback
+        return cfg.fallback_model, None
+
+
+def _get_subscriber_opener_tier(chat_credit, cfg):
+    """Select model + thinking level for subscriber openers based on daily usage.
+    Returns (model, thinking_level). thinking_level is None for GPT fallback."""
+    _reset_daily_counters(chat_credit)
+    used = chat_credit.subscriber_daily_openers
+    chat_credit.subscriber_daily_openers = used + 1
+    chat_credit.save(update_fields=["subscriber_daily_openers"])
+    if used < cfg.sub_opener_tier1:         # 1-8: Pro High
+        return GEMINI_PRO, "high"
+    elif used < cfg.sub_opener_tier2:       # 9-50: Flash High
+        return GEMINI_FLASH, "high"
+    else:                                    # 50+: GPT fallback
+        return cfg.fallback_model, None
+
+
+def _has_pending_locked_reply(user):
+    """Check if user already has a locked reply created today (UTC). Returns LockedReply or None."""
+    return LockedReply.objects.filter(
+        user=user, unlocked=False, created_at__date=timezone.now().date()
+    ).first()
+
+
+def _create_locked_reply(user, reply_json, preview_list, reply_type):
+    """Store a locked reply server-side. Returns the LockedReply instance."""
+    return LockedReply.objects.create(
+        user=user,
+        reply_json=reply_json,
+        preview=preview_list,
+        reply_type=reply_type,
+    )
+
+
+def _extract_blur_preview(reply_json_str, word_count):
+    """Extract first N words from each suggestion for the blur preview."""
+    try:
+        suggestions = json.loads(reply_json_str)
+        previews = []
+        for item in suggestions:
+            if isinstance(item, dict) and "message" in item:
+                words = item["message"].split()
+                preview = " ".join(words[:word_count])
+                if len(words) > word_count:
+                    preview += "..."
+                previews.append(preview)
+        return previews
+    except (json.JSONDecodeError, TypeError):
+        return []
 
 
 def _subscription_payload(chat_credit):
     """Return subscription info payload for mobile clients."""
+    cfg = _get_config()
     _reset_daily_counters(chat_credit)  # Ensure counters are fresh
+    _reset_free_daily_counter(chat_credit)
     expiry = chat_credit.subscription_expiry.isoformat() if chat_credit.subscription_expiry else None
     return {
         "is_subscribed": _is_subscription_active(chat_credit),
@@ -290,17 +359,22 @@ def _subscription_payload(chat_credit):
         "subscription_product_id": chat_credit.subscription_product_id,
         "subscription_platform": chat_credit.subscription_platform,
         "subscription_auto_renewing": chat_credit.subscription_auto_renewing,
-        # Daily limits (new)
-        "daily_openers_remaining": max(0, SUBSCRIPTION_DAILY_OPENER_LIMIT - (chat_credit.subscriber_daily_openers or 0)),
-        "daily_openers_limit": SUBSCRIPTION_DAILY_OPENER_LIMIT,
-        "daily_replies_remaining": max(0, SUBSCRIPTION_DAILY_REPLY_LIMIT - (chat_credit.subscriber_daily_replies or 0)),
-        "daily_replies_limit": SUBSCRIPTION_DAILY_REPLY_LIMIT,
-        # Legacy weekly fields (for backward compatibility)
+        # Subscriber daily usage
+        "daily_openers_used": chat_credit.subscriber_daily_openers or 0,
+        "daily_replies_used": chat_credit.subscriber_daily_replies or 0,
+        # Free user daily credits
+        "free_daily_credits_remaining": max(0, cfg.free_daily_credit_limit - (chat_credit.free_daily_credits_used or 0)),
+        "free_daily_credits_limit": cfg.free_daily_credit_limit,
+        # Pending unlock status
+        "has_pending_unlock": LockedReply.objects.filter(
+            user=chat_credit.user, unlocked=False, created_at__date=timezone.now().date()
+        ).exists(),
+        # Legacy weekly fields (backward compatibility)
         "subscriber_weekly_remaining": max(
             0,
-            SUBSCRIPTION_WEEKLY_LIMIT - (chat_credit.subscriber_weekly_actions or 0)
+            cfg.subscriber_weekly_limit - (chat_credit.subscriber_weekly_actions or 0)
         ),
-        "subscriber_weekly_limit": SUBSCRIPTION_WEEKLY_LIMIT,
+        "subscriber_weekly_limit": cfg.subscriber_weekly_limit,
     }
 
 
@@ -1009,24 +1083,22 @@ def generate_text_with_credits(request):
                     chat_credit.total_earned += top_up
                     chat_credit.save(update_fields=["balance", "total_earned"])
 
-                # Subscription path
+                # Subscription path — silent degradation (no hard cap)
                 if _is_subscription_active(chat_credit):
-                    allowed, remaining = _ensure_reply_allowance(chat_credit)
-                    if not allowed:
-                        return Response(
-                            {
-                                "success": False,
-                                "error": "fair_use_exceeded",
-                                "message": "You hit the daily reply limit. Try again tomorrow.",
-                                **_subscription_payload(chat_credit),
-                            },
-                            status=429,
-                        )
+                    cfg = _get_config()
+                    model, thinking = _get_subscriber_reply_tier(chat_credit, cfg)
+                    _log_ai_action("replies", model, True, True, request.user.username)
 
-                    _log_ai_action("replies", GEMINI_FLASH, True, True, request.user.username)
-                    reply, success = generate_mobile_response(
-                        last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions
-                    )
+                    if model == cfg.fallback_model:
+                        reply, success = generate_mobile_response(
+                            last_text, situation, her_info, tone=tone,
+                            custom_instructions=custom_instructions, use_gpt_only=True,
+                        )
+                    else:
+                        reply, success = generate_mobile_response(
+                            last_text, situation, her_info, tone=tone,
+                            custom_instructions=custom_instructions, thinking_level=thinking,
+                        )
 
                     return Response({
                         "success": success,
@@ -1034,32 +1106,63 @@ def generate_text_with_credits(request):
                         **_subscription_payload(chat_credit),
                     })
 
-                # Non-subscribed fallback: use remaining credits as free actions
-                if chat_credit.balance <= 0:
-                    return Response({
-                        "success": False,
-                        "error": "subscription_required",
-                        "message": "No credits remaining. Start your subscription to continue.",
-                        **_subscription_payload(chat_credit),
-                    })
+                # --- Free registered user path (daily shared pool + blurred cliff) ---
+                cfg = _get_config()
+                allowed, remaining = _ensure_free_credit_allowance(chat_credit, cfg)
 
-                # Generate response with tone and custom instructions
-                _log_ai_action("replies", GEMINI_FLASH, False, True, request.user.username)
+                if not allowed:
+                    # Daily credits exhausted — check one-pending-reply rule
+                    existing = _has_pending_locked_reply(request.user)
+
+                    if existing:
+                        # Already has a pending locked reply today — paywall immediately (no AI call)
+                        return Response({
+                            "success": False,
+                            "error": "has_pending_unlock",
+                            "message": "You have a hidden reply waiting! Upgrade to unlock it and generate more.",
+                            "has_pending_unlock": True,
+                            "locked_reply_id": existing.pk,
+                            "locked_preview": existing.preview,
+                            **_subscription_payload(chat_credit),
+                        })
+
+                    # First time at limit today — generate ONE blurred reply, store server-side
+                    _log_ai_action("replies", cfg.free_reply_model, False, True, request.user.username)
+                    reply, success = generate_mobile_response(
+                        last_text, situation, her_info, tone=tone,
+                        custom_instructions=custom_instructions, thinking_level=cfg.free_reply_thinking,
+                    )
+
+                    if success:
+                        preview = _extract_blur_preview(reply, cfg.blur_preview_word_count)
+                        locked = _create_locked_reply(request.user, reply, preview, 'reply')
+                        return Response({
+                            "success": True,
+                            "is_locked": True,
+                            "locked_reply_id": locked.pk,
+                            "locked_preview": preview,
+                            **_subscription_payload(chat_credit),
+                        })
+                    else:
+                        return Response({
+                            "success": False,
+                            "error": "generation_failed",
+                            "message": "Something went wrong. Please try again.",
+                            **_subscription_payload(chat_credit),
+                        })
+
+                # Normal free user path (has daily credits remaining)
+                _log_ai_action("replies", cfg.free_reply_model, False, True, request.user.username)
                 reply, success = generate_mobile_response(
-                    last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions
+                    last_text, situation, her_info, tone=tone,
+                    custom_instructions=custom_instructions, thinking_level=cfg.free_reply_thinking,
                 )
-
-                if success:
-                    # Deduct credit (legacy/free actions)
-                    chat_credit.balance -= 1
-                    chat_credit.total_used += 1
-                    chat_credit.save()
-                    logger.info(f"Credit deducted. New balance: {chat_credit.balance}")
 
                 return Response({
                     "success": success,
                     "reply": reply,
-                    "credits_remaining": chat_credit.balance,
+                    "is_locked": False,
+                    "credits_remaining": remaining,
                     **_subscription_payload(chat_credit),
                 })
 
@@ -1083,8 +1186,11 @@ def generate_text_with_credits(request):
             logger.info(f"Guest IP: {client_ip} guest_id={guest_id}")
             print(f"[MOBILE] guest Trial created={created} guest_id={guest_id} ip={client_ip} credits_used={trial_ip.credits_used}")
             
-            # Check if guest has used all 3 trial credits
-            if trial_ip.credits_used >= 3:
+            cfg = _get_config()
+            guest_limit = cfg.guest_lifetime_credits
+
+            # Check if guest has used all trial credits
+            if trial_ip.credits_used >= guest_limit:
                 print(f"[MOBILE] guest trial_expired guest_id={guest_id} ip={client_ip} credits_used={trial_ip.credits_used}")
                 return Response({
                     "success": False,
@@ -1099,16 +1205,16 @@ def generate_text_with_credits(request):
             if success:
                 # Increment trial credits used
                 trial_ip.credits_used += 1
-                if trial_ip.credits_used >= 3:
+                if trial_ip.credits_used >= guest_limit:
                     trial_ip.trial_used = True
                 trial_ip.save()
-                logger.info(f"Trial credit used. Remaining: {3 - trial_ip.credits_used}")
-            
+                logger.info(f"Trial credit used. Remaining: {guest_limit - trial_ip.credits_used}")
+
             return Response({
-                "success": success, 
+                "success": success,
                 "reply": reply,
                 "is_trial": True,
-                "trial_credits_remaining": 3 - trial_ip.credits_used
+                "trial_credits_remaining": guest_limit - trial_ip.credits_used
             })
             
     except Exception as e:
@@ -1556,41 +1662,86 @@ def generate_openers_from_profile_image(request):
                     chat_credit.total_earned += top_up
                     chat_credit.save(update_fields=["balance", "total_earned"])
 
-                is_subscriber = _is_subscription_active(chat_credit)
-                if is_subscriber:
-                    allowed, remaining = _ensure_opener_allowance(chat_credit)
-                    if not allowed:
-                        return Response({
-                            "success": False,
-                            "error": "fair_use_exceeded",
-                            "message": "You hit the daily opener limit. Try again tomorrow.",
-                            **_subscription_payload(chat_credit),
-                        }, status=429)
-                elif chat_credit.balance <= 0:
+                # Subscription path — silent degradation (no hard cap)
+                if _is_subscription_active(chat_credit):
+                    cfg = _get_config()
+                    model, thinking = _get_subscriber_opener_tier(chat_credit, cfg)
+                    _log_ai_action("openers", model, True, True, request.user.username)
+
+                    if model == cfg.fallback_model:
+                        reply, success = generate_mobile_openers_from_image(
+                            img_bytes, custom_instructions=custom_instructions,
+                            use_gpt_only=True,
+                        )
+                    else:
+                        reply, success = generate_mobile_openers_from_image(
+                            img_bytes, custom_instructions=custom_instructions,
+                            use_pro_model=(model == GEMINI_PRO), thinking_level=thinking,
+                        )
+
                     return Response({
-                        "success": False,
-                        "error": "subscription_required",
-                        "message": "No credits remaining. Start your subscription to continue.",
+                        "success": success,
+                        "reply": reply,
                         **_subscription_payload(chat_credit),
                     })
 
-                # Generate openers from image (Pro for subscribers, Flash for free users)
-                model_used = GEMINI_PRO if is_subscriber else GEMINI_FLASH
-                _log_ai_action("openers", model_used, is_subscriber, True, request.user.username)
-                reply, success = generate_mobile_openers_from_image(
-                    img_bytes, custom_instructions=custom_instructions, use_pro_model=is_subscriber
-                )
+                # --- Free registered user path (daily shared pool + blurred cliff) ---
+                cfg = _get_config()
+                allowed, remaining = _ensure_free_credit_allowance(chat_credit, cfg)
 
-                if success and not is_subscriber:
-                    chat_credit.balance -= 1
-                    chat_credit.total_used += 1
-                    chat_credit.save()
-                    logger.info(f"Credit deducted. New balance: {chat_credit.balance}")
+                if not allowed:
+                    # Daily credits exhausted — check one-pending-reply rule
+                    existing = _has_pending_locked_reply(request.user)
+
+                    if existing:
+                        # Already has a pending locked reply today — paywall immediately
+                        return Response({
+                            "success": False,
+                            "error": "has_pending_unlock",
+                            "message": "You have a hidden reply waiting! Upgrade to unlock it and generate more.",
+                            "has_pending_unlock": True,
+                            "locked_reply_id": existing.pk,
+                            "locked_preview": existing.preview,
+                            **_subscription_payload(chat_credit),
+                        })
+
+                    # First time at limit today — generate ONE blurred opener, store server-side
+                    _log_ai_action("openers", cfg.free_opener_model, False, True, request.user.username)
+                    reply, success = generate_mobile_openers_from_image(
+                        img_bytes, custom_instructions=custom_instructions,
+                        use_pro_model=False, thinking_level=cfg.free_opener_thinking,
+                    )
+
+                    if success:
+                        preview = _extract_blur_preview(reply, cfg.blur_preview_word_count)
+                        locked = _create_locked_reply(request.user, reply, preview, 'opener')
+                        return Response({
+                            "success": True,
+                            "is_locked": True,
+                            "locked_reply_id": locked.pk,
+                            "locked_preview": preview,
+                            **_subscription_payload(chat_credit),
+                        })
+                    else:
+                        return Response({
+                            "success": False,
+                            "error": "generation_failed",
+                            "message": "Something went wrong. Please try again.",
+                            **_subscription_payload(chat_credit),
+                        })
+
+                # Normal free user path (has daily credits remaining)
+                _log_ai_action("openers", cfg.free_opener_model, False, True, request.user.username)
+                reply, success = generate_mobile_openers_from_image(
+                    img_bytes, custom_instructions=custom_instructions,
+                    use_pro_model=False, thinking_level=cfg.free_opener_thinking,
+                )
 
                 return Response({
                     "success": success,
                     "reply": reply,
-                    "credits_remaining": chat_credit.balance,
+                    "is_locked": False,
+                    "credits_remaining": remaining,
                     **_subscription_payload(chat_credit),
                 })
 
@@ -1619,7 +1770,10 @@ def generate_openers_from_profile_image(request):
                 f"ip={client_ip} credits_used={trial_ip.credits_used}"
             )
 
-            if trial_ip.credits_used >= 3:
+            cfg = _get_config()
+            guest_limit = cfg.guest_lifetime_credits
+
+            if trial_ip.credits_used >= guest_limit:
                 print(
                     f"[MOBILE] guest trial_expired guest_id={guest_id} "
                     f"ip={client_ip} credits_used={trial_ip.credits_used}"
@@ -1638,21 +1792,58 @@ def generate_openers_from_profile_image(request):
 
             if success:
                 trial_ip.credits_used += 1
-                if trial_ip.credits_used >= 3:
+                if trial_ip.credits_used >= guest_limit:
                     trial_ip.trial_used = True
                 trial_ip.save()
-                logger.info(f"Trial credit used. Remaining: {3 - trial_ip.credits_used}")
+                logger.info(f"Trial credit used. Remaining: {guest_limit - trial_ip.credits_used}")
 
             return Response({
                 "success": success,
                 "reply": reply,
                 "is_trial": True,
-                "trial_credits_remaining": 3 - trial_ip.credits_used
+                "trial_credits_remaining": guest_limit - trial_ip.credits_used
             })
 
     except Exception as e:
         logger.error(f"Generate openers from image error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Generation failed", "message": str(e)})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def unlock_reply(request):
+    """Unlock a locked reply after user subscribes. Returns the full text."""
+    locked_id = request.data.get("locked_reply_id")
+    if not locked_id:
+        return HttpResponseBadRequest("Missing locked_reply_id")
+
+    try:
+        chat_credit = ChatCredit.objects.get(user=request.user)
+    except ChatCredit.DoesNotExist:
+        return Response({"success": False, "error": "profile_required"}, status=400)
+
+    if not _is_subscription_active(chat_credit):
+        return Response({
+            "success": False,
+            "error": "subscription_required",
+            "message": "Subscribe to unlock this reply.",
+        }, status=403)
+
+    try:
+        locked = LockedReply.objects.get(pk=locked_id, user=request.user)
+    except LockedReply.DoesNotExist:
+        return Response({"success": False, "error": "not_found"}, status=404)
+
+    # Mark as unlocked
+    locked.unlocked = True
+    locked.save(update_fields=["unlocked"])
+
+    return Response({
+        "success": True,
+        "reply": locked.reply_json,
+        "is_locked": False,
+        **_subscription_payload(chat_credit),
+    })
 
 
 @api_view(["POST"])

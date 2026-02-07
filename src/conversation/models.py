@@ -79,6 +79,9 @@ class ChatCredit(models.Model):
     subscriber_daily_openers = models.PositiveIntegerField(default=0)
     subscriber_daily_replies = models.PositiveIntegerField(default=0)
     subscriber_daily_reset_at = models.DateTimeField(blank=True, null=True)
+    # Free user daily tracking (shared pool for replies + openers)
+    free_daily_credits_used = models.PositiveIntegerField(default=0)
+    free_daily_reset_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.balance} credits"
@@ -119,6 +122,101 @@ def create_user_chat_credit(sender, instance, created, **kwargs):
             total_earned=3
         )
         
+class MobileAppConfig(models.Model):
+    """Singleton config — editable from Django admin. Only one row should exist."""
+
+    # --- Free user limits ---
+    free_daily_credit_limit = models.PositiveIntegerField(
+        default=3, help_text="Daily shared credit pool for free registered users (replies + openers)"
+    )
+    guest_lifetime_credits = models.PositiveIntegerField(
+        default=3, help_text="Lifetime credits for guest (unauthenticated) users"
+    )
+
+    # --- Subscriber degradation tiers (no hard cap — silent downgrade) ---
+    sub_opener_tier1 = models.PositiveIntegerField(
+        default=8, help_text="Openers 1 to N: Pro model (High thinking)"
+    )
+    sub_opener_tier2 = models.PositiveIntegerField(
+        default=50, help_text="Openers N+1 to M: Flash model (High thinking). M+ uses GPT fallback"
+    )
+    sub_reply_tier1 = models.PositiveIntegerField(
+        default=50, help_text="Replies 1 to N: Flash model (High thinking)"
+    )
+    sub_reply_tier2 = models.PositiveIntegerField(
+        default=100, help_text="Replies N+1 to M: Flash model (Low thinking). M+ uses GPT fallback"
+    )
+    subscriber_weekly_limit = models.PositiveIntegerField(
+        default=400, help_text="Legacy weekly fair-use cap for subscribers"
+    )
+
+    # --- Model selection ---
+    free_reply_model = models.CharField(
+        max_length=100, default="gemini-3-flash-preview",
+        help_text="AI model for free user replies"
+    )
+    free_opener_model = models.CharField(
+        max_length=100, default="gemini-3-flash-preview",
+        help_text="AI model for free user openers"
+    )
+    fallback_model = models.CharField(
+        max_length=100, default="gpt-4.1-mini-2025-04-14",
+        help_text="Fallback model (GPT) used after tier2 threshold"
+    )
+
+    # --- Thinking levels ---
+    free_reply_thinking = models.CharField(
+        max_length=20, default="high",
+        help_text="Thinking level for free user replies (low/medium/high)"
+    )
+    free_opener_thinking = models.CharField(
+        max_length=20, default="high",
+        help_text="Thinking level for free user openers (low/medium/high)"
+    )
+    ocr_thinking = models.CharField(
+        max_length=20, default="low",
+        help_text="Thinking level for OCR extraction (low/medium/high)"
+    )
+
+    # --- Blur settings ---
+    blur_preview_word_count = models.PositiveIntegerField(
+        default=3, help_text="Number of visible words shown before the locked block"
+    )
+
+    class Meta:
+        verbose_name = "Mobile App Config"
+        verbose_name_plural = "Mobile App Config"
+
+    def __str__(self):
+        return "Mobile App Configuration"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        """Get or create the singleton config row."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class LockedReply(models.Model):
+    """Stores one pending locked reply per user per day. Full text never sent to client until unlocked."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='locked_replies')
+    reply_json = models.TextField(help_text="Full AI-generated JSON array of suggestions")
+    preview = models.JSONField(help_text="List of first N words per suggestion (sent to client)")
+    reply_type = models.CharField(max_length=20, choices=[('reply', 'Reply'), ('opener', 'Opener')])
+    created_at = models.DateTimeField(auto_now_add=True)
+    unlocked = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"LockedReply #{self.pk} for {self.user.username} ({'unlocked' if self.unlocked else 'locked'})"
+
+
 class CopyEvent(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='copy_events')
     conversation = models.ForeignKey('Conversation', on_delete=models.SET_NULL, null=True, blank=True, related_name='copy_events')
