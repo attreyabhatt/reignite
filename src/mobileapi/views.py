@@ -7,13 +7,15 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from allauth.account.forms import ResetPasswordForm
 from django.http import HttpResponseBadRequest, StreamingHttpResponse
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from decimal import Decimal, InvalidOperation
 import random
 import json
 import logging
+import hmac
+import hashlib
 from functools import lru_cache
 from datetime import datetime, timedelta, timezone as dt_timezone
 
@@ -23,7 +25,15 @@ from conversation.utils.mobile.image_mobile import extract_conversation_from_ima
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .renderers import EventStreamRenderer
-from conversation.models import ChatCredit, TrialIP, GuestTrial, RecommendedOpener, MobileAppConfig, LockedReply
+from conversation.models import (
+    ChatCredit,
+    TrialIP,
+    GuestTrial,
+    RecommendedOpener,
+    MobileAppConfig,
+    LockedReply,
+    DeviceDailyUsage,
+)
 from reignitehome.models import ContactMessage
 from pricing.models import CreditPurchase
 from django.conf import settings
@@ -272,14 +282,88 @@ def _reset_free_daily_counter(chat_credit):
         ])
 
 
-def _ensure_free_credit_allowance(chat_credit, cfg):
-    """Check free user daily shared pool. Returns (allowed, remaining)."""
+def _get_device_fingerprint(request):
+    """Prefer explicit device fingerprint header, fallback to legacy guest id."""
+    raw = (
+        request.META.get("HTTP_X_DEVICE_FINGERPRINT")
+        or request.META.get("HTTP_X_GUEST_ID")
+        or ""
+    ).strip()
+    # Keep bounded to avoid oversized header abuse.
+    return raw[:256]
+
+
+def _hash_device_fingerprint(raw_fingerprint):
+    if not raw_fingerprint:
+        return ""
+    # Store only a keyed hash to avoid persisting raw device identifiers.
+    key = settings.SECRET_KEY.encode("utf-8")
+    msg = raw_fingerprint.encode("utf-8")
+    return hmac.new(key, msg, hashlib.sha256).hexdigest()
+
+
+def _get_device_daily_usage(request):
+    """Return today's usage count for a device fingerprint."""
+    raw_fingerprint = _get_device_fingerprint(request)
+    device_hash = _hash_device_fingerprint(raw_fingerprint)
+    if not device_hash:
+        return 0
+    today = timezone.now().date()
+    usage = DeviceDailyUsage.objects.filter(
+        device_hash=device_hash,
+        day=today,
+    ).first()
+    return usage.used_count if usage else 0
+
+
+def _ensure_free_credit_allowance(chat_credit, cfg, request=None):
+    """Check free user daily shared pool across account + device. Returns (allowed, remaining)."""
     _reset_free_daily_counter(chat_credit)
-    if chat_credit.free_daily_credits_used >= cfg.free_daily_credit_limit:
-        return False, 0
-    chat_credit.free_daily_credits_used += 1
-    chat_credit.save(update_fields=["free_daily_credits_used"])
-    remaining = max(0, cfg.free_daily_credit_limit - chat_credit.free_daily_credits_used)
+    user_used = chat_credit.free_daily_credits_used or 0
+
+    if request is None:
+        if user_used >= cfg.free_daily_credit_limit:
+            return False, 0
+        chat_credit.free_daily_credits_used = user_used + 1
+        chat_credit.save(update_fields=["free_daily_credits_used"])
+        remaining = max(0, cfg.free_daily_credit_limit - chat_credit.free_daily_credits_used)
+        return True, remaining
+
+    raw_fingerprint = _get_device_fingerprint(request)
+    device_hash = _hash_device_fingerprint(raw_fingerprint)
+    today = timezone.now().date()
+    device_used = 0
+    device_usage = None
+
+    with transaction.atomic():
+        # Re-read row in transaction to avoid racey increments.
+        chat_credit = ChatCredit.objects.select_for_update().get(pk=chat_credit.pk)
+        _reset_free_daily_counter(chat_credit)
+        user_used = chat_credit.free_daily_credits_used or 0
+
+        if device_hash:
+            device_usage, _ = DeviceDailyUsage.objects.select_for_update().get_or_create(
+                device_hash=device_hash,
+                day=today,
+                defaults={"used_count": 0},
+            )
+            device_used = device_usage.used_count or 0
+
+        effective_used = max(user_used, device_used)
+        if effective_used >= cfg.free_daily_credit_limit:
+            return False, 0
+
+        new_used = effective_used + 1
+
+        if chat_credit.free_daily_credits_used != new_used:
+            chat_credit.free_daily_credits_used = new_used
+            chat_credit.save(update_fields=["free_daily_credits_used"])
+
+        if device_usage and device_usage.used_count != new_used:
+            device_usage.used_count = new_used
+            device_usage.save(update_fields=["used_count", "last_seen"])
+
+    remaining = max(0, cfg.free_daily_credit_limit - new_used)
     return True, remaining
 
 
@@ -332,11 +416,15 @@ def _extract_blur_preview(reply_json_str, word_count):
         return []
 
 
-def _subscription_payload(chat_credit):
+def _subscription_payload(chat_credit, request=None):
     """Return subscription info payload for mobile clients."""
     cfg = _get_config()
     _reset_daily_counters(chat_credit)  # Ensure counters are fresh
     _reset_free_daily_counter(chat_credit)
+    user_used = chat_credit.free_daily_credits_used or 0
+    device_used = _get_device_daily_usage(request) if request is not None else 0
+    effective_used = max(user_used, device_used)
+    remaining_free = max(0, cfg.free_daily_credit_limit - effective_used)
     expiry = chat_credit.subscription_expiry.isoformat() if chat_credit.subscription_expiry else None
     return {
         "is_subscribed": _is_subscription_active(chat_credit),
@@ -348,7 +436,7 @@ def _subscription_payload(chat_credit):
         "daily_openers_used": chat_credit.subscriber_daily_openers or 0,
         "daily_replies_used": chat_credit.subscriber_daily_replies or 0,
         # Free user daily credits
-        "free_daily_credits_remaining": max(0, cfg.free_daily_credit_limit - (chat_credit.free_daily_credits_used or 0)),
+        "free_daily_credits_remaining": remaining_free,
         "free_daily_credits_limit": cfg.free_daily_credit_limit,
         # Pending unlock status
         "has_pending_unlock": LockedReply.objects.filter(
@@ -374,7 +462,7 @@ def _reset_trial_if_stale(trial_ip):
 
 
 def _get_guest_id(request):
-    return (request.META.get("HTTP_X_GUEST_ID") or "").strip()
+    return _get_device_fingerprint(request)[:64]
 
 
 def _get_or_create_guest_trial(request):
@@ -524,7 +612,7 @@ def register(request):
         
         logger.info(f"New user created: {username} with {chat_credit.balance} credits")
         
-        subscription_info = _subscription_payload(chat_credit)
+        subscription_info = _subscription_payload(chat_credit, request=request)
 
         return Response({
             "success": True,
@@ -570,7 +658,7 @@ def login(request):
             defaults={'balance': 10}  # Default credits for existing users
         )
 
-        subscription_info = _subscription_payload(chat_credit)
+        subscription_info = _subscription_payload(chat_credit, request=request)
         
         return Response({
             "success": True,
@@ -796,7 +884,7 @@ def verify_subscription(request):
                 "subscription_auto_renewing",
                 "subscription_last_checked",
             ])
-            payload = _subscription_payload(chat_credit)
+            payload = _subscription_payload(chat_credit, request=request)
             return Response({"success": True, **payload})
 
         # mark as not subscribed if verification failed
@@ -892,7 +980,7 @@ def profile(request):
     try:
         user = request.user
         chat_credit = ChatCredit.objects.get(user=user)
-        subscription_info = _subscription_payload(chat_credit)
+        subscription_info = _subscription_payload(chat_credit, request=request)
         
         return Response({
             "success": True,
@@ -907,7 +995,7 @@ def profile(request):
     except ChatCredit.DoesNotExist:
         # Create chat credit if doesn't exist
         chat_credit = ChatCredit.objects.create(user=user, balance=10)
-        subscription_info = _subscription_payload(chat_credit)
+        subscription_info = _subscription_payload(chat_credit, request=request)
         return Response({
             "success": True,
             "user": {
@@ -1088,12 +1176,12 @@ def generate_text_with_credits(request):
                     return Response({
                         "success": success,
                         "reply": reply,
-                        **_subscription_payload(chat_credit),
+                        **_subscription_payload(chat_credit, request=request),
                     })
 
                 # --- Free registered user path (daily shared pool + blurred cliff) ---
                 cfg = _get_config()
-                allowed, remaining = _ensure_free_credit_allowance(chat_credit, cfg)
+                allowed, remaining = _ensure_free_credit_allowance(chat_credit, cfg, request=request)
 
                 if not allowed:
                     # Daily credits exhausted — check one-pending-reply rule
@@ -1108,7 +1196,7 @@ def generate_text_with_credits(request):
                             "has_pending_unlock": True,
                             "locked_reply_id": existing.pk,
                             "locked_preview": existing.preview,
-                            **_subscription_payload(chat_credit),
+                            **_subscription_payload(chat_credit, request=request),
                         })
 
                     # First time at limit today — generate ONE blurred reply, store server-side
@@ -1126,14 +1214,14 @@ def generate_text_with_credits(request):
                             "is_locked": True,
                             "locked_reply_id": locked.pk,
                             "locked_preview": preview,
-                            **_subscription_payload(chat_credit),
+                            **_subscription_payload(chat_credit, request=request),
                         })
                     else:
                         return Response({
                             "success": False,
                             "error": "generation_failed",
                             "message": "Something went wrong. Please try again.",
-                            **_subscription_payload(chat_credit),
+                            **_subscription_payload(chat_credit, request=request),
                         })
 
                 # Normal free user path (has daily credits remaining)
@@ -1148,7 +1236,7 @@ def generate_text_with_credits(request):
                     "reply": reply,
                     "is_locked": False,
                     "credits_remaining": remaining,
-                    **_subscription_payload(chat_credit),
+                    **_subscription_payload(chat_credit, request=request),
                 })
 
             except ChatCredit.DoesNotExist:
@@ -1162,7 +1250,7 @@ def generate_text_with_credits(request):
                     "success": success,
                     "reply": reply,
                     "credits_remaining": chat_credit.balance,
-                    **_subscription_payload(chat_credit),
+                    **_subscription_payload(chat_credit, request=request),
                 })
         else:
             logger.info("Guest user detected")
@@ -1247,7 +1335,7 @@ def extract_from_image_with_credits(request):
                                 "success": False,
                                 "error": "fair_use_exceeded",
                                 "conversation": "You hit the weekly fair-use limit. Try again soon.",
-                                **_subscription_payload(chat_credit),
+                                **_subscription_payload(chat_credit, request=request),
                             },
                             status=429,
                         )
@@ -1258,7 +1346,7 @@ def extract_from_image_with_credits(request):
                 return Response({
                     "conversation": conversation,
                     "credits_remaining": chat_credit.balance,
-                    **_subscription_payload(chat_credit),
+                    **_subscription_payload(chat_credit, request=request),
                 })
 
             except ChatCredit.DoesNotExist:
@@ -1268,7 +1356,7 @@ def extract_from_image_with_credits(request):
                 return Response({
                     "conversation": conversation or "Failed to extract conversation.",
                     "credits_remaining": chat_credit.balance,
-                    **_subscription_payload(chat_credit),
+                    **_subscription_payload(chat_credit, request=request),
                 })
         else:
             # Guests: OCR is free and does not consume trial credits
@@ -1319,7 +1407,7 @@ def extract_from_image_with_credits_stream(request):
                 allowed, remaining = _ensure_subscriber_allowance(chat_credit)
                 if not allowed:
                     return StreamingHttpResponse(
-                        _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit)),
+                        _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit, request=request)),
                         content_type="text/event-stream",
                     )
             # For non-subscribers, OCR streaming is free (no credit gate)
@@ -1353,7 +1441,7 @@ def extract_from_image_with_credits_stream(request):
                             "type": "done",
                             "conversation": full,
                             "credits_remaining": chat_credit.balance,
-                            **_subscription_payload(chat_credit),
+                            **_subscription_payload(chat_credit, request=request),
                         }
                     )
                 )
@@ -1439,14 +1527,14 @@ def analyze_profile(request):
                         "success": False,
                         "error": "fair_use_exceeded",
                         "profile_info": "You hit the weekly fair-use limit. Try again soon.",
-                        **_subscription_payload(chat_credit),
+                        **_subscription_payload(chat_credit, request=request),
                     }, status=429)
             elif chat_credit.balance <= 0:
                 return Response({
                     "success": False,
                     "error": "subscription_required",
                     "profile_info": "Start your subscription to continue.",
-                    **_subscription_payload(chat_credit),
+                    **_subscription_payload(chat_credit, request=request),
                 })
 
         # Analyze the profile image
@@ -1471,7 +1559,14 @@ def analyze_profile(request):
         return Response({
             "success": True,
             "profile_info": analysis,
-            **(_subscription_payload(ChatCredit.objects.get(user=request.user)) if request.user.is_authenticated else {}),
+            **(
+                _subscription_payload(
+                    ChatCredit.objects.get(user=request.user),
+                    request=request,
+                )
+                if request.user.is_authenticated
+                else {}
+            ),
         })
         
     except Exception as e:
@@ -1554,12 +1649,12 @@ def analyze_profile_stream(request):
                 allowed, remaining = _ensure_subscriber_allowance(chat_credit)
                 if not allowed:
                     return StreamingHttpResponse(
-                        _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit)),
+                        _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit, request=request)),
                         content_type="text/event-stream",
                     )
             elif chat_credit.balance <= 0:
                 return StreamingHttpResponse(
-                    _error_stream("subscription_required", "No credits remaining. Start your subscription to continue.", _subscription_payload(chat_credit)),
+                    _error_stream("subscription_required", "No credits remaining. Start your subscription to continue.", _subscription_payload(chat_credit, request=request)),
                     content_type="text/event-stream",
                 )
         except ChatCredit.DoesNotExist:
@@ -1587,7 +1682,7 @@ def analyze_profile_stream(request):
 
             yield _sse_event(
                 json.dumps(
-                    {"type": "done", "success": True, "profile_info": full, **(_subscription_payload(chat_credit) if chat_credit else {})}
+                    {"type": "done", "success": True, "profile_info": full, **(_subscription_payload(chat_credit, request=request) if chat_credit else {})}
                 )
             )
         except Exception as exc:
@@ -1667,12 +1762,12 @@ def generate_openers_from_profile_image(request):
                     return Response({
                         "success": success,
                         "reply": reply,
-                        **_subscription_payload(chat_credit),
+                        **_subscription_payload(chat_credit, request=request),
                     })
 
                 # --- Free registered user path (daily shared pool + blurred cliff) ---
                 cfg = _get_config()
-                allowed, remaining = _ensure_free_credit_allowance(chat_credit, cfg)
+                allowed, remaining = _ensure_free_credit_allowance(chat_credit, cfg, request=request)
 
                 if not allowed:
                     # Daily credits exhausted — check one-pending-reply rule
@@ -1687,7 +1782,7 @@ def generate_openers_from_profile_image(request):
                             "has_pending_unlock": True,
                             "locked_reply_id": existing.pk,
                             "locked_preview": existing.preview,
-                            **_subscription_payload(chat_credit),
+                            **_subscription_payload(chat_credit, request=request),
                         })
 
                     # First time at limit today — generate ONE blurred opener, store server-side
@@ -1705,14 +1800,14 @@ def generate_openers_from_profile_image(request):
                             "is_locked": True,
                             "locked_reply_id": locked.pk,
                             "locked_preview": preview,
-                            **_subscription_payload(chat_credit),
+                            **_subscription_payload(chat_credit, request=request),
                         })
                     else:
                         return Response({
                             "success": False,
                             "error": "generation_failed",
                             "message": "Something went wrong. Please try again.",
-                            **_subscription_payload(chat_credit),
+                            **_subscription_payload(chat_credit, request=request),
                         })
 
                 # Normal free user path (has daily credits remaining)
@@ -1727,7 +1822,7 @@ def generate_openers_from_profile_image(request):
                     "reply": reply,
                     "is_locked": False,
                     "credits_remaining": remaining,
-                    **_subscription_payload(chat_credit),
+                    **_subscription_payload(chat_credit, request=request),
                 })
 
             except ChatCredit.DoesNotExist:
@@ -1743,7 +1838,7 @@ def generate_openers_from_profile_image(request):
                     "success": success,
                     "reply": reply,
                     "credits_remaining": chat_credit.balance,
-                    **_subscription_payload(chat_credit),
+                    **_subscription_payload(chat_credit, request=request),
                 })
         else:
             logger.info("Guest user detected")
@@ -1827,7 +1922,7 @@ def unlock_reply(request):
         "success": True,
         "reply": locked.reply_json,
         "is_locked": False,
-        **_subscription_payload(chat_credit),
+        **_subscription_payload(chat_credit, request=request),
     })
 
 
@@ -1863,7 +1958,7 @@ def recommended_openers(request):
                         }
                         for opener in openers
                     ],
-                    **_subscription_payload(chat_credit),
+                    **_subscription_payload(chat_credit, request=request),
                 }
             )
 
@@ -1890,3 +1985,4 @@ def recommended_openers(request):
     except Exception as exc:
         logger.error("Recommended openers error: %s", exc, exc_info=True)
         return Response({"success": False, "error": "generation_failed"}, status=500)
+

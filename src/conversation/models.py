@@ -25,6 +25,26 @@ class GuestTrial(models.Model):
     def __str__(self):
         return f"{self.guest_id} - Trial: {'Used' if self.trial_used else 'Available'}"
 
+
+class DeviceDailyUsage(models.Model):
+    """Per-device daily usage counter for free-user anti-smurf enforcement."""
+    device_hash = models.CharField(max_length=64, db_index=True)
+    day = models.DateField(db_index=True)
+    used_count = models.PositiveIntegerField(default=0)
+    first_seen = models.DateTimeField(auto_now_add=True)
+    last_seen = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device_hash", "day"],
+                name="unique_device_hash_day_usage",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.device_hash[:10]}... @ {self.day}: {self.used_count}"
+
 class RecommendedOpener(models.Model):
     text = models.TextField()
     why_it_works = models.TextField(blank=True)

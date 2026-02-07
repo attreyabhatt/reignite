@@ -1,5 +1,16 @@
 from django.contrib import admin
-from .models import ChatCredit, Conversation, CopyEvent, GuestTrial, TrialIP, RecommendedOpener, MobileAppConfig, DegradationTier, LockedReply
+from .models import (
+    ChatCredit,
+    Conversation,
+    CopyEvent,
+    GuestTrial,
+    TrialIP,
+    DeviceDailyUsage,
+    RecommendedOpener,
+    MobileAppConfig,
+    DegradationTier,
+    LockedReply,
+)
 
 @admin.register(ChatCredit)
 class ChatCreditAdmin(admin.ModelAdmin):
@@ -38,6 +49,13 @@ class TrialIPAdmin(admin.ModelAdmin):
     list_display = ('ip_address', 'credits_used', 'trial_used', 'first_seen')
     search_fields = ('ip_address',)
     list_filter = ('trial_used', 'first_seen')
+
+
+@admin.register(DeviceDailyUsage)
+class DeviceDailyUsageAdmin(admin.ModelAdmin):
+    list_display = ('device_hash', 'day', 'used_count', 'last_seen')
+    search_fields = ('device_hash',)
+    list_filter = ('day',)
 
 
 @admin.register(RecommendedOpener)
