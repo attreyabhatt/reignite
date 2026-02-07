@@ -133,19 +133,6 @@ class MobileAppConfig(models.Model):
         default=3, help_text="Lifetime credits for guest (unauthenticated) users"
     )
 
-    # --- Subscriber degradation tiers (no hard cap — silent downgrade) ---
-    sub_opener_tier1 = models.PositiveIntegerField(
-        default=8, help_text="Openers 1 to N: Pro model (High thinking)"
-    )
-    sub_opener_tier2 = models.PositiveIntegerField(
-        default=50, help_text="Openers N+1 to M: Flash model (High thinking). M+ uses GPT fallback"
-    )
-    sub_reply_tier1 = models.PositiveIntegerField(
-        default=50, help_text="Replies 1 to N: Flash model (High thinking)"
-    )
-    sub_reply_tier2 = models.PositiveIntegerField(
-        default=100, help_text="Replies N+1 to M: Flash model (Low thinking). M+ uses GPT fallback"
-    )
     subscriber_weekly_limit = models.PositiveIntegerField(
         default=400, help_text="Legacy weekly fair-use cap for subscribers"
     )
@@ -199,6 +186,34 @@ class MobileAppConfig(models.Model):
         """Get or create the singleton config row."""
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class DegradationTier(models.Model):
+    """One row per degradation tier. Admin can add/remove/reorder."""
+    TIER_TYPE_CHOICES = [
+        ('opener', 'Opener'),
+        ('reply', 'Reply'),
+    ]
+    config = models.ForeignKey(
+        MobileAppConfig, on_delete=models.CASCADE, related_name='tiers'
+    )
+    tier_type = models.CharField(max_length=10, choices=TIER_TYPE_CHOICES)
+    threshold = models.PositiveIntegerField(
+        help_text="Use this model/thinking for requests 1..N (cumulative daily count)"
+    )
+    model = models.CharField(max_length=100, help_text="e.g. gemini-3-pro-preview, gemini-3-flash-preview")
+    thinking_level = models.CharField(
+        max_length=20, blank=True, default="high",
+        help_text="minimal/low/medium/high. Leave blank for GPT models."
+    )
+    sort_order = models.PositiveIntegerField(default=0, help_text="Lower = used first")
+
+    class Meta:
+        ordering = ['tier_type', 'sort_order', 'threshold']
+        verbose_name = "Degradation Tier"
+
+    def __str__(self):
+        return f"{self.get_tier_type_display()} \u2264{self.threshold}: {self.model} ({self.thinking_level})"
 
 
 class LockedReply(models.Model):

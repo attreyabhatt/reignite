@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ChatCredit, Conversation, CopyEvent, GuestTrial, TrialIP, RecommendedOpener, MobileAppConfig, LockedReply
+from .models import ChatCredit, Conversation, CopyEvent, GuestTrial, TrialIP, RecommendedOpener, MobileAppConfig, DegradationTier, LockedReply
 
 @admin.register(ChatCredit)
 class ChatCreditAdmin(admin.ModelAdmin):
@@ -48,18 +48,26 @@ class RecommendedOpenerAdmin(admin.ModelAdmin):
     ordering = ('sort_order', 'id')
 
 
+class DegradationTierInline(admin.TabularInline):
+    model = DegradationTier
+    extra = 1
+    fields = ('tier_type', 'sort_order', 'threshold', 'model', 'thinking_level')
+    ordering = ('tier_type', 'sort_order')
+
+
 @admin.register(MobileAppConfig)
 class MobileAppConfigAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Free User Limits", {"fields": ("free_daily_credit_limit", "guest_lifetime_credits")}),
-        ("Subscriber Degradation Tiers", {
-            "description": "No hard cap. Quality silently degrades at each threshold.",
-            "fields": ("sub_opener_tier1", "sub_opener_tier2", "sub_reply_tier1", "sub_reply_tier2", "subscriber_weekly_limit"),
-        }),
-        ("Free User Models", {"fields": ("free_reply_model", "free_opener_model", "fallback_model")}),
-        ("Free User Thinking Levels", {"fields": ("free_reply_thinking", "free_opener_thinking", "ocr_thinking")}),
+        ("Free User Models & Thinking", {"fields": (
+            "free_reply_model", "free_reply_thinking",
+            "free_opener_model", "free_opener_thinking",
+            "ocr_thinking",
+        )}),
+        ("Fallback & Legacy", {"fields": ("fallback_model", "subscriber_weekly_limit")}),
         ("Blur Settings", {"fields": ("blur_preview_word_count",)}),
     )
+    inlines = [DegradationTierInline]
 
     def has_add_permission(self, request):
         return not MobileAppConfig.objects.exists()

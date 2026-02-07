@@ -283,34 +283,19 @@ def _ensure_free_credit_allowance(chat_credit, cfg):
     return True, remaining
 
 
-def _get_subscriber_reply_tier(chat_credit, cfg):
-    """Select model + thinking level for subscriber replies based on daily usage.
-    Returns (model, thinking_level). thinking_level is None for GPT fallback."""
+def _get_subscriber_tier(chat_credit, cfg, tier_type, usage_field):
+    """Walk DegradationTier rows for tier_type in sort_order.
+    Returns (model, thinking_level). Falls back to cfg.fallback_model."""
     _reset_daily_counters(chat_credit)
-    used = chat_credit.subscriber_daily_replies
-    chat_credit.subscriber_daily_replies = used + 1
-    chat_credit.save(update_fields=["subscriber_daily_replies"])
-    if used < cfg.sub_reply_tier1:          # 1-50: Flash High
-        return GEMINI_FLASH, "high"
-    elif used < cfg.sub_reply_tier2:        # 51-100: Flash Low
-        return GEMINI_FLASH, "low"
-    else:                                    # 100+: GPT fallback
-        return cfg.fallback_model, None
+    used = getattr(chat_credit, usage_field)
+    setattr(chat_credit, usage_field, used + 1)
+    chat_credit.save(update_fields=[usage_field])
 
-
-def _get_subscriber_opener_tier(chat_credit, cfg):
-    """Select model + thinking level for subscriber openers based on daily usage.
-    Returns (model, thinking_level). thinking_level is None for GPT fallback."""
-    _reset_daily_counters(chat_credit)
-    used = chat_credit.subscriber_daily_openers
-    chat_credit.subscriber_daily_openers = used + 1
-    chat_credit.save(update_fields=["subscriber_daily_openers"])
-    if used < cfg.sub_opener_tier1:         # 1-8: Pro High
-        return GEMINI_PRO, "high"
-    elif used < cfg.sub_opener_tier2:       # 9-50: Flash High
-        return GEMINI_FLASH, "high"
-    else:                                    # 50+: GPT fallback
-        return cfg.fallback_model, None
+    tiers = cfg.tiers.filter(tier_type=tier_type).order_by('sort_order')
+    for tier in tiers:
+        if used < tier.threshold:
+            return tier.model, tier.thinking_level or None
+    return cfg.fallback_model, None
 
 
 def _has_pending_locked_reply(user):
@@ -1086,7 +1071,7 @@ def generate_text_with_credits(request):
                 # Subscription path — silent degradation (no hard cap)
                 if _is_subscription_active(chat_credit):
                     cfg = _get_config()
-                    model, thinking = _get_subscriber_reply_tier(chat_credit, cfg)
+                    model, thinking = _get_subscriber_tier(chat_credit, cfg, 'reply', 'subscriber_daily_replies')
                     _log_ai_action("replies", model, True, True, request.user.username)
 
                     if model == cfg.fallback_model:
@@ -1665,7 +1650,7 @@ def generate_openers_from_profile_image(request):
                 # Subscription path — silent degradation (no hard cap)
                 if _is_subscription_active(chat_credit):
                     cfg = _get_config()
-                    model, thinking = _get_subscriber_opener_tier(chat_credit, cfg)
+                    model, thinking = _get_subscriber_tier(chat_credit, cfg, 'opener', 'subscriber_daily_openers')
                     _log_ai_action("openers", model, True, True, request.user.username)
 
                     if model == cfg.fallback_model:
