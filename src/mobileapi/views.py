@@ -68,7 +68,6 @@ def _log_ai_action(action_type: str, model: str, is_subscribed: bool, is_signed_
     user_status = f"signed up ({username})" if is_signed_up else "guest user"
 
     log_line = f"[AI DEBUG] {model_name} | {action_type} | {subscription_status} | {user_status}"
-    print(log_line)
     logger.info(log_line)
 def _get_config():
     """Load admin-configurable settings from the MobileAppConfig singleton."""
@@ -80,6 +79,40 @@ def _mask_token(token):
     if len(token) <= 12:
         return f"{token[:4]}...{token[-4:]}"
     return f"{token[:8]}...{token[-4:]}"
+
+
+def _mask_guest_id(guest_id):
+    guest_id = (guest_id or "").strip()
+    if not guest_id:
+        return ""
+    if len(guest_id) <= 8:
+        return f"{guest_id[:2]}...{guest_id[-2:]}"
+    return f"{guest_id[:4]}...{guest_id[-4:]}"
+
+
+def _mask_ip(ip_address):
+    ip_address = (ip_address or "").strip()
+    if not ip_address:
+        return ""
+    if "." in ip_address:
+        parts = ip_address.split(".")
+        if len(parts) == 4:
+            return f"{parts[0]}.{parts[1]}.x.x"
+    if ":" in ip_address:
+        parts = [part for part in ip_address.split(":") if part]
+        if len(parts) >= 2:
+            return f"{parts[0]}:{parts[1]}:****"
+    return _mask_guest_id(ip_address)
+
+
+def _safe_http_error(exc):
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        resp = getattr(exc, "resp", None)
+        status = getattr(resp, "status", None)
+    if status is not None:
+        return f"{type(exc).__name__}(status={status})"
+    return type(exc).__name__
 
 
 def _sse_event(payload):
@@ -138,7 +171,12 @@ def _verify_google_play_purchase(product_id, purchase_token):
             .execute()
         )
     except HttpError as exc:
-        logger.warning("Google Play verification failed: %s", exc)
+        logger.warning(
+            "Google Play verification failed product_id=%s token=%s error=%s",
+            product_id,
+            _mask_token(purchase_token),
+            _safe_http_error(exc),
+        )
         return False, "google_play_verification_failed"
 
     purchase_state = response.get("purchaseState")
@@ -186,7 +224,12 @@ def _acknowledge_google_play_purchase(product_id, purchase_token):
                 logger.info("Acknowledged Google Play purchase: product_id=%s", product_id)
             except HttpError as ack_exc:
                 # Acknowledgement might fail if already acknowledged, which is fine
-                logger.warning("Failed to acknowledge purchase (might already be acknowledged): %s", ack_exc)
+                logger.warning(
+                    "Failed to acknowledge purchase product_id=%s token=%s error=%s",
+                    product_id,
+                    _mask_token(purchase_token),
+                    _safe_http_error(ack_exc),
+                )
 
         # Consume the purchase (for consumables) - this is what unlocks the SKU for repurchase
         # consumptionState: 0 = not consumed, 1 = consumed
@@ -196,16 +239,30 @@ def _acknowledge_google_play_purchase(product_id, purchase_token):
                 productId=product_id,
                 token=purchase_token,
             ).execute()
-            logger.info("Consumed Google Play purchase: product_id=%s token=%s", product_id, purchase_token[:20])
+            logger.info(
+                "Consumed Google Play purchase: product_id=%s token=%s",
+                product_id,
+                _mask_token(purchase_token),
+            )
             return True, None
         except HttpError as consume_exc:
             # If consumption fails, it might already be consumed
-            logger.warning("Failed to consume purchase: %s", consume_exc)
+            logger.warning(
+                "Failed to consume purchase product_id=%s token=%s error=%s",
+                product_id,
+                _mask_token(purchase_token),
+                _safe_http_error(consume_exc),
+            )
             # Still return success if acknowledgement worked
             return True, None
 
     except HttpError as exc:
-        logger.error("Failed to acknowledge/consume Google Play purchase: %s", exc)
+        logger.error(
+            "Failed to acknowledge/consume Google Play purchase product_id=%s token=%s error=%s",
+            product_id,
+            _mask_token(purchase_token),
+            _safe_http_error(exc),
+        )
         return False, str(exc)
     except Exception as exc:
         logger.error("Unexpected error acknowledging purchase: %s", exc, exc_info=True)
@@ -525,7 +582,14 @@ def _verify_google_play_subscription(product_id, purchase_token):
             )
             .execute()
         )
-        logger.info("Play subscription response: %s", resp)
+        logger.info(
+            "Play subscription response received product_id=%s token=%s purchase_state=%s expiry_present=%s auto_renewing=%s",
+            product_id,
+            _mask_token(purchase_token),
+            resp.get("purchaseState"),
+            bool(resp.get("expiryTimeMillis")),
+            resp.get("autoRenewing", False),
+        )
 
         purchase_state = resp.get("purchaseState")
         if purchase_state not in (0, None):
@@ -543,13 +607,11 @@ def _verify_google_play_subscription(product_id, purchase_token):
         }
     except HttpError as exc:
         logger.warning(
-            "Google Play subscription verification failed product_id=%s token=%s package=%s status=%s content=%s error=%s",
+            "Google Play subscription verification failed product_id=%s token=%s package=%s error=%s",
             product_id,
             _mask_token(purchase_token),
             settings.GOOGLE_PLAY_PACKAGE_NAME,
-            getattr(exc, "status_code", None),
-            getattr(exc, "content", None),
-            exc,
+            _safe_http_error(exc),
         )
         return False, "google_play_verification_failed", None
     except Exception as exc:
@@ -680,6 +742,9 @@ def login(request):
 @permission_classes([IsAuthenticated])
 def google_play_purchase(request):
     """Record a Google Play purchase and grant credits."""
+    product_id = ""
+    purchase_token = ""
+    order_id = ""
     try:
         product_id = (request.data.get("product_id") or "").strip()
         purchase_token = (request.data.get("purchase_token") or "").strip()
@@ -725,17 +790,23 @@ def google_play_purchase(request):
                 "GP verify failed user=%s product_id=%s token=%s error=%s",
                 getattr(request.user, "username", "anon"),
                 product_id,
-                purchase_token,
+                _mask_token(purchase_token),
                 verify_error,
             )
 
             # CRITICAL: Even if verification fails (refunded/cancelled), try to consume it
             # This removes it from the purchase queue so it stops appearing in restorePurchases()
             if verify_error == "google_play_not_purchased":
-                logger.info("Attempting to consume refunded/cancelled purchase to clear queue: token=%s", purchase_token[:20])
+                logger.info(
+                    "Attempting to consume refunded/cancelled purchase to clear queue: token=%s",
+                    _mask_token(purchase_token),
+                )
                 ack_success, ack_error = _acknowledge_google_play_purchase(product_id, purchase_token)
                 if ack_success:
-                    logger.info("Successfully consumed old purchase from queue: token=%s", purchase_token[:20])
+                    logger.info(
+                        "Successfully consumed old purchase from queue: token=%s",
+                        _mask_token(purchase_token),
+                    )
                 else:
                     logger.warning("Failed to consume old purchase: error=%s", ack_error)
 
@@ -754,7 +825,7 @@ def google_play_purchase(request):
                 "GP purchase already processed user=%s product_id=%s token=%s balance=%s",
                 request.user.username,
                 product_id,
-                purchase_token,
+                _mask_token(purchase_token),
                 chat_credit.balance,
             )
             # CRITICAL: Acknowledge/consume the purchase even if already processed
@@ -794,7 +865,7 @@ def google_play_purchase(request):
             request.user.username,
             product_id,
             order_id or "none",
-            purchase_token,
+            _mask_token(purchase_token),
             currency or "unknown",
             credits,
             chat_credit.balance,
@@ -824,9 +895,9 @@ def google_play_purchase(request):
         logger.error(
             "Google Play purchase error user=%s product_id=%s token=%s order_id=%s",
             getattr(request.user, "username", "anon"),
-            request.data.get("product_id"),
-            request.data.get("purchase_token"),
-            request.data.get("order_id"),
+            product_id or request.data.get("product_id"),
+            _mask_token(purchase_token or request.data.get("purchase_token")),
+            order_id or request.data.get("order_id"),
             exc_info=True,
         )
         return Response(
@@ -1120,10 +1191,12 @@ def generate_text_with_credits(request):
     """Generate text with credit system"""
     try:
         auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
-        print(
-            f"[MOBILE] generate_text_with_credits path={request.path} "
-            f"auth_header={auth_header_present} is_authenticated={request.user.is_authenticated} "
-            f"user={getattr(request.user, 'username', 'guest')}"
+        logger.info(
+            "Generate request received path=%s auth_header=%s is_authenticated=%s user=%s",
+            request.path,
+            auth_header_present,
+            request.user.is_authenticated,
+            getattr(request.user, "username", "guest"),
         )
         last_text = request.data.get("last_text")
         situation = request.data.get("situation")
@@ -1256,15 +1329,25 @@ def generate_text_with_credits(request):
             logger.info("Guest user detected")
             # Handle guest users with IP-based trial
             trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
-            logger.info(f"Guest IP: {client_ip} guest_id={guest_id}")
-            print(f"[MOBILE] guest Trial created={created} guest_id={guest_id} ip={client_ip} credits_used={trial_ip.credits_used}")
+            logger.info(
+                "Guest trial context created=%s guest_id=%s ip=%s credits_used=%s",
+                created,
+                _mask_guest_id(guest_id),
+                _mask_ip(client_ip),
+                trial_ip.credits_used,
+            )
             
             cfg = _get_config()
             guest_limit = cfg.guest_lifetime_credits
 
             # Check if guest has used all trial credits
             if trial_ip.credits_used >= guest_limit:
-                print(f"[MOBILE] guest trial_expired guest_id={guest_id} ip={client_ip} credits_used={trial_ip.credits_used}")
+                logger.info(
+                    "Guest trial expired guest_id=%s ip=%s credits_used=%s",
+                    _mask_guest_id(guest_id),
+                    _mask_ip(client_ip),
+                    trial_ip.credits_used,
+                )
                 return Response({
                     "success": False,
                     "error": "trial_expired",
@@ -1301,10 +1384,12 @@ def extract_from_image_with_credits(request):
     """Extract from image with credit system"""
     try:
         auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
-        print(
-            f"[MOBILE] extract_from_image_with_credits path={request.path} "
-            f"auth_header={auth_header_present} is_authenticated={request.user.is_authenticated} "
-            f"user={getattr(request.user, 'username', 'guest')}"
+        logger.info(
+            "Extract image request received path=%s auth_header=%s is_authenticated=%s user=%s",
+            request.path,
+            auth_header_present,
+            request.user.is_authenticated,
+            getattr(request.user, "username", "guest"),
         )
         screenshot = request.FILES.get("screenshot")
         
@@ -1702,10 +1787,12 @@ def generate_openers_from_profile_image(request):
     """Generate opener messages directly from a profile image (no extraction step)."""
     try:
         auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
-        print(
-            f"[MOBILE] generate_openers_from_profile_image path={request.path} "
-            f"auth_header={auth_header_present} is_authenticated={request.user.is_authenticated} "
-            f"user={getattr(request.user, 'username', 'guest')}"
+        logger.info(
+            "Generate openers request received path=%s auth_header=%s is_authenticated=%s user=%s",
+            request.path,
+            auth_header_present,
+            request.user.is_authenticated,
+            getattr(request.user, "username", "guest"),
         )
         profile_image = request.FILES.get("profile_image")
         custom_instructions = (request.data.get("custom_instructions") or "").strip()[:250]  # Max 250 chars
@@ -1843,20 +1930,23 @@ def generate_openers_from_profile_image(request):
         else:
             logger.info("Guest user detected")
             trial_ip, created, guest_id, client_ip = _get_or_create_guest_trial(request)
-            logger.info(f"Guest IP: {client_ip} guest_id={guest_id}")
-
-            print(
-                f"[MOBILE] guest Trial created={created} guest_id={guest_id} "
-                f"ip={client_ip} credits_used={trial_ip.credits_used}"
+            logger.info(
+                "Guest opener trial context created=%s guest_id=%s ip=%s credits_used=%s",
+                created,
+                _mask_guest_id(guest_id),
+                _mask_ip(client_ip),
+                trial_ip.credits_used,
             )
 
             cfg = _get_config()
             guest_limit = cfg.guest_lifetime_credits
 
             if trial_ip.credits_used >= guest_limit:
-                print(
-                    f"[MOBILE] guest trial_expired guest_id={guest_id} "
-                    f"ip={client_ip} credits_used={trial_ip.credits_used}"
+                logger.info(
+                    "Guest opener trial expired guest_id=%s ip=%s credits_used=%s",
+                    _mask_guest_id(guest_id),
+                    _mask_ip(client_ip),
+                    trial_ip.credits_used,
                 )
                 return Response({
                     "success": False,
