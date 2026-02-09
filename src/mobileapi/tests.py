@@ -1,7 +1,10 @@
 from unittest.mock import patch
 
+from conversation.models import RecommendedOpener
+from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
@@ -161,3 +164,258 @@ class TokenRotationTests(TestCase):
         new_profile = new_client.get(reverse("mobile_profile"))
         self.assertEqual(new_profile.status_code, 200)
         self.assertTrue(new_profile.data.get("success"))
+
+
+class PublicEndpointRateLimitTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.ip = "203.0.113.10"
+        cache.clear()
+        self.user = User.objects.create_user(
+            username="rateloginuser",
+            email="ratelogin@example.com",
+            password="StrongPass123!",
+        )
+        RecommendedOpener.objects.create(
+            text="Test opener",
+            why_it_works="It is short and friendly.",
+            is_active=True,
+            sort_order=1,
+        )
+
+    def tearDown(self):
+        cache.clear()
+
+    def _image(self, name="test.png"):
+        return SimpleUploadedFile(
+            name,
+            b"\x89PNG\r\n\x1a\nfakepngdata",
+            content_type="image/png",
+        )
+
+    @override_settings(
+        MOBILE_RATELIMIT_REGISTER_IP="100/m",
+        MOBILE_RATELIMIT_REGISTER_EMAIL="100/m",
+        MOBILE_RATELIMIT_LOGIN_IP="100/m",
+        MOBILE_RATELIMIT_LOGIN_USERNAME="100/m",
+        MOBILE_RATELIMIT_PASSWORD_RESET_IP="100/m",
+        MOBILE_RATELIMIT_PASSWORD_RESET_EMAIL="100/m",
+        MOBILE_RATELIMIT_REPORT_IP="100/m",
+        MOBILE_RATELIMIT_GENERATE_IP="100/m",
+        MOBILE_RATELIMIT_GENERATE_DEVICE="100/m",
+        MOBILE_RATELIMIT_GENERATE_OPENERS_IP="100/m",
+        MOBILE_RATELIMIT_GENERATE_OPENERS_DEVICE="100/m",
+        MOBILE_RATELIMIT_EXTRACT_IP="100/m",
+        MOBILE_RATELIMIT_EXTRACT_DEVICE="100/m",
+        MOBILE_RATELIMIT_EXTRACT_STREAM_IP="100/m",
+        MOBILE_RATELIMIT_EXTRACT_STREAM_DEVICE="100/m",
+        MOBILE_RATELIMIT_ANALYZE_IP="100/m",
+        MOBILE_RATELIMIT_ANALYZE_DEVICE="100/m",
+        MOBILE_RATELIMIT_ANALYZE_STREAM_IP="100/m",
+        MOBILE_RATELIMIT_ANALYZE_STREAM_DEVICE="100/m",
+        MOBILE_RATELIMIT_RECOMMENDED_OPENERS_IP="100/m",
+    )
+    def test_public_endpoints_under_limit(self):
+        with patch("mobileapi.views.generate_mobile_response", return_value=("reply", True)):
+            with patch(
+                "mobileapi.views.generate_mobile_openers_from_image",
+                return_value=("opener", True),
+            ):
+                with patch(
+                    "mobileapi.views.extract_conversation_from_image_mobile",
+                    return_value="conversation",
+                ):
+                    with patch(
+                        "mobileapi.views.stream_conversation_from_image_bytes",
+                        return_value=iter(["delta"]),
+                    ):
+                        with patch("mobileapi.views.analyze_profile_image", return_value="analysis"):
+                            with patch(
+                                "mobileapi.views.stream_profile_analysis_bytes",
+                                return_value=iter(["analysis"]),
+                            ):
+                                with patch("mobileapi.views.ResetPasswordForm.save"):
+                                    register_resp = self.client.post(
+                                        reverse("mobile_register"),
+                                        {
+                                            "username": "publicrateuser",
+                                            "email": "publicrate@example.com",
+                                            "password": "StrongPass123!",
+                                        },
+                                        format="json",
+                                        REMOTE_ADDR=self.ip,
+                                    )
+                                    self.assertNotEqual(register_resp.status_code, 429)
+
+                                    login_resp = self.client.post(
+                                        reverse("mobile_login"),
+                                        {
+                                            "username": "rateloginuser",
+                                            "password": "StrongPass123!",
+                                        },
+                                        format="json",
+                                        REMOTE_ADDR=self.ip,
+                                    )
+                                    self.assertNotEqual(login_resp.status_code, 429)
+
+                                    reset_resp = self.client.post(
+                                        reverse("mobile_password_reset"),
+                                        {"email": "ratelogin@example.com"},
+                                        format="json",
+                                        REMOTE_ADDR=self.ip,
+                                    )
+                                    self.assertNotEqual(reset_resp.status_code, 429)
+
+                                    report_resp = self.client.post(
+                                        reverse("report_issue"),
+                                        {
+                                            "reason": "bug",
+                                            "title": "Issue",
+                                            "subject": "Something happened",
+                                            "email": "report@example.com",
+                                        },
+                                        format="json",
+                                        REMOTE_ADDR=self.ip,
+                                    )
+                                    self.assertNotEqual(report_resp.status_code, 429)
+
+                                    generate_resp = self.client.post(
+                                        reverse("generate_text_with_credits"),
+                                        {
+                                            "last_text": "hi there",
+                                            "situation": "just_matched",
+                                            "tone": "Natural",
+                                        },
+                                        format="json",
+                                        REMOTE_ADDR=self.ip,
+                                        HTTP_X_DEVICE_FINGERPRINT="device-1",
+                                    )
+                                    self.assertNotEqual(generate_resp.status_code, 429)
+
+                                    openers_resp = self.client.post(
+                                        reverse("generate_openers_from_image"),
+                                        {
+                                            "profile_image": self._image("openers.png"),
+                                        },
+                                        format="multipart",
+                                        REMOTE_ADDR=self.ip,
+                                        HTTP_X_DEVICE_FINGERPRINT="device-1",
+                                    )
+                                    self.assertNotEqual(openers_resp.status_code, 429)
+
+                                    extract_resp = self.client.post(
+                                        reverse("extract_from_image_with_credits"),
+                                        {"screenshot": self._image("extract.png")},
+                                        format="multipart",
+                                        REMOTE_ADDR=self.ip,
+                                        HTTP_X_DEVICE_FINGERPRINT="device-1",
+                                    )
+                                    self.assertNotEqual(extract_resp.status_code, 429)
+
+                                    extract_stream_resp = self.client.post(
+                                        reverse("extract_from_image_with_credits_stream"),
+                                        {"screenshot": self._image("extract-stream.png")},
+                                        format="multipart",
+                                        REMOTE_ADDR=self.ip,
+                                        HTTP_X_DEVICE_FINGERPRINT="device-1",
+                                    )
+                                    self.assertNotEqual(extract_stream_resp.status_code, 429)
+
+                                    analyze_resp = self.client.post(
+                                        reverse("analyze_profile"),
+                                        {"profile_image": self._image("analyze.png")},
+                                        format="multipart",
+                                        REMOTE_ADDR=self.ip,
+                                        HTTP_X_DEVICE_FINGERPRINT="device-1",
+                                    )
+                                    self.assertNotEqual(analyze_resp.status_code, 429)
+
+                                    analyze_stream_resp = self.client.post(
+                                        reverse("analyze_profile_stream"),
+                                        {"profile_image": self._image("analyze-stream.png")},
+                                        format="multipart",
+                                        REMOTE_ADDR=self.ip,
+                                        HTTP_X_DEVICE_FINGERPRINT="device-1",
+                                    )
+                                    self.assertNotEqual(analyze_stream_resp.status_code, 429)
+
+                                    recommended_resp = self.client.post(
+                                        reverse("recommended_openers"),
+                                        {"count": 1},
+                                        format="json",
+                                        REMOTE_ADDR=self.ip,
+                                    )
+                                    self.assertNotEqual(recommended_resp.status_code, 429)
+
+    @override_settings(
+        MOBILE_RATELIMIT_REGISTER_IP="2/m",
+        MOBILE_RATELIMIT_REGISTER_EMAIL="100/m",
+    )
+    def test_register_over_limit_returns_json_429(self):
+        for idx in range(2):
+            response = self.client.post(
+                reverse("mobile_register"),
+                {
+                    "username": f"burstuser{idx}",
+                    "email": f"burst{idx}@example.com",
+                    "password": "StrongPass123!",
+                },
+                format="json",
+                REMOTE_ADDR=self.ip,
+            )
+            self.assertNotEqual(response.status_code, 429)
+
+        blocked = self.client.post(
+            reverse("mobile_register"),
+            {
+                "username": "burstuser2",
+                "email": "burst2@example.com",
+                "password": "StrongPass123!",
+            },
+            format="json",
+            REMOTE_ADDR=self.ip,
+        )
+        self.assertEqual(blocked.status_code, 429)
+        self.assertEqual(blocked.json().get("error"), "rate_limited")
+
+    @override_settings(
+        MOBILE_RATELIMIT_GENERATE_IP="2/m",
+        MOBILE_RATELIMIT_GENERATE_DEVICE="100/m",
+    )
+    def test_generate_ip_limit_blocks_rotating_device_ids(self):
+        with patch("mobileapi.views.generate_mobile_response", return_value=("reply", True)) as mocked_generate:
+            for idx in range(2):
+                response = self.client.post(
+                    reverse("generate_text_with_credits"),
+                    {
+                        "last_text": "hello",
+                        "situation": "just_matched",
+                        "tone": "Natural",
+                    },
+                    format="json",
+                    REMOTE_ADDR=self.ip,
+                    HTTP_X_DEVICE_FINGERPRINT=f"device-{idx}",
+                )
+                self.assertNotEqual(response.status_code, 429)
+
+            blocked = self.client.post(
+                reverse("generate_text_with_credits"),
+                {
+                    "last_text": "hello",
+                    "situation": "just_matched",
+                    "tone": "Natural",
+                },
+                format="json",
+                REMOTE_ADDR=self.ip,
+                HTTP_X_DEVICE_FINGERPRINT="device-rotated",
+            )
+            self.assertEqual(blocked.status_code, 429)
+            self.assertEqual(blocked.json().get("error"), "rate_limited")
+            self.assertEqual(mocked_generate.call_count, 2)
+
+    @override_settings(MOBILE_RATELIMIT_RECOMMENDED_OPENERS_IP="1/m")
+    def test_authenticated_endpoints_not_affected_by_public_limits(self):
+        token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        profile_response = self.client.get(reverse("mobile_profile"), REMOTE_ADDR=self.ip)
+        self.assertEqual(profile_response.status_code, 200)

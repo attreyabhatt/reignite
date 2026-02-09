@@ -32,6 +32,18 @@ WHAT_ALLOWED = {
     "Other",
 }
 
+
+def ratelimited_error(request, exception=None):
+    return JsonResponse(
+        {
+            "success": False,
+            "error": "rate_limited",
+            "message": "Too many requests. Please try again shortly.",
+        },
+        status=429,
+    )
+
+
 def home(request):
     if 'chat_credits' not in request.session:
         request.session['chat_credits'] = 5

@@ -39,6 +39,7 @@ from pricing.models import CreditPurchase
 from django.conf import settings
 from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django_ratelimit.decorators import ratelimit
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -113,6 +114,55 @@ def _safe_http_error(exc):
     if status is not None:
         return f"{type(exc).__name__}(status={status})"
     return type(exc).__name__
+
+
+def _rate(setting_name):
+    def _value(group, request):
+        return getattr(settings, setting_name)
+
+    return _value
+
+
+def _request_field_for_ratelimit(request, field_name):
+    payload = getattr(request, "_ratelimit_payload_cache", None)
+    if payload is None:
+        payload = {}
+        content_type = (request.META.get("CONTENT_TYPE") or "").lower()
+        if "application/json" in content_type:
+            try:
+                raw_body = request.body.decode("utf-8") if request.body else "{}"
+                parsed = json.loads(raw_body or "{}")
+                if isinstance(parsed, dict):
+                    payload = parsed
+            except Exception:
+                payload = {}
+        setattr(request, "_ratelimit_payload_cache", payload)
+
+    raw_value = payload.get(field_name, "")
+    if raw_value is None:
+        return ""
+    return str(raw_value).strip().lower()[:160]
+
+
+def _ratelimit_email(group, request):
+    email = _request_field_for_ratelimit(request, "email")
+    return email or "missing-email"
+
+
+def _ratelimit_username(group, request):
+    username = _request_field_for_ratelimit(request, "username")
+    return username or "missing-username"
+
+
+def _ratelimit_device(group, request):
+    raw = (
+        request.META.get("HTTP_X_DEVICE_FINGERPRINT")
+        or request.META.get("HTTP_X_GUEST_ID")
+        or ""
+    ).strip()
+    if raw:
+        return _hash_device_fingerprint(raw[:256])
+    return f"ip:{get_client_ip(request)}"
 
 
 def _rotate_user_token(user):
@@ -641,6 +691,8 @@ def get_client_ip(request):
             ip = request.META.get('REMOTE_ADDR', '127.0.0.1')
         return ip
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_REGISTER_IP"), block=True)
+@ratelimit(key=_ratelimit_email, rate=_rate("MOBILE_RATELIMIT_REGISTER_EMAIL"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register(request):
@@ -702,6 +754,8 @@ def register(request):
         logger.error(f"Registration error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Registration failed"})
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_LOGIN_IP"), block=True)
+@ratelimit(key=_ratelimit_username, rate=_rate("MOBILE_RATELIMIT_LOGIN_USERNAME"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login(request):
@@ -1025,6 +1079,8 @@ def payment_history(request):
             status=500,
         )
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_PASSWORD_RESET_IP"), block=True)
+@ratelimit(key=_ratelimit_email, rate=_rate("MOBILE_RATELIMIT_PASSWORD_RESET_EMAIL"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def password_reset(request):
@@ -1194,6 +1250,8 @@ def delete_account(request):
             status=500,
         )
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_GENERATE_IP"), block=True)
+@ratelimit(key=_ratelimit_device, rate=_rate("MOBILE_RATELIMIT_GENERATE_DEVICE"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def generate_text_with_credits(request):
@@ -1387,6 +1445,8 @@ def generate_text_with_credits(request):
         return Response({"success": False, "error": "Generation failed", "message": str(e)})
 
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_EXTRACT_IP"), block=True)
+@ratelimit(key=_ratelimit_device, rate=_rate("MOBILE_RATELIMIT_EXTRACT_DEVICE"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def extract_from_image_with_credits(request):
@@ -1467,6 +1527,8 @@ def extract_from_image_with_credits(request):
         }, status=500)
 
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_EXTRACT_STREAM_IP"), block=True)
+@ratelimit(key=_ratelimit_device, rate=_rate("MOBILE_RATELIMIT_EXTRACT_STREAM_DEVICE"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
@@ -1583,6 +1645,8 @@ def extract_from_image_with_credits_stream(request):
     response["X-Accel-Buffering"] = "no"
     return response
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_ANALYZE_IP"), block=True)
+@ratelimit(key=_ratelimit_device, rate=_rate("MOBILE_RATELIMIT_ANALYZE_DEVICE"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def analyze_profile(request):
@@ -1671,6 +1735,7 @@ def analyze_profile(request):
         }, status=500)
 
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_REPORT_IP"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def report_issue(request):
@@ -1711,6 +1776,8 @@ def report_issue(request):
     return Response({"success": True})
 
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_ANALYZE_STREAM_IP"), block=True)
+@ratelimit(key=_ratelimit_device, rate=_rate("MOBILE_RATELIMIT_ANALYZE_STREAM_DEVICE"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
@@ -1790,6 +1857,12 @@ def analyze_profile_stream(request):
     return response
 
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_GENERATE_OPENERS_IP"), block=True)
+@ratelimit(
+    key=_ratelimit_device,
+    rate=_rate("MOBILE_RATELIMIT_GENERATE_OPENERS_DEVICE"),
+    block=True,
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def generate_openers_from_profile_image(request):
@@ -2025,6 +2098,7 @@ def unlock_reply(request):
     })
 
 
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_RECOMMENDED_OPENERS_IP"), block=True)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def recommended_openers(request):

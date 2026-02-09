@@ -93,9 +93,34 @@ INSTALLED_APPS = [
 ]
 
 # settings.py
+# Mobile API public endpoint rate limits (Phase 1).
+MOBILE_RATELIMIT_REGISTER_IP = config("MOBILE_RATELIMIT_REGISTER_IP", default="5/10m")
+MOBILE_RATELIMIT_REGISTER_EMAIL = config("MOBILE_RATELIMIT_REGISTER_EMAIL", default="3/10m")
+MOBILE_RATELIMIT_LOGIN_IP = config("MOBILE_RATELIMIT_LOGIN_IP", default="20/10m")
+MOBILE_RATELIMIT_LOGIN_USERNAME = config("MOBILE_RATELIMIT_LOGIN_USERNAME", default="10/10m")
+MOBILE_RATELIMIT_PASSWORD_RESET_IP = config("MOBILE_RATELIMIT_PASSWORD_RESET_IP", default="5/10m")
+MOBILE_RATELIMIT_PASSWORD_RESET_EMAIL = config("MOBILE_RATELIMIT_PASSWORD_RESET_EMAIL", default="3/10m")
+MOBILE_RATELIMIT_REPORT_IP = config("MOBILE_RATELIMIT_REPORT_IP", default="20/10m")
+MOBILE_RATELIMIT_GENERATE_IP = config("MOBILE_RATELIMIT_GENERATE_IP", default="60/10m")
+MOBILE_RATELIMIT_GENERATE_DEVICE = config("MOBILE_RATELIMIT_GENERATE_DEVICE", default="60/10m")
+MOBILE_RATELIMIT_GENERATE_OPENERS_IP = config("MOBILE_RATELIMIT_GENERATE_OPENERS_IP", default="20/10m")
+MOBILE_RATELIMIT_GENERATE_OPENERS_DEVICE = config("MOBILE_RATELIMIT_GENERATE_OPENERS_DEVICE", default="20/10m")
+MOBILE_RATELIMIT_EXTRACT_IP = config("MOBILE_RATELIMIT_EXTRACT_IP", default="20/10m")
+MOBILE_RATELIMIT_EXTRACT_DEVICE = config("MOBILE_RATELIMIT_EXTRACT_DEVICE", default="20/10m")
+MOBILE_RATELIMIT_EXTRACT_STREAM_IP = config("MOBILE_RATELIMIT_EXTRACT_STREAM_IP", default="20/10m")
+MOBILE_RATELIMIT_EXTRACT_STREAM_DEVICE = config("MOBILE_RATELIMIT_EXTRACT_STREAM_DEVICE", default="20/10m")
+MOBILE_RATELIMIT_ANALYZE_IP = config("MOBILE_RATELIMIT_ANALYZE_IP", default="20/10m")
+MOBILE_RATELIMIT_ANALYZE_DEVICE = config("MOBILE_RATELIMIT_ANALYZE_DEVICE", default="20/10m")
+MOBILE_RATELIMIT_ANALYZE_STREAM_IP = config("MOBILE_RATELIMIT_ANALYZE_STREAM_IP", default="20/10m")
+MOBILE_RATELIMIT_ANALYZE_STREAM_DEVICE = config("MOBILE_RATELIMIT_ANALYZE_STREAM_DEVICE", default="20/10m")
+MOBILE_RATELIMIT_RECOMMENDED_OPENERS_IP = config(
+    "MOBILE_RATELIMIT_RECOMMENDED_OPENERS_IP",
+    default="60/10m",
+)
+
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",   # public endpoints
+        "rest_framework.permissions.IsAuthenticated",
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',  # First - for mobile API
@@ -120,10 +145,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_ratelimit.middleware.RatelimitMiddleware',
     
     # Add the account middleware:
     "allauth.account.middleware.AccountMiddleware",
 ]
+
+RATELIMIT_VIEW = "reignitehome.views.ratelimited_error"
 
 ROOT_URLCONF = 'reignitehome.urls'
 
