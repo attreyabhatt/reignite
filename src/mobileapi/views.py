@@ -115,6 +115,14 @@ def _safe_http_error(exc):
     return type(exc).__name__
 
 
+def _rotate_user_token(user):
+    """Invalidate any previous token and issue a fresh one."""
+    with transaction.atomic():
+        User.objects.select_for_update().filter(pk=user.pk).exists()
+        Token.objects.filter(user=user).delete()
+        return Token.objects.create(user=user)
+
+
 def _sse_event(payload):
     return f"data: {payload}\n\n"
 
@@ -659,8 +667,8 @@ def register(request):
             password=password
         )
         
-        # Create token
-        token, created = Token.objects.get_or_create(user=user)
+        # Issue a fresh token for this new session.
+        token = _rotate_user_token(user)
         
         # Ensure chat credits exist (signal may already create them)
         chat_credit, created = ChatCredit.objects.get_or_create(
@@ -711,8 +719,8 @@ def login(request):
         if not user:
             return Response({"success": False, "error": "Invalid credentials"})
         
-        # Get or create token
-        token, created = Token.objects.get_or_create(user=user)
+        # Rotate token on each successful login.
+        token = _rotate_user_token(user)
         
         # Get chat credits
         chat_credit, created = ChatCredit.objects.get_or_create(
@@ -1108,8 +1116,9 @@ def change_password(request):
 
     user.set_password(new_password)
     user.save()
+    token = _rotate_user_token(user)
 
-    return Response({"success": True})
+    return Response({"success": True, "token": token.key})
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
