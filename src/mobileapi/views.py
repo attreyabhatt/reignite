@@ -1740,40 +1740,47 @@ def analyze_profile(request):
 @permission_classes([AllowAny])
 def report_issue(request):
     """Store a support/report request from the mobile app."""
-    reason = (request.data.get("reason") or "").strip()
-    title = (request.data.get("title") or "").strip()
-    subject = (request.data.get("subject") or "").strip()
-    email = (request.data.get("email") or "").strip()
-
-    if not all([reason, title, subject, email]):
-        return Response(
-            {"success": False, "error": "Missing required fields"},
-            status=400,
-        )
-
     try:
-        validate_email(email)
-    except ValidationError:
-        return Response(
-            {"success": False, "error": "Invalid email address"},
-            status=400,
+        reason = (request.data.get("reason") or "").strip()
+        title = (request.data.get("title") or "").strip()
+        subject = (request.data.get("subject") or "").strip()
+        email = (request.data.get("email") or "").strip()
+
+        if not all([reason, title, subject, email]):
+            return Response(
+                {"success": False, "error": "Missing required fields"},
+                status=400,
+            )
+
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response(
+                {"success": False, "error": "Invalid email address"},
+                status=400,
+            )
+
+        allowed_reasons = {choice[0] for choice in ContactMessage.REASON_CHOICES}
+        if reason not in allowed_reasons:
+            return Response(
+                {"success": False, "error": "Invalid reason"},
+                status=400,
+            )
+
+        ContactMessage.objects.create(
+            reason=reason,
+            title=title,
+            subject=subject,
+            email=email,
         )
 
-    allowed_reasons = {choice[0] for choice in ContactMessage.REASON_CHOICES}
-    if reason not in allowed_reasons:
+        return Response({"success": True})
+    except Exception as exc:
+        logger.error("report_issue failed: %s", exc, exc_info=True)
         return Response(
-            {"success": False, "error": "Invalid reason"},
-            status=400,
+            {"success": False, "error": "Could not store feedback"},
+            status=500,
         )
-
-    ContactMessage.objects.create(
-        reason=reason,
-        title=title,
-        subject=subject,
-        email=email,
-    )
-
-    return Response({"success": True})
 
 
 @ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_ANALYZE_STREAM_IP"), block=True)
