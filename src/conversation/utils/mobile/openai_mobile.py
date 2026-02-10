@@ -25,7 +25,8 @@ GPT_MODEL = "gpt-4.1-mini-2025-04-14"
 
 def generate_openers_from_image_openai(
     image_bytes: bytes,
-    custom_instructions: str = ""
+    custom_instructions: str = "",
+    model: str = GPT_MODEL,
 ) -> str:
     """
     Generate opener suggestions from profile image using GPT-4.1-mini.
@@ -34,6 +35,7 @@ def generate_openers_from_image_openai(
     Args:
         image_bytes: Raw bytes of the profile image
         custom_instructions: Optional user-provided instructions
+        model: OpenAI model name
 
     Returns:
         JSON array string of openers
@@ -58,7 +60,7 @@ User's custom instructions (MUST FOLLOW):
     user_prompt = get_mobile_opener_user_prompt()
 
     response = client.chat.completions.create(
-        model=GPT_MODEL,
+        model=model,
         messages=[
             {"role": "system", "content": system_prompt.strip()},
             {
@@ -91,7 +93,8 @@ User's custom instructions (MUST FOLLOW):
 
 def generate_replies_openai(
     last_text: str,
-    custom_instructions: str = ""
+    custom_instructions: str = "",
+    model: str = GPT_MODEL,
 ) -> str:
     """
     Generate reply suggestions using GPT-4.1-mini.
@@ -100,6 +103,7 @@ def generate_replies_openai(
     Args:
         last_text: The conversation text
         custom_instructions: Optional user-provided instructions
+        model: OpenAI model name
 
     Returns:
         JSON array string of replies
@@ -115,7 +119,7 @@ def generate_replies_openai(
     user_prompt = get_mobile_reply_user_prompt()
 
     response = client.chat.completions.create(
-        model=GPT_MODEL,
+        model=model,
         messages=[
             {"role": "system", "content": system_prompt.strip()},
             {"role": "user", "content": user_prompt.strip()}
@@ -136,7 +140,8 @@ def generate_replies_openai(
 
 def extract_conversation_from_image_openai(
     img_bytes: bytes,
-    mime: str = "image/jpeg"
+    mime: str = "image/jpeg",
+    model: str = GPT_MODEL,
 ) -> str:
     """
     Extract conversation text from screenshot using GPT-4.1-mini vision.
@@ -145,6 +150,7 @@ def extract_conversation_from_image_openai(
     Args:
         img_bytes: Raw bytes of the screenshot image
         mime: MIME type of the image
+        model: OpenAI model name
 
     Returns:
         Extracted conversation text with labels and timestamps
@@ -171,7 +177,7 @@ system [<timestamp>]: <system message>
 Output ONLY the transcribed lines, no commentary."""
 
     response = client.chat.completions.create(
-        model=GPT_MODEL,
+        model=model,
         messages=[
             {"role": "system", "content": system_prompt},
             {

@@ -47,24 +47,18 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-# Mobile subscription/fair-use limits
-# Model constants (must match custom_mobile.py)
-GEMINI_PRO = "gemini-3-pro-preview"
-GEMINI_FLASH = "gemini-3-flash-preview"
-
-
 def _log_ai_action(action_type: str, model: str, is_subscribed: bool, is_signed_up: bool, username: str = None):
     """
     Log AI action with formatted debug info.
 
     Args:
         action_type: "openers" or "replies"
-        model: The model being used (GEMINI_PRO or GEMINI_FLASH)
+        model: The model being used
         is_subscribed: Whether user has active subscription
         is_signed_up: Whether user is signed up (not guest)
         username: Username if signed up, None for guests
     """
-    model_name = "gemini-pro" if model == GEMINI_PRO else "gemini-flash"
+    model_name = (model or "unknown").strip()
     subscription_status = "subscribed" if is_subscribed else "not subscribed"
     user_status = f"signed up ({username})" if is_signed_up else "guest user"
 
@@ -357,15 +351,29 @@ def _is_subscription_active(chat_credit):
     return True
 
 
-def _ensure_subscriber_allowance(chat_credit):
-    """Enforce weekly fair-use cap for subscribers (legacy). Returns (allowed, remaining)."""
+def _check_subscriber_allowance(chat_credit):
+    """Check weekly fair-use cap for subscribers (legacy). Returns (allowed, remaining)."""
     cfg = _get_config()
     _reset_weekly_counter(chat_credit)
-    if chat_credit.subscriber_weekly_actions >= cfg.subscriber_weekly_limit:
+    used = chat_credit.subscriber_weekly_actions or 0
+    if used >= cfg.subscriber_weekly_limit:
         return False, 0
-    chat_credit.subscriber_weekly_actions += 1
-    chat_credit.save(update_fields=["subscriber_weekly_actions"])
-    remaining = max(0, cfg.subscriber_weekly_limit - chat_credit.subscriber_weekly_actions)
+    remaining = max(0, cfg.subscriber_weekly_limit - used)
+    return True, remaining
+
+
+def _consume_subscriber_allowance(chat_credit):
+    """Consume one weekly fair-use action after a successful generation."""
+    cfg = _get_config()
+    with transaction.atomic():
+        chat_credit = ChatCredit.objects.select_for_update().get(pk=chat_credit.pk)
+        _reset_weekly_counter(chat_credit)
+        used = chat_credit.subscriber_weekly_actions or 0
+        if used >= cfg.subscriber_weekly_limit:
+            return False, 0
+        chat_credit.subscriber_weekly_actions = used + 1
+        chat_credit.save(update_fields=["subscriber_weekly_actions"])
+        remaining = max(0, cfg.subscriber_weekly_limit - chat_credit.subscriber_weekly_actions)
     return True, remaining
 
 
@@ -431,7 +439,7 @@ def _get_device_daily_usage(request):
     return usage.used_count if usage else 0
 
 
-def _ensure_free_credit_allowance(chat_credit, cfg, request=None):
+def _check_free_credit_allowance(chat_credit, cfg, request=None):
     """Check free user daily shared pool across account + device. Returns (allowed, remaining)."""
     _reset_free_daily_counter(chat_credit)
     user_used = chat_credit.free_daily_credits_used or 0
@@ -439,9 +447,31 @@ def _ensure_free_credit_allowance(chat_credit, cfg, request=None):
     if request is None:
         if user_used >= cfg.free_daily_credit_limit:
             return False, 0
-        chat_credit.free_daily_credits_used = user_used + 1
-        chat_credit.save(update_fields=["free_daily_credits_used"])
-        remaining = max(0, cfg.free_daily_credit_limit - chat_credit.free_daily_credits_used)
+        remaining = max(0, cfg.free_daily_credit_limit - user_used)
+        return True, remaining
+
+    device_used = _get_device_daily_usage(request)
+    effective_used = max(user_used, device_used)
+    if effective_used >= cfg.free_daily_credit_limit:
+        return False, 0
+    remaining = max(0, cfg.free_daily_credit_limit - effective_used)
+    return True, remaining
+
+
+def _consume_free_credit_allowance(chat_credit, cfg, request=None):
+    """Consume one free daily credit after a successful generation."""
+    _reset_free_daily_counter(chat_credit)
+
+    if request is None:
+        with transaction.atomic():
+            chat_credit = ChatCredit.objects.select_for_update().get(pk=chat_credit.pk)
+            _reset_free_daily_counter(chat_credit)
+            user_used = chat_credit.free_daily_credits_used or 0
+            if user_used >= cfg.free_daily_credit_limit:
+                return False, 0
+            chat_credit.free_daily_credits_used = user_used + 1
+            chat_credit.save(update_fields=["free_daily_credits_used"])
+            remaining = max(0, cfg.free_daily_credit_limit - chat_credit.free_daily_credits_used)
         return True, remaining
 
     raw_fingerprint = _get_device_fingerprint(request)
@@ -487,14 +517,22 @@ def _get_subscriber_tier(chat_credit, cfg, tier_type, usage_field):
     Returns (model, thinking_level). Falls back to cfg.fallback_model."""
     _reset_daily_counters(chat_credit)
     used = getattr(chat_credit, usage_field)
-    setattr(chat_credit, usage_field, used + 1)
-    chat_credit.save(update_fields=[usage_field])
 
     tiers = cfg.tiers.filter(tier_type=tier_type).order_by('sort_order')
     for tier in tiers:
         if used < tier.threshold:
             return tier.model, tier.thinking_level or None
     return cfg.fallback_model, None
+
+
+def _consume_subscriber_daily_usage(chat_credit, usage_field):
+    """Consume one subscriber daily usage unit after successful generation."""
+    with transaction.atomic():
+        chat_credit = ChatCredit.objects.select_for_update().get(pk=chat_credit.pk)
+        _reset_daily_counters(chat_credit)
+        used = getattr(chat_credit, usage_field) or 0
+        setattr(chat_credit, usage_field, used + 1)
+        chat_credit.save(update_fields=[usage_field])
 
 
 def _has_pending_locked_reply(user):
@@ -1302,16 +1340,18 @@ def generate_text_with_credits(request):
                     model, thinking = _get_subscriber_tier(chat_credit, cfg, 'reply', 'subscriber_daily_replies')
                     _log_ai_action("replies", model, True, True, request.user.username)
 
-                    if model == cfg.fallback_model:
-                        reply, success = generate_mobile_response(
-                            last_text, situation, her_info, tone=tone,
-                            custom_instructions=custom_instructions, use_gpt_only=True,
-                        )
-                    else:
-                        reply, success = generate_mobile_response(
-                            last_text, situation, her_info, tone=tone,
-                            custom_instructions=custom_instructions, thinking_level=thinking,
-                        )
+                    reply, success = generate_mobile_response(
+                        last_text,
+                        situation,
+                        her_info,
+                        tone=tone,
+                        custom_instructions=custom_instructions,
+                        thinking_level=thinking,
+                        primary_model=model,
+                        fallback_model=cfg.fallback_model,
+                    )
+                    if success:
+                        _consume_subscriber_daily_usage(chat_credit, 'subscriber_daily_replies')
 
                     return Response({
                         "success": success,
@@ -1321,7 +1361,7 @@ def generate_text_with_credits(request):
 
                 # --- Free registered user path (daily shared pool + blurred cliff) ---
                 cfg = _get_config()
-                allowed, remaining = _ensure_free_credit_allowance(chat_credit, cfg, request=request)
+                allowed, remaining = _check_free_credit_allowance(chat_credit, cfg, request=request)
 
                 if not allowed:
                     # Daily credits exhausted — check one-pending-reply rule
@@ -1342,8 +1382,14 @@ def generate_text_with_credits(request):
                     # First time at limit today — generate ONE blurred reply, store server-side
                     _log_ai_action("replies", cfg.free_reply_model, False, True, request.user.username)
                     reply, success = generate_mobile_response(
-                        last_text, situation, her_info, tone=tone,
-                        custom_instructions=custom_instructions, thinking_level=cfg.free_reply_thinking,
+                        last_text,
+                        situation,
+                        her_info,
+                        tone=tone,
+                        custom_instructions=custom_instructions,
+                        thinking_level=cfg.free_reply_thinking,
+                        primary_model=cfg.free_reply_model,
+                        fallback_model=cfg.fallback_model,
                     )
 
                     if success:
@@ -1367,9 +1413,19 @@ def generate_text_with_credits(request):
                 # Normal free user path (has daily credits remaining)
                 _log_ai_action("replies", cfg.free_reply_model, False, True, request.user.username)
                 reply, success = generate_mobile_response(
-                    last_text, situation, her_info, tone=tone,
-                    custom_instructions=custom_instructions, thinking_level=cfg.free_reply_thinking,
+                    last_text,
+                    situation,
+                    her_info,
+                    tone=tone,
+                    custom_instructions=custom_instructions,
+                    thinking_level=cfg.free_reply_thinking,
+                    primary_model=cfg.free_reply_model,
+                    fallback_model=cfg.fallback_model,
                 )
+                if success:
+                    consumed, remaining = _consume_free_credit_allowance(chat_credit, cfg, request=request)
+                    if not consumed:
+                        logger.warning("Free reply usage was successful but could not be consumed due to limit race user=%s", request.user.username)
 
                 return Response({
                     "success": success,
@@ -1383,8 +1439,20 @@ def generate_text_with_credits(request):
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 # Create chat credit for user
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)  # 6-1
-                _log_ai_action("replies", GEMINI_FLASH, False, True, request.user.username)
-                reply, success = generate_mobile_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
+                cfg = _get_config()
+                _log_ai_action("replies", cfg.free_reply_model, False, True, request.user.username)
+                reply, success = generate_mobile_response(
+                    last_text,
+                    situation,
+                    her_info,
+                    tone=tone,
+                    custom_instructions=custom_instructions,
+                    thinking_level=cfg.free_reply_thinking,
+                    primary_model=cfg.free_reply_model,
+                    fallback_model=cfg.fallback_model,
+                )
+                if success:
+                    _consume_free_credit_allowance(chat_credit, cfg, request=request)
 
                 return Response({
                     "success": success,
@@ -1422,8 +1490,17 @@ def generate_text_with_credits(request):
                 })
 
             # Generate response with tone and custom instructions
-            _log_ai_action("replies", GEMINI_FLASH, False, False)
-            reply, success = generate_mobile_response(last_text, situation, her_info, tone=tone, custom_instructions=custom_instructions)
+            _log_ai_action("replies", cfg.free_reply_model, False, False)
+            reply, success = generate_mobile_response(
+                last_text,
+                situation,
+                her_info,
+                tone=tone,
+                custom_instructions=custom_instructions,
+                thinking_level=cfg.free_reply_thinking,
+                primary_model=cfg.free_reply_model,
+                fallback_model=cfg.fallback_model,
+            )
 
             if success:
                 # Increment trial credits used
@@ -1476,13 +1553,15 @@ def extract_from_image_with_credits(request):
         allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic']
         if screenshot.content_type and screenshot.content_type not in allowed_types:
             logger.warning(f"Unusual content type: {screenshot.content_type}")
+        cfg = _get_config()
         
         # Check if user is authenticated
         if request.user.is_authenticated:
             try:
                 chat_credit = ChatCredit.objects.get(user=request.user)
-                if _is_subscription_active(chat_credit):
-                    allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                is_sub_active = _is_subscription_active(chat_credit)
+                if is_sub_active:
+                    allowed, remaining = _check_subscriber_allowance(chat_credit)
                     if not allowed:
                         return Response(
                             {
@@ -1495,7 +1574,14 @@ def extract_from_image_with_credits(request):
                         )
                 # For non-subscribers, OCR is free (do not check or deduct credits)
 
-                conversation = extract_conversation_from_image_mobile(screenshot)
+                conversation = extract_conversation_from_image_mobile(
+                    screenshot,
+                    thinking_level=cfg.ocr_thinking,
+                )
+                if is_sub_active and conversation and not conversation.lower().startswith("failed to extract"):
+                    consumed, _ = _consume_subscriber_allowance(chat_credit)
+                    if not consumed:
+                        logger.warning("Subscriber OCR usage was successful but could not be consumed due to weekly limit race user=%s", request.user.username)
 
                 return Response({
                     "conversation": conversation,
@@ -1505,7 +1591,10 @@ def extract_from_image_with_credits(request):
 
             except ChatCredit.DoesNotExist:
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=9)  # legacy field retained
-                conversation = extract_conversation_from_image_mobile(screenshot)
+                conversation = extract_conversation_from_image_mobile(
+                    screenshot,
+                    thinking_level=cfg.ocr_thinking,
+                )
                 
                 return Response({
                     "conversation": conversation or "Failed to extract conversation.",
@@ -1514,7 +1603,10 @@ def extract_from_image_with_credits(request):
                 })
         else:
             # Guests: OCR is free and does not consume trial credits
-            conversation = extract_conversation_from_image_mobile(screenshot)
+            conversation = extract_conversation_from_image_mobile(
+                screenshot,
+                thinking_level=cfg.ocr_thinking,
+            )
             return Response({
                 "conversation": conversation or "Failed to extract conversation.",
                 "is_trial": True,
@@ -1560,7 +1652,7 @@ def extract_from_image_with_credits_stream(request):
             chat_credit = ChatCredit.objects.get(user=request.user)
             is_sub_active = _is_subscription_active(chat_credit)
             if is_sub_active:
-                allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                allowed, remaining = _check_subscriber_allowance(chat_credit)
                 if not allowed:
                     return StreamingHttpResponse(
                         _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit, request=request)),
@@ -1590,6 +1682,11 @@ def extract_from_image_with_credits_stream(request):
                 if not full:
                     yield _sse_event(json.dumps({"type": "error", "error": "ocr_failed", "message": "Failed to extract conversation. Please try a clearer screenshot."}))
                     return
+
+                if is_sub_active:
+                    consumed, _ = _consume_subscriber_allowance(chat_credit)
+                    if not consumed:
+                        logger.warning("Subscriber OCR stream usage was successful but could not be consumed due to weekly limit race user=%s", request.user.username)
 
                 yield _sse_event(
                     json.dumps(
@@ -1653,6 +1750,7 @@ def analyze_profile(request):
     """Analyze profile image/screenshot to extract information"""
     try:
         chat_credit = None
+        is_sub_active = False
         profile_image = request.FILES.get("profile_image")
         
         if not profile_image:
@@ -1678,8 +1776,9 @@ def analyze_profile(request):
             except ChatCredit.DoesNotExist:
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
 
-            if _is_subscription_active(chat_credit):
-                allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+            is_sub_active = _is_subscription_active(chat_credit)
+            if is_sub_active:
+                allowed, remaining = _check_subscriber_allowance(chat_credit)
                 if not allowed:
                     return Response({
                         "success": False,
@@ -1708,7 +1807,12 @@ def analyze_profile(request):
         if request.user.is_authenticated:
             if chat_credit is None:
                 chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
-            if not _is_subscription_active(chat_credit) and chat_credit.balance > 0:
+                is_sub_active = _is_subscription_active(chat_credit)
+            if is_sub_active:
+                consumed, _ = _consume_subscriber_allowance(chat_credit)
+                if not consumed:
+                    logger.warning("Subscriber analyze usage was successful but could not be consumed due to weekly limit race user=%s", request.user.username)
+            elif chat_credit.balance > 0:
                 chat_credit.balance -= 1
                 chat_credit.total_used += 1
                 chat_credit.save()
@@ -1814,7 +1918,7 @@ def analyze_profile_stream(request):
             chat_credit = ChatCredit.objects.get(user=request.user)
             is_sub_active = _is_subscription_active(chat_credit)
             if is_sub_active:
-                allowed, remaining = _ensure_subscriber_allowance(chat_credit)
+                allowed, remaining = _check_subscriber_allowance(chat_credit)
                 if not allowed:
                     return StreamingHttpResponse(
                         _error_stream("fair_use_exceeded", "You hit the weekly fair-use limit. Try again soon.", _subscription_payload(chat_credit, request=request)),
@@ -1843,10 +1947,15 @@ def analyze_profile_stream(request):
                 )
                 return
 
-            if request.user.is_authenticated and chat_credit and not is_sub_active and chat_credit.balance > 0:
-                chat_credit.balance -= 1
-                chat_credit.total_used += 1
-                chat_credit.save()
+            if request.user.is_authenticated and chat_credit:
+                if is_sub_active:
+                    consumed, _ = _consume_subscriber_allowance(chat_credit)
+                    if not consumed:
+                        logger.warning("Subscriber analyze stream usage was successful but could not be consumed due to weekly limit race user=%s", request.user.username)
+                elif chat_credit.balance > 0:
+                    chat_credit.balance -= 1
+                    chat_credit.total_used += 1
+                    chat_credit.save()
 
             yield _sse_event(
                 json.dumps(
@@ -1924,16 +2033,15 @@ def generate_openers_from_profile_image(request):
                     model, thinking = _get_subscriber_tier(chat_credit, cfg, 'opener', 'subscriber_daily_openers')
                     _log_ai_action("openers", model, True, True, request.user.username)
 
-                    if model == cfg.fallback_model:
-                        reply, success = generate_mobile_openers_from_image(
-                            img_bytes, custom_instructions=custom_instructions,
-                            use_gpt_only=True,
-                        )
-                    else:
-                        reply, success = generate_mobile_openers_from_image(
-                            img_bytes, custom_instructions=custom_instructions,
-                            use_pro_model=(model == GEMINI_PRO), thinking_level=thinking,
-                        )
+                    reply, success = generate_mobile_openers_from_image(
+                        img_bytes,
+                        custom_instructions=custom_instructions,
+                        thinking_level=thinking,
+                        primary_model=model,
+                        fallback_model=cfg.fallback_model,
+                    )
+                    if success:
+                        _consume_subscriber_daily_usage(chat_credit, 'subscriber_daily_openers')
 
                     return Response({
                         "success": success,
@@ -1943,7 +2051,7 @@ def generate_openers_from_profile_image(request):
 
                 # --- Free registered user path (daily shared pool + blurred cliff) ---
                 cfg = _get_config()
-                allowed, remaining = _ensure_free_credit_allowance(chat_credit, cfg, request=request)
+                allowed, remaining = _check_free_credit_allowance(chat_credit, cfg, request=request)
 
                 if not allowed:
                     # Daily credits exhausted — check one-pending-reply rule
@@ -1964,8 +2072,11 @@ def generate_openers_from_profile_image(request):
                     # First time at limit today — generate ONE blurred opener, store server-side
                     _log_ai_action("openers", cfg.free_opener_model, False, True, request.user.username)
                     reply, success = generate_mobile_openers_from_image(
-                        img_bytes, custom_instructions=custom_instructions,
-                        use_pro_model=False, thinking_level=cfg.free_opener_thinking,
+                        img_bytes,
+                        custom_instructions=custom_instructions,
+                        thinking_level=cfg.free_opener_thinking,
+                        primary_model=cfg.free_opener_model,
+                        fallback_model=cfg.fallback_model,
                     )
 
                     if success:
@@ -1989,9 +2100,16 @@ def generate_openers_from_profile_image(request):
                 # Normal free user path (has daily credits remaining)
                 _log_ai_action("openers", cfg.free_opener_model, False, True, request.user.username)
                 reply, success = generate_mobile_openers_from_image(
-                    img_bytes, custom_instructions=custom_instructions,
-                    use_pro_model=False, thinking_level=cfg.free_opener_thinking,
+                    img_bytes,
+                    custom_instructions=custom_instructions,
+                    thinking_level=cfg.free_opener_thinking,
+                    primary_model=cfg.free_opener_model,
+                    fallback_model=cfg.fallback_model,
                 )
+                if success:
+                    consumed, remaining = _consume_free_credit_allowance(chat_credit, cfg, request=request)
+                    if not consumed:
+                        logger.warning("Free opener usage was successful but could not be consumed due to limit race user=%s", request.user.username)
 
                 return Response({
                     "success": success,
@@ -2004,11 +2122,17 @@ def generate_openers_from_profile_image(request):
             except ChatCredit.DoesNotExist:
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
-                # New user, not a subscriber, use Flash model
-                _log_ai_action("openers", GEMINI_FLASH, False, True, request.user.username)
+                cfg = _get_config()
+                _log_ai_action("openers", cfg.free_opener_model, False, True, request.user.username)
                 reply, success = generate_mobile_openers_from_image(
-                    img_bytes, custom_instructions=custom_instructions, use_pro_model=False
+                    img_bytes,
+                    custom_instructions=custom_instructions,
+                    thinking_level=cfg.free_opener_thinking,
+                    primary_model=cfg.free_opener_model,
+                    fallback_model=cfg.fallback_model,
                 )
+                if success:
+                    _consume_free_credit_allowance(chat_credit, cfg, request=request)
 
                 return Response({
                     "success": success,
@@ -2043,10 +2167,14 @@ def generate_openers_from_profile_image(request):
                     "message": "Trial expired. Please sign up for more credits."
                 })
 
-            # Generate openers from image (Flash for guests)
-            _log_ai_action("openers", GEMINI_FLASH, False, False)
+            # Generate openers from image using configured free tier model/thinking
+            _log_ai_action("openers", cfg.free_opener_model, False, False)
             reply, success = generate_mobile_openers_from_image(
-                img_bytes, custom_instructions=custom_instructions, use_pro_model=False
+                img_bytes,
+                custom_instructions=custom_instructions,
+                thinking_level=cfg.free_opener_thinking,
+                primary_model=cfg.free_opener_model,
+                fallback_model=cfg.fallback_model,
             )
 
             if success:

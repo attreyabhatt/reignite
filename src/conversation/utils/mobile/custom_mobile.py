@@ -29,18 +29,53 @@ GEMINI_PRO = "gemini-3-pro-preview"      # For openers (paid users)
 GEMINI_FLASH = "gemini-3-flash-preview"  # For replies and free users
 GPT_MODEL = "gpt-4.1-mini-2025-04-14"    # Fallback model
 
+VALID_THINKING_LEVELS = {"minimal", "low", "medium", "high"}
+
+
+def _normalize_model(model: Optional[str], default: str) -> str:
+    """Return a non-empty model name."""
+    model = (model or "").strip()
+    return model or default
+
+
+def _normalize_thinking_level(thinking_level: Optional[str], default: str = "high") -> str:
+    """Clamp thinking level to a supported value."""
+    level = (thinking_level or "").strip().lower()
+    if level in VALID_THINKING_LEVELS:
+        return level
+    return default
+
+
+def _is_gemini_model(model: str) -> bool:
+    return (model or "").strip().lower().startswith("gemini")
+
+
+def _dedupe_models(models):
+    """Preserve order and remove empty/duplicate model entries."""
+    cleaned = []
+    seen = set()
+    for model in models:
+        normalized = (model or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        cleaned.append(normalized)
+    return cleaned
+
 # Config factories — thinking level is now caller-supplied
 
-def _make_text_config(thinking_level="high"):
+def _make_text_config(thinking_level: Optional[str] = "high"):
     """Build a text-only Gemini config with the given thinking level."""
+    thinking_level = _normalize_thinking_level(thinking_level)
     return types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
         temperature=1.0,
         top_p=0.95,
     )
 
-def _make_image_config(thinking_level="high"):
+def _make_image_config(thinking_level: Optional[str] = "high"):
     """Build an image Gemini config with the given thinking level."""
+    thinking_level = _normalize_thinking_level(thinking_level)
     return types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
         media_resolution="media_resolution_high",
@@ -134,7 +169,11 @@ def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: st
     return ai_reply
 
 
-def _call_openai_openers(image_bytes: bytes, custom_instructions: str) -> str:
+def _call_openai_openers(
+    image_bytes: bytes,
+    custom_instructions: str,
+    model: str = GPT_MODEL,
+) -> str:
     """
     Call OpenAI GPT-4.1-mini for opener generation (fallback).
 
@@ -148,7 +187,11 @@ def _call_openai_openers(image_bytes: bytes, custom_instructions: str) -> str:
     Raises:
         Exception: If API call or validation fails
     """
-    ai_reply = generate_openers_from_image_openai(image_bytes, custom_instructions)
+    ai_reply = generate_openers_from_image_openai(
+        image_bytes,
+        custom_instructions,
+        model=model,
+    )
     return _validate_and_clean_json(ai_reply)
 
 
@@ -156,23 +199,28 @@ def generate_mobile_openers_from_image(
     image_bytes: bytes,
     custom_instructions: str = "",
     use_pro_model: bool = True,
-    thinking_level: str = "high",
+    thinking_level: Optional[str] = "high",
     use_gpt_only: bool = False,
+    primary_model: Optional[str] = None,
+    fallback_model: str = GPT_MODEL,
 ) -> Tuple[str, bool]:
     """
     Generate opener suggestions from profile image with cascading fallback.
 
     Fallback chain:
-    - use_gpt_only=True: GPT-4.1-mini only (skip Gemini)
-    - Paid users (use_pro_model=True): Gemini Pro -> Gemini Flash -> GPT-4.1-mini
-    - Free users (use_pro_model=False): Gemini Flash -> GPT-4.1-mini
+    - Explicit config: primary_model -> fallback_model
+    - use_gpt_only=True: fallback_model only
+    - Legacy paid path (use_pro_model=True): Gemini Pro -> Gemini Flash -> fallback_model
+    - Legacy free path (use_pro_model=False): Gemini Flash -> fallback_model
 
     Args:
         image_bytes: Raw bytes of the profile image
         custom_instructions: Optional user-provided instructions
-        use_pro_model: If True, use Gemini Pro first (paid users). If False, start with Flash (free/guests).
+        use_pro_model: Legacy selector when primary_model is not passed.
         thinking_level: Thinking level for Gemini (low/medium/high)
-        use_gpt_only: If True, skip Gemini cascade and go straight to GPT
+        use_gpt_only: If True, skip Gemini cascade and go straight to fallback_model
+        primary_model: Explicit first model to use (preferred for config-driven routing)
+        fallback_model: Explicit fallback model after primary_model
 
     Returns:
         Tuple of (JSON array string of openers, success boolean)
@@ -180,22 +228,32 @@ def generate_mobile_openers_from_image(
     success = False
     ai_reply = None
     model_used = None
+    thinking_level = _normalize_thinking_level(thinking_level)
+    fallback_model = _normalize_model(fallback_model, GPT_MODEL)
 
-    # Build model cascade based on user tier
+    # Build model cascade
     if use_gpt_only:
-        models = [GPT_MODEL]
+        models = [fallback_model]
+    elif primary_model:
+        models = [primary_model, fallback_model]
     elif use_pro_model:
-        models = [GEMINI_PRO, GEMINI_FLASH, GPT_MODEL]
+        models = [GEMINI_PRO, GEMINI_FLASH, fallback_model]
     else:
-        models = [GEMINI_FLASH, GPT_MODEL]
+        models = [GEMINI_FLASH, fallback_model]
+
+    models = _dedupe_models(models)
 
     # Try each model in sequence
     for i, model in enumerate(models, 1):
         try:
-            if model.startswith('gemini'):
+            if _is_gemini_model(model):
                 ai_reply = _call_gemini_openers(image_bytes, custom_instructions, model, thinking_level=thinking_level)
             else:
-                ai_reply = _call_openai_openers(image_bytes, custom_instructions)
+                ai_reply = _call_openai_openers(
+                    image_bytes,
+                    custom_instructions,
+                    model=model,
+                )
 
             # Success!
             success = True
@@ -244,7 +302,11 @@ def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = 
     return ai_reply, usage_info
 
 
-def _call_openai_replies(last_text: str, custom_instructions: str) -> str:
+def _call_openai_replies(
+    last_text: str,
+    custom_instructions: str,
+    model: str = GPT_MODEL,
+) -> str:
     """
     Call OpenAI GPT-4.1-mini for reply generation (fallback).
 
@@ -258,7 +320,11 @@ def _call_openai_replies(last_text: str, custom_instructions: str) -> str:
     Raises:
         Exception: If API call or validation fails
     """
-    ai_reply = generate_replies_openai(last_text, custom_instructions)
+    ai_reply = generate_replies_openai(
+        last_text,
+        custom_instructions,
+        model=model,
+    )
     return _validate_and_clean_json(ai_reply)
 
 
@@ -268,14 +334,17 @@ def generate_mobile_response(
     her_info: str = "",
     tone: str = "Natural",
     custom_instructions: str = "",
-    thinking_level: str = "high",
+    thinking_level: Optional[str] = "high",
     use_gpt_only: bool = False,
+    primary_model: Optional[str] = None,
+    fallback_model: str = GPT_MODEL,
 ) -> Tuple[str, bool]:
     """
     Generate reply suggestions for mobile app with cascading fallback.
 
-    Fallback chain (default): Gemini Flash -> GPT-4.1-mini
-    When use_gpt_only=True: GPT-4.1-mini only (skip Gemini)
+    Fallback chain (default): primary_model -> fallback_model
+    Legacy default without explicit model: Gemini Flash -> fallback_model
+    When use_gpt_only=True: fallback_model only
 
     Args:
         last_text: The conversation text
@@ -284,7 +353,9 @@ def generate_mobile_response(
         tone: The desired tone (Natural, Flirty, Funny, Serious)
         custom_instructions: Optional user-provided instructions
         thinking_level: Thinking level for Gemini (low/medium/high)
-        use_gpt_only: If True, skip Gemini cascade and go straight to GPT
+        use_gpt_only: If True, skip Gemini cascade and go straight to fallback_model
+        primary_model: Explicit first model to use (preferred for config-driven routing)
+        fallback_model: Explicit fallback model after primary_model
 
     Returns:
         Tuple of (JSON array string of replies, success boolean)
@@ -293,19 +364,29 @@ def generate_mobile_response(
     ai_reply = None
     model_used = None
     usage_info: Optional[Dict[str, Any]] = None
+    thinking_level = _normalize_thinking_level(thinking_level)
+    fallback_model = _normalize_model(fallback_model, GPT_MODEL)
 
     if use_gpt_only:
-        models = [GPT_MODEL]
+        models = [fallback_model]
+    elif primary_model:
+        models = [primary_model, fallback_model]
     else:
-        models = [GEMINI_FLASH, GPT_MODEL]
+        models = [GEMINI_FLASH, fallback_model]
+
+    models = _dedupe_models(models)
 
     # Try each model in sequence
     for i, model in enumerate(models, 1):
         try:
-            if model.startswith('gemini'):
+            if _is_gemini_model(model):
                 ai_reply, usage_info = _call_gemini_replies(last_text, custom_instructions, model=model, thinking_level=thinking_level)
             else:
-                ai_reply = _call_openai_replies(last_text, custom_instructions)
+                ai_reply = _call_openai_replies(
+                    last_text,
+                    custom_instructions,
+                    model=model,
+                )
 
             # Success!
             success = True

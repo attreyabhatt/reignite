@@ -19,9 +19,17 @@ client = genai.Client(api_key=config('GEMINI_API_KEY'))
 
 GEMINI_FLASH = "gemini-3-flash-preview"
 GPT_MODEL = "gpt-4.1-mini-2025-04-14"
+VALID_THINKING_LEVELS = {"minimal", "low", "medium", "high"}
 
 
-def extract_conversation_from_image_mobile(screenshot_file):
+def _normalize_thinking_level(thinking_level: str, default: str = "low") -> str:
+    level = (thinking_level or "").strip().lower()
+    if level in VALID_THINKING_LEVELS:
+        return level
+    return default
+
+
+def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str = "low"):
     """
     Extract conversation text from a screenshot using Gemini Flash with GPT-4.1-mini fallback.
 
@@ -32,12 +40,14 @@ def extract_conversation_from_image_mobile(screenshot_file):
 
     Args:
         screenshot_file: Uploaded file object with .read() method
+        thinking_level: Gemini thinking level (minimal/low/medium/high)
 
     Returns:
         Extracted conversation text with labels and timestamps
     """
     img_bytes = screenshot_file.read()
     original_bytes = len(img_bytes)
+    thinking_level = _normalize_thinking_level(thinking_level)
 
     # Resize/compress large images to reduce latency and payload size
     resized_bytes = _resize_image_bytes(img_bytes)
@@ -54,7 +64,13 @@ def extract_conversation_from_image_mobile(screenshot_file):
     # Attempt 1: Gemini Flash with resized image
     try:
         start_time = time.time()
-        output = _run_ocr_call(prompt, resized_bytes, mime, start_time)
+        output = _run_ocr_call(
+            prompt,
+            resized_bytes,
+            mime,
+            start_time,
+            thinking_level=thinking_level,
+        )
 
         # Failsafe: require labeled lines with a timestamp bracket
         if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
@@ -70,7 +86,13 @@ def extract_conversation_from_image_mobile(screenshot_file):
     # Attempt 2: Gemini Flash with original image
     try:
         start_time = time.time()
-        output = _run_ocr_call(prompt, img_bytes, mime, start_time)
+        output = _run_ocr_call(
+            prompt,
+            img_bytes,
+            mime,
+            start_time,
+            thinking_level=thinking_level,
+        )
 
         if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
             raise ValueError("OCR output missing labeled lines")
@@ -103,15 +125,16 @@ def extract_conversation_from_image_mobile(screenshot_file):
             "If it keeps happening, try a clearer, uncropped screenshot.")
 
 
-def _run_ocr_call(prompt, img_bytes, mime, start_time):
+def _run_ocr_call(prompt, img_bytes, mime, start_time, thinking_level: str = "low"):
     """Run OCR using Gemini Flash vision."""
     image_part = types.Part.from_bytes(data=img_bytes, mime_type=mime)
+    thinking_level = _normalize_thinking_level(thinking_level)
 
     response = client.models.generate_content(
         model=GEMINI_FLASH,
         contents=[prompt, image_part],
         config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_level="low")
+            thinking_config=types.ThinkingConfig(thinking_level=thinking_level)
         )
     )
 

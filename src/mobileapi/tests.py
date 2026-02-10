@@ -1,11 +1,17 @@
 from unittest.mock import patch
+from datetime import timedelta
 
-from conversation.models import RecommendedOpener
+from conversation.models import (
+    RecommendedOpener,
+    MobileAppConfig,
+    DegradationTier,
+)
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
@@ -419,3 +425,266 @@ class PublicEndpointRateLimitTests(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
         profile_response = self.client.get(reverse("mobile_profile"), REMOTE_ADDR=self.ip)
         self.assertEqual(profile_response.status_code, 200)
+
+
+@override_settings(
+    MOBILE_RATELIMIT_GENERATE_IP="100/m",
+    MOBILE_RATELIMIT_GENERATE_DEVICE="100/m",
+    MOBILE_RATELIMIT_GENERATE_OPENERS_IP="100/m",
+    MOBILE_RATELIMIT_GENERATE_OPENERS_DEVICE="100/m",
+    MOBILE_RATELIMIT_EXTRACT_IP="100/m",
+    MOBILE_RATELIMIT_EXTRACT_DEVICE="100/m",
+)
+class MobileConfigRoutingTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.cfg = MobileAppConfig.load()
+        self.cfg.guest_lifetime_credits = 10
+        self.cfg.fallback_model = "gpt-4.1-mini-2025-04-14"
+        self.cfg.save()
+
+    def _image(self, name="test.png"):
+        return SimpleUploadedFile(
+            name,
+            b"\x89PNG\r\n\x1a\nfakepngdata",
+            content_type="image/png",
+        )
+
+    def test_guest_reply_uses_configured_model_and_thinking(self):
+        self.cfg.free_reply_model = "gemini-3-pro-preview"
+        self.cfg.free_reply_thinking = "medium"
+        self.cfg.save()
+
+        with patch("mobileapi.views.generate_mobile_response", return_value=("reply", True)) as mocked_generate:
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {
+                    "last_text": "hello",
+                    "situation": "just_matched",
+                    "tone": "Natural",
+                },
+                format="json",
+                REMOTE_ADDR="203.0.113.21",
+                HTTP_X_DEVICE_FINGERPRINT="cfg-device-reply",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mocked_generate.called)
+        kwargs = mocked_generate.call_args.kwargs
+        self.assertEqual(kwargs.get("primary_model"), self.cfg.free_reply_model)
+        self.assertEqual(kwargs.get("fallback_model"), self.cfg.fallback_model)
+        self.assertEqual(kwargs.get("thinking_level"), self.cfg.free_reply_thinking)
+
+    def test_guest_openers_use_configured_model_and_thinking(self):
+        self.cfg.free_opener_model = "gemini-3-pro-preview"
+        self.cfg.free_opener_thinking = "low"
+        self.cfg.save()
+
+        with patch("mobileapi.views.generate_mobile_openers_from_image", return_value=("reply", True)) as mocked_generate:
+            response = self.client.post(
+                reverse("generate_openers_from_image"),
+                {"profile_image": self._image("openers-cfg.png")},
+                format="multipart",
+                REMOTE_ADDR="203.0.113.22",
+                HTTP_X_DEVICE_FINGERPRINT="cfg-device-openers",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mocked_generate.called)
+        kwargs = mocked_generate.call_args.kwargs
+        self.assertEqual(kwargs.get("primary_model"), self.cfg.free_opener_model)
+        self.assertEqual(kwargs.get("fallback_model"), self.cfg.fallback_model)
+        self.assertEqual(kwargs.get("thinking_level"), self.cfg.free_opener_thinking)
+
+    def test_subscriber_reply_uses_tier_model_and_thinking(self):
+        user = User.objects.create_user(
+            username="subtieruser",
+            email="subtier@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        chat_credit = user.chat_credit
+        chat_credit.is_subscribed = True
+        chat_credit.subscription_expiry = timezone.now() + timedelta(days=30)
+        chat_credit.save(update_fields=["is_subscribed", "subscription_expiry"])
+
+        self.cfg.tiers.all().delete()
+        DegradationTier.objects.create(
+            config=self.cfg,
+            tier_type="reply",
+            sort_order=1,
+            threshold=100,
+            model="gemini-3-pro-preview",
+            thinking_level="minimal",
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        with patch("mobileapi.views.generate_mobile_response", return_value=("reply", True)) as mocked_generate:
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {
+                    "last_text": "hello",
+                    "situation": "just_matched",
+                    "tone": "Natural",
+                },
+                format="json",
+                REMOTE_ADDR="203.0.113.23",
+                HTTP_X_DEVICE_FINGERPRINT="cfg-device-sub",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        kwargs = mocked_generate.call_args.kwargs
+        self.assertEqual(kwargs.get("primary_model"), "gemini-3-pro-preview")
+        self.assertEqual(kwargs.get("fallback_model"), self.cfg.fallback_model)
+        self.assertEqual(kwargs.get("thinking_level"), "minimal")
+
+    def test_extract_uses_configured_ocr_thinking(self):
+        self.cfg.ocr_thinking = "medium"
+        self.cfg.save()
+
+        with patch("mobileapi.views.extract_conversation_from_image_mobile", return_value="conversation") as mocked_extract:
+            response = self.client.post(
+                reverse("extract_from_image_with_credits"),
+                {"screenshot": self._image("ocr-cfg.png")},
+                format="multipart",
+                REMOTE_ADDR="203.0.113.24",
+                HTTP_X_DEVICE_FINGERPRINT="cfg-device-ocr",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        kwargs = mocked_extract.call_args.kwargs
+        self.assertEqual(kwargs.get("thinking_level"), self.cfg.ocr_thinking)
+
+    def test_subscriber_reply_daily_usage_consumed_only_on_success(self):
+        user = User.objects.create_user(
+            username="subdailyuser",
+            email="subdaily@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        chat_credit = user.chat_credit
+        chat_credit.is_subscribed = True
+        chat_credit.subscription_expiry = timezone.now() + timedelta(days=30)
+        chat_credit.subscriber_daily_replies = 0
+        chat_credit.save(
+            update_fields=[
+                "is_subscribed",
+                "subscription_expiry",
+                "subscriber_daily_replies",
+            ]
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        with patch("mobileapi.views.generate_mobile_response", return_value=("reply", False)):
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {"last_text": "hello", "situation": "just_matched", "tone": "Natural"},
+                format="json",
+                REMOTE_ADDR="203.0.113.31",
+                HTTP_X_DEVICE_FINGERPRINT="usage-sub-fail",
+            )
+        self.assertEqual(response.status_code, 200)
+        chat_credit.refresh_from_db()
+        self.assertEqual(chat_credit.subscriber_daily_replies, 0)
+
+        with patch("mobileapi.views.generate_mobile_response", return_value=("reply", True)):
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {"last_text": "hello", "situation": "just_matched", "tone": "Natural"},
+                format="json",
+                REMOTE_ADDR="203.0.113.31",
+                HTTP_X_DEVICE_FINGERPRINT="usage-sub-success",
+            )
+        self.assertEqual(response.status_code, 200)
+        chat_credit.refresh_from_db()
+        self.assertEqual(chat_credit.subscriber_daily_replies, 1)
+
+    def test_free_reply_daily_usage_consumed_only_on_success(self):
+        user = User.objects.create_user(
+            username="freedailyuser",
+            email="freedaily@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        chat_credit = user.chat_credit
+        chat_credit.is_subscribed = False
+        chat_credit.free_daily_credits_used = 0
+        chat_credit.save(update_fields=["is_subscribed", "free_daily_credits_used"])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        with patch("mobileapi.views.generate_mobile_response", return_value=("reply", False)):
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {"last_text": "hello", "situation": "just_matched", "tone": "Natural"},
+                format="json",
+                REMOTE_ADDR="203.0.113.32",
+                HTTP_X_DEVICE_FINGERPRINT="usage-free-fail",
+            )
+        self.assertEqual(response.status_code, 200)
+        chat_credit.refresh_from_db()
+        self.assertEqual(chat_credit.free_daily_credits_used, 0)
+
+        with patch("mobileapi.views.generate_mobile_response", return_value=("reply", True)):
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {"last_text": "hello", "situation": "just_matched", "tone": "Natural"},
+                format="json",
+                REMOTE_ADDR="203.0.113.32",
+                HTTP_X_DEVICE_FINGERPRINT="usage-free-success",
+            )
+        self.assertEqual(response.status_code, 200)
+        chat_credit.refresh_from_db()
+        self.assertEqual(chat_credit.free_daily_credits_used, 1)
+
+    def test_subscriber_weekly_ocr_usage_consumed_only_on_success(self):
+        user = User.objects.create_user(
+            username="subocruser",
+            email="subocr@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        chat_credit = user.chat_credit
+        chat_credit.is_subscribed = True
+        chat_credit.subscription_expiry = timezone.now() + timedelta(days=30)
+        chat_credit.subscriber_weekly_actions = 0
+        chat_credit.save(
+            update_fields=[
+                "is_subscribed",
+                "subscription_expiry",
+                "subscriber_weekly_actions",
+            ]
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        with patch(
+            "mobileapi.views.extract_conversation_from_image_mobile",
+            return_value="Failed to extract the conversation with timestamps.",
+        ):
+            response = self.client.post(
+                reverse("extract_from_image_with_credits"),
+                {"screenshot": self._image("ocr-fail.png")},
+                format="multipart",
+                REMOTE_ADDR="203.0.113.33",
+                HTTP_X_DEVICE_FINGERPRINT="usage-ocr-fail",
+            )
+        self.assertEqual(response.status_code, 200)
+        chat_credit.refresh_from_db()
+        self.assertEqual(chat_credit.subscriber_weekly_actions, 0)
+
+        with patch(
+            "mobileapi.views.extract_conversation_from_image_mobile",
+            return_value="you []: hi",
+        ):
+            response = self.client.post(
+                reverse("extract_from_image_with_credits"),
+                {"screenshot": self._image("ocr-success.png")},
+                format="multipart",
+                REMOTE_ADDR="203.0.113.33",
+                HTTP_X_DEVICE_FINGERPRINT="usage-ocr-success",
+            )
+        self.assertEqual(response.status_code, 200)
+        chat_credit.refresh_from_db()
+        self.assertEqual(chat_credit.subscriber_weekly_actions, 1)
