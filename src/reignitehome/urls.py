@@ -15,6 +15,12 @@ urlpatterns = [
     path('api/', include('mobileapi.urls')), 
     
     path('privacy-policy/', privacy_policy, name='privacy_policy'),
+    # ScreenClean mobile app privacy policy route
+    path(
+        'policy/screenclean/',
+        TemplateView.as_view(template_name='policy/screenclean/policy.html'),
+        name='screenclean_privacy_policy',
+    ),
     path('terms/', terms_and_conditions, name='terms_and_conditions'),
     path('refund-policy/', refund_policy, name='refund_policy'),
     path('contact/', contact_view, name='contact'),
