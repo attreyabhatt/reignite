@@ -1,13 +1,26 @@
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
 from conversation import views
 from reignitehome.views import ajax_reply_home,home,privacy_policy,terms_and_conditions,refund_policy,contact_view,delete_account_request,safety_standards
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView, TemplateView
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
+    re_path(
+        r'^flirtfix/?$',
+        RedirectView.as_view(
+            url=(
+                "https://play.google.com/store/apps/details?id=com.tryagaintext.flirtfix"
+                "&hl=en_IN&referrer=utm_source%%3Dinstagram%%26utm_medium%%3Dbio"
+                "%%26utm_campaign%%3Dflirtfix_instagram_bio"
+            ),
+            permanent=True,
+            query_string=False,
+        ),
+        name='flirtfix_redirect',
+    ),
     path('conversations/',include('conversation.urls')), 
     path('ajax-reply-home/', ajax_reply_home, name='ajax_reply_home'),
     path('accounts/', include('allauth.urls')),  
