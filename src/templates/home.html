@@ -77,12 +77,72 @@
         padding: .75rem 1.4rem;
     }
 
-    .btn-ghost {
-        border-radius: 9999px;
-        padding: .75rem 1.4rem;
-        border: 1px solid var(--card-border);
-        background: #fff;
-        color: var(--text);
+    .hero-cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .85rem;
+        align-items: center;
+    }
+
+    .hero-primary-btn {
+        box-shadow: 0 8px 22px rgba(11, 18, 32, .2);
+    }
+
+    .hero-store-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .65rem;
+        padding: .62rem .95rem .62rem .85rem;
+        border-radius: 14px;
+        border: 1px solid rgba(15, 23, 42, .9);
+        background: linear-gradient(180deg, #161f33, #0f172a);
+        color: #fff;
+        text-decoration: none;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, .22);
+        transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+    }
+
+    .hero-store-btn:hover,
+    .hero-store-btn:focus-visible {
+        color: #fff;
+        transform: translateY(-1px);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, .28);
+        filter: brightness(1.04);
+    }
+
+    .hero-store-btn:focus-visible {
+        outline: 3px solid rgba(10, 132, 255, .35);
+        outline-offset: 2px;
+    }
+
+    .hero-store-icon {
+        font-size: 1.25rem;
+        line-height: 1;
+        color: #7dd3fc;
+    }
+
+    .hero-store-copy {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.1;
+    }
+
+    .hero-store-kicker {
+        font-size: .63rem;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        opacity: .78;
+    }
+
+    .hero-store-title {
+        font-size: .95rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .hero-seo-copy {
+        max-width: 34rem;
     }
 
     .credit-chip {
@@ -243,6 +303,31 @@
             transform: none;
             box-shadow: var(--shadow);
         }
+
+        .hero-store-btn {
+            transition: none;
+        }
+
+        .hero-store-btn:hover,
+        .hero-store-btn:focus-visible {
+            transform: none;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .hero-cta {
+            align-items: stretch;
+        }
+
+        .hero-cta .btn,
+        .hero-store-btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .hero-store-copy {
+            align-items: center;
+        }
     }
 
     /* Ensure page has a compositing context and something to blur */
@@ -284,9 +369,21 @@
                         stage</span> of the chat</h1>
                 <p class="lead text-muted mb-4">From first message to asking her out — paste the convo or upload a
                     screenshot and get <strong>3 send-ready replies</strong> that match the vibe.</p>
-                <div class="d-flex gap-3">
-                    <a href="#try" class="btn btn-dark btn-lg">Try it free</a>
+                <div class="hero-cta">
+                    <a href="#try" class="btn btn-dark btn-lg hero-primary-btn">Try it free</a>
+                    <a href="/flirtfix" class="hero-store-btn"
+                        title="Download FlirtFix for Android on Google Play"
+                        aria-label="Download FlirtFix Android app from Google Play Store">
+                        <i class="bi bi-google-play hero-store-icon" aria-hidden="true"></i>
+                        <span class="hero-store-copy">
+                            <span class="hero-store-kicker">Get the Android app</span>
+                            <span class="hero-store-title">Download on Google Play</span>
+                        </span>
+                    </a>
                 </div>
+                <p class="small text-muted mt-3 mb-0 hero-seo-copy">
+                    Install the FlirtFix Android app from Google Play for faster replies on mobile.
+                </p>
             </div>
             <div class="col-lg-6">
                 <!-- Glass preview grid -->
