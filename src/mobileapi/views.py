@@ -640,6 +640,11 @@ def _get_or_create_guest_trial(request):
         return guest_trial, created, guest_id, client_ip
 
     # Fallback for older clients without guest id
+    logger.warning(
+        "Guest trial fallback to legacy conversation.TrialIP guest_id_missing ip=%s user_agent=%s",
+        _mask_ip(client_ip),
+        (request.META.get("HTTP_USER_AGENT") or "")[:120],
+    )
     trial_ip, created = TrialIP.objects.get_or_create(
         ip_address=client_ip,
         defaults={'trial_used': False, 'credits_used': 0}

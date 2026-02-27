@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     
     'reignitehome',
     'conversation',
+    'mobileapi',
     'pricing',
     
     'rest_framework',

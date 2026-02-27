@@ -1,10 +1,13 @@
 from unittest.mock import patch
 from datetime import timedelta
 
+from django.contrib import admin
 from conversation.models import (
     RecommendedOpener,
     MobileAppConfig,
     DegradationTier,
+    GuestTrial as ConversationGuestTrial,
+    TrialIP as ConversationTrialIP,
 )
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -12,9 +15,11 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from reignitehome.models import TrialIP as HomeTrialIP
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
+from mobileapi import admin as mobile_admin
 from mobileapi import views
 
 
@@ -52,6 +57,83 @@ class RedactionHelperTests(TestCase):
         self.assertIn("FakeHttpError", summary)
         self.assertIn("status=403", summary)
         self.assertNotIn("raw_provider_payload_123", summary)
+
+
+class AdminSeparationTests(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="adminsplit",
+            email="adminsplit@example.com",
+            password="StrongPass123!",
+        )
+        self.client.force_login(self.superuser)
+
+    def test_trialip_admin_visibility_split(self):
+        self.assertNotIn(ConversationTrialIP, admin.site._registry)
+        self.assertIn(HomeTrialIP, admin.site._registry)
+
+    def test_mobile_proxy_admin_pages_resolve(self):
+        urls = [
+            reverse("admin:mobileapi_mobileguesttrial_changelist"),
+            reverse("admin:mobileapi_mobiledevicedailyusage_changelist"),
+            reverse("admin:mobileapi_mobilerecommendedopener_changelist"),
+            reverse("admin:mobileapi_mobileappconfigproxy_changelist"),
+            reverse("admin:mobileapi_mobilelockedreply_changelist"),
+        ]
+        for url in urls:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+    def test_mobile_proxy_models_registered(self):
+        registered_models = set(admin.site._registry.keys())
+        expected = {
+            mobile_admin.MobileGuestTrial,
+            mobile_admin.MobileDeviceDailyUsage,
+            mobile_admin.MobileRecommendedOpener,
+            mobile_admin.MobileAppConfigProxy,
+            mobile_admin.MobileLockedReply,
+        }
+        self.assertTrue(expected.issubset(registered_models))
+
+
+class GuestTrialRoutingTests(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+    def test_guest_trial_prefers_guesttrial_when_device_fingerprint_present(self):
+        request = self.factory.post(
+            "/api/generate/",
+            {},
+            format="json",
+            REMOTE_ADDR="203.0.113.10",
+            HTTP_X_DEVICE_FINGERPRINT="device-abc-123",
+        )
+
+        trial, created, guest_id, client_ip = views._get_or_create_guest_trial(request)
+        self.assertIsInstance(trial, ConversationGuestTrial)
+        self.assertEqual(guest_id, "device-abc-123")
+        self.assertEqual(client_ip, "203.0.113.10")
+        self.assertIn(created, (True, False))
+
+    def test_guest_trial_falls_back_to_legacy_trialip_when_guest_id_missing(self):
+        request = self.factory.post(
+            "/api/generate/",
+            {},
+            format="json",
+            REMOTE_ADDR="203.0.113.11",
+            HTTP_USER_AGENT="legacy-client/1.0",
+        )
+
+        with self.assertLogs("mobileapi.views", level="WARNING") as log_ctx:
+            trial, created, guest_id, client_ip = views._get_or_create_guest_trial(request)
+
+        self.assertIsInstance(trial, ConversationTrialIP)
+        self.assertEqual(guest_id, "")
+        self.assertEqual(client_ip, "203.0.113.11")
+        self.assertIn(created, (True, False))
+
+        logs = "\n".join(log_ctx.output)
+        self.assertIn("Guest trial fallback to legacy conversation.TrialIP", logs)
 
 
 class LogSafetyTests(TestCase):
