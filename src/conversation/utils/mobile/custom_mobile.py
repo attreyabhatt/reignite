@@ -124,7 +124,12 @@ def _validate_and_clean_json(text: str) -> str:
     return json.dumps(cleaned)
 
 
-def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: str, thinking_level: str = "high") -> str:
+def _call_gemini_openers(
+    image_bytes: bytes,
+    custom_instructions: str,
+    model: str,
+    thinking_level: str = "high",
+) -> Tuple[str, Optional[Dict[str, Any]]]:
     """
     Call Gemini for opener generation.
 
@@ -135,7 +140,7 @@ def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: st
         thinking_level: Thinking level (low/medium/high)
 
     Returns:
-        Validated JSON string of openers
+        Tuple of (validated JSON string, usage info dict)
 
     Raises:
         Exception: If API call or validation fails
@@ -160,8 +165,9 @@ def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: st
     )
 
     ai_reply = _validate_and_clean_json(response.text)
+    usage_info = _extract_usage(response)
 
-    return ai_reply
+    return ai_reply, usage_info
 
 
 def _call_openai_openers(
@@ -223,6 +229,7 @@ def generate_mobile_openers_from_image(
     success = False
     ai_reply = None
     model_used = None
+    usage_info: Optional[Dict[str, Any]] = None
     thinking_level = _normalize_thinking_level(thinking_level)
     fallback_model = _normalize_model(fallback_model, GPT_MODEL)
 
@@ -242,7 +249,12 @@ def generate_mobile_openers_from_image(
     for i, model in enumerate(models, 1):
         try:
             if _is_gemini_model(model):
-                ai_reply = _call_gemini_openers(image_bytes, custom_instructions, model, thinking_level=thinking_level)
+                ai_reply, usage_info = _call_gemini_openers(
+                    image_bytes,
+                    custom_instructions,
+                    model,
+                    thinking_level=thinking_level,
+                )
             else:
                 ai_reply = _call_openai_openers(
                     image_bytes,
@@ -266,6 +278,8 @@ def generate_mobile_openers_from_image(
             f"[AI-ACTION] action=openers model_used={model_used} "
             f"thinking={thinking_for_log} status=success"
         )
+        if usage_info:
+            print("[USAGE]", usage_info)
     else:
         print(
             f"[AI-ACTION] action=openers model_used=none "

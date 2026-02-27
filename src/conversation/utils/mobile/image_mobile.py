@@ -10,6 +10,7 @@ from google import genai
 from google.genai import types
 from decouple import config
 import time
+from typing import Any, Dict
 from PIL import Image
 
 from .openai_mobile import extract_conversation_from_image_openai
@@ -27,6 +28,54 @@ def _normalize_thinking_level(thinking_level: str, default: str = "low") -> str:
     if level in VALID_THINKING_LEVELS:
         return level
     return default
+
+
+def _extract_usage(response: Any) -> Dict[str, int]:
+    def _to_int(value: Any) -> int:
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def _read_usage_int(usage_obj: Any, *attr_names: str) -> int:
+        for name in attr_names:
+            value = getattr(usage_obj, name, None)
+            if value is not None:
+                return _to_int(value)
+        return 0
+
+    usage = getattr(response, "usage_metadata", None)
+    if not usage:
+        return {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "thinking_tokens": 0,
+            "total_tokens": 0,
+        }
+
+    input_tokens = _read_usage_int(
+        usage,
+        "prompt_token_count",
+        "input_token_count",
+    )
+    output_tokens = _read_usage_int(
+        usage,
+        "candidates_token_count",
+        "output_token_count",
+    )
+    thinking_tokens = _read_usage_int(
+        usage,
+        "thoughts_token_count",
+        "thinking_token_count",
+        "thought_token_count",
+    )
+    total_tokens = input_tokens + output_tokens + thinking_tokens
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "thinking_tokens": thinking_tokens,
+        "total_tokens": total_tokens,
+    }
 
 
 def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str = "low"):
@@ -64,7 +113,7 @@ def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str 
     # Attempt 1: Gemini Flash with resized image
     try:
         start_time = time.time()
-        output = _run_ocr_call(
+        output, usage_info = _run_ocr_call(
             prompt,
             resized_bytes,
             mime,
@@ -78,6 +127,8 @@ def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str 
 
         model_used = GEMINI_FLASH
         print(f"[AI-ACTION] action=ocr model_used={model_used} status=success")
+        if usage_info:
+            print("[USAGE]", usage_info)
         return output
 
     except Exception as e:
@@ -86,7 +137,7 @@ def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str 
     # Attempt 2: Gemini Flash with original image
     try:
         start_time = time.time()
-        output = _run_ocr_call(
+        output, usage_info = _run_ocr_call(
             prompt,
             img_bytes,
             mime,
@@ -99,6 +150,8 @@ def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str 
 
         model_used = GEMINI_FLASH
         print(f"[AI-ACTION] action=ocr model_used={model_used} status=success (original_image)")
+        if usage_info:
+            print("[USAGE]", usage_info)
         return output
 
     except Exception as e:
@@ -138,18 +191,13 @@ def _run_ocr_call(prompt, img_bytes, mime, start_time, thinking_level: str = "lo
         )
     )
 
-    # Log usage
-    usage = getattr(response, "usage_metadata", None)
-    if usage:
-        input_tokens = getattr(usage, "prompt_token_count", 0)
-        output_tokens = getattr(usage, "candidates_token_count", 0)
-        print(f"[DEBUG] Gemini OCR usage | input={input_tokens} | output={output_tokens} | total={input_tokens + output_tokens}")
+    usage_info = _extract_usage(response)
 
     output = response.text.strip()
     elapsed = time.time() - start_time
     print(f"[DEBUG] Gemini OCR response time: {elapsed:.2f} seconds")
 
-    return output
+    return output, usage_info
 
 
 def _resize_image_bytes(img_bytes, max_long_edge=1280, quality=85):
