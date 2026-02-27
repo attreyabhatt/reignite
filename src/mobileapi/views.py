@@ -175,12 +175,6 @@ def _rotate_user_token(user):
         return Token.objects.create(user=user)
 
 
-def _get_or_create_user_token(user):
-    """Return a stable token for routine logins."""
-    token, _ = Token.objects.get_or_create(user=user)
-    return token
-
-
 def _sse_event(payload):
     return f"data: {payload}\n\n"
 
@@ -825,9 +819,8 @@ def login(request):
         if not user:
             return Response({"success": False, "error": "Invalid credentials"})
         
-        # Keep token stable across routine logins so restored app backups
-        # don't resurrect a now-invalid token after reinstall.
-        token = _get_or_create_user_token(user)
+        # Rotate token on each successful login.
+        token = _rotate_user_token(user)
         
         # Get chat credits
         chat_credit, created = ChatCredit.objects.get_or_create(
