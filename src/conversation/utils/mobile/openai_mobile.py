@@ -7,7 +7,7 @@ from openai import OpenAI
 from decouple import config
 import json
 import base64
-from typing import Tuple
+from typing import Any, Dict, Tuple, Union
 
 from .prompts_mobile import (
     get_mobile_opener_prompt,
@@ -23,11 +23,42 @@ client = OpenAI(api_key=config('GPT_API_KEY'))
 GPT_MODEL = "gpt-4.1-mini-2025-04-14"
 
 
+def _build_usage_info(response: Any) -> Dict[str, int]:
+    usage = getattr(response, "usage", None)
+
+    def _to_int(value: Any) -> int:
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    if not usage:
+        return {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "thinking_tokens": 0,
+            "total_tokens": 0,
+        }
+
+    input_tokens = _to_int(getattr(usage, "prompt_tokens", 0))
+    output_tokens = _to_int(getattr(usage, "completion_tokens", 0))
+    thinking_tokens = 0
+    total_tokens = input_tokens + output_tokens + thinking_tokens
+
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "thinking_tokens": thinking_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
 def generate_openers_from_image_openai(
     image_bytes: bytes,
     custom_instructions: str = "",
     model: str = GPT_MODEL,
-) -> str:
+    return_usage: bool = False,
+) -> Union[str, Tuple[str, Dict[str, int]]]:
     """
     Generate opener suggestions from profile image using GPT-4.1-mini.
     Fallback for when Gemini models fail.
@@ -83,11 +114,10 @@ User's custom instructions (MUST FOLLOW):
 
     ai_reply = response.choices[0].message.content.strip()
 
-    # Log usage
-    usage = getattr(response, "usage", None)
-    if usage:
-        print(f"[DEBUG] OpenAI image opener usage | input={usage.prompt_tokens} | output={usage.completion_tokens}")
+    usage_info = _build_usage_info(response)
 
+    if return_usage:
+        return ai_reply, usage_info
     return ai_reply
 
 
@@ -95,7 +125,8 @@ def generate_replies_openai(
     last_text: str,
     custom_instructions: str = "",
     model: str = GPT_MODEL,
-) -> str:
+    return_usage: bool = False,
+) -> Union[str, Tuple[str, Dict[str, int]]]:
     """
     Generate reply suggestions using GPT-4.1-mini.
     Fallback for when Gemini Flash fails.
@@ -130,11 +161,10 @@ def generate_replies_openai(
 
     ai_reply = response.choices[0].message.content.strip()
 
-    # Log usage
-    usage = getattr(response, "usage", None)
-    if usage:
-        print(f"[DEBUG] OpenAI reply usage | input={usage.prompt_tokens} | output={usage.completion_tokens}")
+    usage_info = _build_usage_info(response)
 
+    if return_usage:
+        return ai_reply, usage_info
     return ai_reply
 
 

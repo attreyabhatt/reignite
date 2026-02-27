@@ -12,7 +12,7 @@ from conversation.models import (
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from reignitehome.models import TrialIP as HomeTrialIP
@@ -21,6 +21,7 @@ from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from mobileapi import admin as mobile_admin
 from mobileapi import views
+from mobileapi.models import MobileCopyEvent, MobileGenerationEvent
 
 
 class RedactionHelperTests(TestCase):
@@ -79,6 +80,9 @@ class AdminSeparationTests(TestCase):
             reverse("admin:mobileapi_mobilerecommendedopener_changelist"),
             reverse("admin:mobileapi_mobileappconfigproxy_changelist"),
             reverse("admin:mobileapi_mobilelockedreply_changelist"),
+            reverse("admin:mobileapi_mobilegenerationevent_changelist"),
+            reverse("admin:mobileapi_mobilecopyevent_changelist"),
+            reverse("admin:mobileapi_mobilesignupuser_changelist"),
         ]
         for url in urls:
             response = self.client.get(url)
@@ -92,6 +96,9 @@ class AdminSeparationTests(TestCase):
             mobile_admin.MobileRecommendedOpener,
             mobile_admin.MobileAppConfigProxy,
             mobile_admin.MobileLockedReply,
+            mobile_admin.MobileSignupUser,
+            MobileGenerationEvent,
+            MobileCopyEvent,
         }
         self.assertTrue(expected.issubset(registered_models))
 
@@ -848,3 +855,326 @@ class MobileConfigRoutingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         chat_credit.refresh_from_db()
         self.assertEqual(chat_credit.subscriber_weekly_actions, 1)
+
+
+@override_settings(
+    MOBILE_RATELIMIT_GENERATE_IP="100/m",
+    MOBILE_RATELIMIT_GENERATE_DEVICE="100/m",
+    MOBILE_RATELIMIT_GENERATE_OPENERS_IP="100/m",
+    MOBILE_RATELIMIT_GENERATE_OPENERS_DEVICE="100/m",
+    MOBILE_RATELIMIT_RECOMMENDED_OPENERS_IP="100/m",
+)
+class MobileAnalyticsEventTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.cfg = MobileAppConfig.load()
+        self.cfg.guest_lifetime_credits = 10
+        self.cfg.save()
+
+    def _image(self, name="analytics.png"):
+        return SimpleUploadedFile(
+            name,
+            b"\x89PNG\r\n\x1a\nanalytics",
+            content_type="image/png",
+        )
+
+    def test_generate_logs_reply_event_with_ocr_context(self):
+        with patch(
+            "mobileapi.views.generate_mobile_response",
+            return_value=(
+                '[{"message":"Sure, let us do Friday."}]',
+                True,
+                {
+                    "model_used": "gemini-3-flash-preview",
+                    "thinking_used": "medium",
+                    "usage": {
+                        "input_tokens": 101,
+                        "output_tokens": 22,
+                        "thinking_tokens": 41,
+                        "total_tokens": 164,
+                    },
+                    "source_type": "ai",
+                },
+            ),
+        ):
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {
+                    "last_text": "you []: hey\nher []: hi",
+                    "situation": "stuck_after_reply",
+                    "tone": "Natural",
+                    "input_source": "ocr",
+                    "ocr_text": "you []: hey\nher []: hi",
+                },
+                format="json",
+                REMOTE_ADDR="203.0.113.101",
+                HTTP_X_DEVICE_FINGERPRINT="analytics-ocr-device",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(MobileGenerationEvent.objects.count(), 1)
+        event = MobileGenerationEvent.objects.first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.action_type, MobileGenerationEvent.ActionType.REPLY)
+        self.assertEqual(event.reply_ocr_text, "you []: hey\nher []: hi")
+        self.assertEqual(event.model_used, "gemini-3-flash-preview")
+        self.assertEqual(event.total_tokens, 164)
+        self.assertEqual(response.data.get("generation_event_id"), event.pk)
+
+    def test_generate_does_not_store_manual_reply_context(self):
+        with patch(
+            "mobileapi.views.generate_mobile_response",
+            return_value=(
+                '[{"message":"Got you"}]',
+                True,
+                {
+                    "model_used": "gemini-3-flash-preview",
+                    "thinking_used": "low",
+                    "usage": {
+                        "input_tokens": 10,
+                        "output_tokens": 5,
+                        "thinking_tokens": 1,
+                        "total_tokens": 16,
+                    },
+                    "source_type": "ai",
+                },
+            ),
+        ):
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {
+                    "last_text": "manual message context",
+                    "situation": "stuck_after_reply",
+                    "tone": "Natural",
+                    "input_source": "manual",
+                    "ocr_text": "should_not_store",
+                },
+                format="json",
+                REMOTE_ADDR="203.0.113.102",
+                HTTP_X_DEVICE_FINGERPRINT="analytics-manual-device",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        event = MobileGenerationEvent.objects.latest("id")
+        self.assertIsNone(event.reply_ocr_text)
+
+    def test_generate_defaults_legacy_input_source_to_ocr(self):
+        with patch(
+            "mobileapi.views.generate_mobile_response",
+            return_value=(
+                '[{"message":"Works for me"}]',
+                True,
+                {
+                    "model_used": "gemini-3-flash-preview",
+                    "thinking_used": "medium",
+                    "usage": {
+                        "input_tokens": 15,
+                        "output_tokens": 7,
+                        "thinking_tokens": 3,
+                        "total_tokens": 25,
+                    },
+                    "source_type": "ai",
+                },
+            ),
+        ):
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {
+                    "last_text": "you []: hello\nher []: hi there",
+                    "situation": "stuck_after_reply",
+                    "tone": "Natural",
+                },
+                format="json",
+                REMOTE_ADDR="203.0.113.107",
+                HTTP_X_DEVICE_FINGERPRINT="analytics-legacy-device",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        event = MobileGenerationEvent.objects.latest("id")
+        self.assertEqual(event.reply_ocr_text, "you []: hello\nher []: hi there")
+        self.assertEqual(event.metadata.get("input_source"), "ocr")
+
+    def test_generate_openers_logs_event_with_model_thinking_and_tokens(self):
+        with patch(
+            "mobileapi.views.generate_mobile_openers_from_image",
+            return_value=(
+                '[{"message":"You look like trouble in a good way."}]',
+                True,
+                {
+                    "model_used": "gemini-3-pro-preview",
+                    "thinking_used": "high",
+                    "usage": {
+                        "input_tokens": 66,
+                        "output_tokens": 44,
+                        "thinking_tokens": 11,
+                        "total_tokens": 121,
+                    },
+                    "source_type": "ai",
+                },
+            ),
+        ):
+            response = self.client.post(
+                reverse("generate_openers_from_image"),
+                {"profile_image": self._image("openers-analytics.png")},
+                format="multipart",
+                REMOTE_ADDR="203.0.113.103",
+                HTTP_X_DEVICE_FINGERPRINT="analytics-openers-device",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        event = MobileGenerationEvent.objects.latest("id")
+        self.assertEqual(event.action_type, MobileGenerationEvent.ActionType.OPENER)
+        self.assertEqual(event.model_used, "gemini-3-pro-preview")
+        self.assertEqual(event.thinking_used, "high")
+        self.assertEqual(event.total_tokens, 121)
+        self.assertEqual(response.data.get("generation_event_id"), event.pk)
+
+    def test_recommended_openers_logs_static_generation_event(self):
+        RecommendedOpener.objects.create(
+            text="Hey troublemaker.",
+            why_it_works="Short and playful.",
+            is_active=True,
+            sort_order=1,
+        )
+
+        response = self.client.post(
+            reverse("recommended_openers"),
+            {"count": 1},
+            format="json",
+            REMOTE_ADDR="203.0.113.104",
+            HTTP_X_DEVICE_FINGERPRINT="analytics-reco-device",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = MobileGenerationEvent.objects.latest("id")
+        self.assertEqual(event.source_type, MobileGenerationEvent.SourceType.RECOMMENDED_STATIC)
+        self.assertEqual(event.model_used, MobileGenerationEvent.SourceType.RECOMMENDED_STATIC)
+        self.assertEqual(event.total_tokens, 0)
+        self.assertEqual(response.data.get("generation_event_id"), event.pk)
+
+    def test_copy_event_accepts_opener_copy_for_guest(self):
+        guest_hash = views._hash_device_fingerprint("copy-device-guest")
+        generation_event = MobileGenerationEvent.objects.create(
+            user_type=MobileGenerationEvent.UserType.FREE,
+            action_type=MobileGenerationEvent.ActionType.OPENER,
+            source_type=MobileGenerationEvent.SourceType.AI,
+            guest_id_hash=guest_hash,
+            model_used="gemini-3-flash-preview",
+            thinking_used="low",
+            generated_json='[{"message":"Hey"}]',
+        )
+
+        response = self.client.post(
+            reverse("mobile_copy_event"),
+            {
+                "copied_text": "Hey there",
+                "copy_type": "opener",
+                "generation_event_id": generation_event.pk,
+            },
+            format="json",
+            REMOTE_ADDR="203.0.113.105",
+            HTTP_X_DEVICE_FINGERPRINT="copy-device-guest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data.get("success"), True)
+        copy_event = MobileCopyEvent.objects.latest("id")
+        self.assertEqual(copy_event.copy_type, MobileCopyEvent.CopyType.OPENER)
+        self.assertEqual(copy_event.generation_event_id, generation_event.pk)
+
+    def test_copy_event_requires_reply_ocr_context_for_reply_type(self):
+        response = self.client.post(
+            reverse("mobile_copy_event"),
+            {
+                "copied_text": "Let us do Friday",
+                "copy_type": "reply",
+            },
+            format="json",
+            REMOTE_ADDR="203.0.113.106",
+            HTTP_X_DEVICE_FINGERPRINT="copy-device-invalid",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get("error"), "reply_context_ocr_text_required")
+
+    def test_copy_event_supports_authenticated_users(self):
+        user = User.objects.create_user(
+            username="copyauthuser",
+            email="copyauth@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        generation_event = MobileGenerationEvent.objects.create(
+            user=user,
+            user_type=MobileGenerationEvent.UserType.AUTHENTICATED_NON_SUBSCRIBED,
+            action_type=MobileGenerationEvent.ActionType.REPLY,
+            source_type=MobileGenerationEvent.SourceType.AI,
+            model_used="gemini-3-flash-preview",
+            thinking_used="medium",
+            generated_json='[{"message":"Sounds good"}]',
+        )
+
+        response = self.client.post(
+            reverse("mobile_copy_event"),
+            {
+                "copied_text": "Sounds good",
+                "copy_type": "reply",
+                "reply_context_ocr_text": "you []: hi\nher []: hey",
+                "generation_event_id": generation_event.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        copy_event = MobileCopyEvent.objects.latest("id")
+        self.assertEqual(copy_event.user_id, user.id)
+        self.assertEqual(
+            copy_event.user_type,
+            MobileCopyEvent.UserType.AUTHENTICATED_NON_SUBSCRIBED,
+        )
+
+
+class MobileSignupAdminTests(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="adminmobileanalytics",
+            email="adminmobileanalytics@example.com",
+            password="StrongPass123!",
+        )
+        self.factory = RequestFactory()
+
+    def test_signup_list_contains_only_users_with_mobile_events(self):
+        active_user = User.objects.create_user(
+            username="active_mobile_user",
+            email="active-mobile@example.com",
+            password="StrongPass123!",
+        )
+        inactive_user = User.objects.create_user(
+            username="inactive_mobile_user",
+            email="inactive-mobile@example.com",
+            password="StrongPass123!",
+        )
+
+        MobileGenerationEvent.objects.create(
+            user=active_user,
+            user_type=MobileGenerationEvent.UserType.AUTHENTICATED_NON_SUBSCRIBED,
+            action_type=MobileGenerationEvent.ActionType.REPLY,
+            source_type=MobileGenerationEvent.SourceType.AI,
+            model_used="gemini-3-flash-preview",
+            thinking_used="low",
+            generated_json='[{"message":"Hi"}]',
+        )
+
+        request = self.factory.get(reverse("admin:mobileapi_mobilesignupuser_changelist"))
+        request.user = self.superuser
+
+        admin_obj = mobile_admin.MobileSignupUserAdmin(
+            mobile_admin.MobileSignupUser,
+            admin.site,
+        )
+        queryset = admin_obj.get_queryset(request)
+
+        self.assertIn(active_user, queryset)
+        self.assertNotIn(inactive_user, queryset)

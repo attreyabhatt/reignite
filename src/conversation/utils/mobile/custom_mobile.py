@@ -62,6 +62,15 @@ def _dedupe_models(models):
         cleaned.append(normalized)
     return cleaned
 
+
+def _empty_usage() -> Dict[str, int]:
+    return {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "thinking_tokens": 0,
+        "total_tokens": 0,
+    }
+
 # Config factories — thinking level is now caller-supplied
 
 def _make_text_config(thinking_level: Optional[str] = "high"):
@@ -174,7 +183,7 @@ def _call_openai_openers(
     image_bytes: bytes,
     custom_instructions: str,
     model: str = GPT_MODEL,
-) -> str:
+) -> Tuple[str, Dict[str, Any]]:
     """
     Call OpenAI GPT-4.1-mini for opener generation (fallback).
 
@@ -188,12 +197,13 @@ def _call_openai_openers(
     Raises:
         Exception: If API call or validation fails
     """
-    ai_reply = generate_openers_from_image_openai(
+    ai_reply, usage_info = generate_openers_from_image_openai(
         image_bytes,
         custom_instructions,
         model=model,
+        return_usage=True,
     )
-    return _validate_and_clean_json(ai_reply)
+    return _validate_and_clean_json(ai_reply), usage_info
 
 
 def generate_mobile_openers_from_image(
@@ -204,6 +214,7 @@ def generate_mobile_openers_from_image(
     use_gpt_only: bool = False,
     primary_model: Optional[str] = None,
     fallback_model: str = GPT_MODEL,
+    return_meta: bool = False,
 ) -> Tuple[str, bool]:
     """
     Generate opener suggestions from profile image with cascading fallback.
@@ -225,6 +236,7 @@ def generate_mobile_openers_from_image(
 
     Returns:
         Tuple of (JSON array string of openers, success boolean)
+        When return_meta=True, returns (reply, success, meta)
     """
     success = False
     ai_reply = None
@@ -256,7 +268,7 @@ def generate_mobile_openers_from_image(
                     thinking_level=thinking_level,
                 )
             else:
-                ai_reply = _call_openai_openers(
+                ai_reply, usage_info = _call_openai_openers(
                     image_bytes,
                     custom_instructions,
                     model=model,
@@ -271,6 +283,8 @@ def generate_mobile_openers_from_image(
             print(f"[FAILSAFE] action=openers attempt={i} model={model} status=failed error={type(e).__name__}: {str(e)}")
             continue
 
+    usage_info = usage_info or _empty_usage()
+
     # Log final result
     if success:
         thinking_for_log = thinking_level if _is_gemini_model(model_used or "") else "n/a"
@@ -278,8 +292,7 @@ def generate_mobile_openers_from_image(
             f"[AI-ACTION] action=openers model_used={model_used} "
             f"thinking={thinking_for_log} status=success"
         )
-        if usage_info:
-            print("[USAGE]", usage_info)
+        print("[USAGE]", usage_info)
     else:
         print(
             f"[AI-ACTION] action=openers model_used=none "
@@ -289,7 +302,16 @@ def generate_mobile_openers_from_image(
             {"message": "We hit a hiccup generating openers. Try again in a moment."}
         ])
 
+    meta = {
+        "model_used": model_used or "none",
+        "thinking_used": thinking_for_log if success else thinking_level,
+        "usage": usage_info,
+        "source_type": "ai",
+    }
+
     print(ai_reply)
+    if return_meta:
+        return ai_reply, success, meta
     return ai_reply, success
 
 
@@ -322,7 +344,7 @@ def _call_openai_replies(
     last_text: str,
     custom_instructions: str,
     model: str = GPT_MODEL,
-) -> str:
+) -> Tuple[str, Dict[str, Any]]:
     """
     Call OpenAI GPT-4.1-mini for reply generation (fallback).
 
@@ -336,12 +358,13 @@ def _call_openai_replies(
     Raises:
         Exception: If API call or validation fails
     """
-    ai_reply = generate_replies_openai(
+    ai_reply, usage_info = generate_replies_openai(
         last_text,
         custom_instructions,
         model=model,
+        return_usage=True,
     )
-    return _validate_and_clean_json(ai_reply)
+    return _validate_and_clean_json(ai_reply), usage_info
 
 
 def generate_mobile_response(
@@ -354,6 +377,7 @@ def generate_mobile_response(
     use_gpt_only: bool = False,
     primary_model: Optional[str] = None,
     fallback_model: str = GPT_MODEL,
+    return_meta: bool = False,
 ) -> Tuple[str, bool]:
     """
     Generate reply suggestions for mobile app with cascading fallback.
@@ -375,6 +399,7 @@ def generate_mobile_response(
 
     Returns:
         Tuple of (JSON array string of replies, success boolean)
+        When return_meta=True, returns (reply, success, meta)
     """
     success = False
     ai_reply = None
@@ -398,7 +423,7 @@ def generate_mobile_response(
             if _is_gemini_model(model):
                 ai_reply, usage_info = _call_gemini_replies(last_text, custom_instructions, model=model, thinking_level=thinking_level)
             else:
-                ai_reply = _call_openai_replies(
+                ai_reply, usage_info = _call_openai_replies(
                     last_text,
                     custom_instructions,
                     model=model,
@@ -413,6 +438,8 @@ def generate_mobile_response(
             print(f"[FAILSAFE] action=replies attempt={i} model={model} status=failed error={type(e).__name__}: {str(e)}")
             continue
 
+    usage_info = usage_info or _empty_usage()
+
     # Log final result
     if success:
         thinking_for_log = thinking_level if _is_gemini_model(model_used or "") else "n/a"
@@ -420,8 +447,7 @@ def generate_mobile_response(
             f"[AI-ACTION] action=replies model_used={model_used} "
             f"thinking={thinking_for_log} status=success"
         )
-        if usage_info:
-            print("[USAGE]", usage_info)
+        print("[USAGE]", usage_info)
     else:
         print(
             f"[AI-ACTION] action=replies model_used=none "
@@ -431,7 +457,16 @@ def generate_mobile_response(
             {"message": "We hit a hiccup generating replies. Try again in a moment."}
         ])
 
+    meta = {
+        "model_used": model_used or "none",
+        "thinking_used": thinking_for_log if success else thinking_level,
+        "usage": usage_info,
+        "source_type": "ai",
+    }
+
     print(ai_reply)
+    if return_meta:
+        return ai_reply, success, meta
     return ai_reply, success
 
 

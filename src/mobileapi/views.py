@@ -16,6 +16,7 @@ import json
 import logging
 import hmac
 import hashlib
+from typing import Any, Dict, Optional, Tuple
 from functools import lru_cache
 from datetime import datetime, timedelta, timezone as dt_timezone
 
@@ -26,6 +27,7 @@ from conversation.utils.image_gpt import extract_conversation_from_image, stream
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .auth import normalize_authorization_header
 from .renderers import EventStreamRenderer
+from .models import MobileCopyEvent, MobileGenerationEvent
 from conversation.models import (
     ChatCredit,
     TrialIP,
@@ -116,6 +118,205 @@ def _safe_http_error(exc):
     if status is not None:
         return f"{type(exc).__name__}(status={status})"
     return type(exc).__name__
+
+
+def _empty_usage() -> Dict[str, int]:
+    return {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "thinking_tokens": 0,
+        "total_tokens": 0,
+    }
+
+
+def _to_non_negative_int(value: Any) -> int:
+    try:
+        parsed = int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+    return parsed if parsed >= 0 else 0
+
+
+def _normalize_usage_payload(usage: Any) -> Dict[str, int]:
+    if not isinstance(usage, dict):
+        return _empty_usage()
+
+    input_tokens = _to_non_negative_int(usage.get("input_tokens"))
+    output_tokens = _to_non_negative_int(usage.get("output_tokens"))
+    thinking_tokens = _to_non_negative_int(usage.get("thinking_tokens"))
+
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "thinking_tokens": thinking_tokens,
+        "total_tokens": input_tokens + output_tokens + thinking_tokens,
+    }
+
+
+def _normalize_generation_result(result: Any) -> Tuple[str, bool, Dict[str, Any]]:
+    if not isinstance(result, tuple):
+        raise ValueError("Unexpected generation result payload")
+
+    if len(result) == 3:
+        reply, success, meta = result
+    elif len(result) == 2:
+        reply, success = result
+        meta = {}
+    else:
+        raise ValueError("Unexpected generation result tuple length")
+
+    if not isinstance(meta, dict):
+        meta = {}
+
+    return (
+        str(reply or ""),
+        bool(success),
+        {
+            "model_used": str(meta.get("model_used") or "unknown"),
+            "thinking_used": str(meta.get("thinking_used") or "n/a"),
+            "source_type": str(meta.get("source_type") or MobileGenerationEvent.SourceType.AI),
+            "usage": _normalize_usage_payload(meta.get("usage")),
+        },
+    )
+
+
+def _resolve_mobile_user_type(request, chat_credit: Optional[ChatCredit] = None) -> str:
+    if not request.user.is_authenticated:
+        return MobileGenerationEvent.UserType.FREE
+
+    if chat_credit is None:
+        try:
+            chat_credit = ChatCredit.objects.get(user=request.user)
+        except ChatCredit.DoesNotExist:
+            chat_credit = None
+
+    if chat_credit and _is_subscription_active(chat_credit):
+        return MobileGenerationEvent.UserType.SUBSCRIBED
+
+    return MobileGenerationEvent.UserType.AUTHENTICATED_NON_SUBSCRIBED
+
+
+def _get_guest_hash_for_mobile_analytics(request) -> str:
+    guest_id = _get_guest_id(request)
+    if not guest_id:
+        return ""
+    return _hash_device_fingerprint(guest_id)
+
+
+def _as_generated_json_text(payload: Any) -> str:
+    if isinstance(payload, str):
+        return payload
+    try:
+        return json.dumps(payload)
+    except (TypeError, ValueError):
+        return str(payload or "")
+
+
+def _persist_mobile_generation_event(
+    *,
+    request,
+    chat_credit: Optional[ChatCredit],
+    action_type: str,
+    source_type: str,
+    generated_payload: Any,
+    model_used: str,
+    thinking_used: str,
+    usage: Dict[str, int],
+    reply_ocr_text: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[MobileGenerationEvent]:
+    try:
+        user_type = _resolve_mobile_user_type(request, chat_credit=chat_credit)
+        user = request.user if request.user.is_authenticated else None
+        guest_hash = ""
+        if not user:
+            guest_hash = _get_guest_hash_for_mobile_analytics(request)
+
+        usage = _normalize_usage_payload(usage)
+        event = MobileGenerationEvent.objects.create(
+            user=user,
+            guest_id_hash=guest_hash or None,
+            user_type=user_type,
+            action_type=action_type,
+            source_type=source_type,
+            model_used=(model_used or "unknown")[:120],
+            thinking_used=(thinking_used or "n/a")[:20],
+            input_tokens=usage["input_tokens"],
+            output_tokens=usage["output_tokens"],
+            thinking_tokens=usage["thinking_tokens"],
+            total_tokens=usage["total_tokens"],
+            generated_json=_as_generated_json_text(generated_payload),
+            reply_ocr_text=(reply_ocr_text or "").strip() or None,
+            metadata=metadata or {},
+        )
+        logger.info(
+            "Mobile generation event persisted id=%s action_type=%s user_type=%s source_type=%s",
+            event.pk,
+            event.action_type,
+            event.user_type,
+            event.source_type,
+        )
+        return event
+    except Exception as exc:
+        logger.warning("Failed to persist mobile generation event: %s", exc, exc_info=True)
+        return None
+
+
+def _persist_mobile_copy_event(
+    *,
+    request,
+    chat_credit: Optional[ChatCredit],
+    copy_type: str,
+    copied_text: str,
+    generation_event: Optional[MobileGenerationEvent] = None,
+    reply_context_ocr_text: Optional[str] = None,
+) -> Optional[MobileCopyEvent]:
+    try:
+        user_type = _resolve_mobile_user_type(request, chat_credit=chat_credit)
+        user = request.user if request.user.is_authenticated else None
+        guest_hash = ""
+        if not user:
+            guest_hash = _get_guest_hash_for_mobile_analytics(request)
+
+        event = MobileCopyEvent.objects.create(
+            user=user,
+            guest_id_hash=guest_hash or None,
+            user_type=user_type,
+            copy_type=copy_type,
+            copied_text=copied_text,
+            reply_context_ocr_text=(reply_context_ocr_text or "").strip() or None,
+            generation_event=generation_event,
+        )
+        logger.info(
+            "Mobile copy event persisted id=%s copy_type=%s user_type=%s",
+            event.pk,
+            event.copy_type,
+            event.user_type,
+        )
+        return event
+    except Exception as exc:
+        logger.warning("Failed to persist mobile copy event: %s", exc, exc_info=True)
+        return None
+
+
+def _parse_reply_input_context(request, last_text: str = "") -> Tuple[str, str]:
+    raw_input_source = request.data.get("input_source")
+    if raw_input_source is None or str(raw_input_source).strip() == "":
+        # Legacy mobile clients do not send input_source; current UX is OCR-driven.
+        input_source = "ocr"
+    else:
+        input_source = str(raw_input_source).strip().lower()
+
+    if input_source not in {"ocr", "manual"}:
+        input_source = "manual"
+
+    ocr_text = (request.data.get("ocr_text") or "").strip()
+    if input_source == "ocr" and not ocr_text:
+        ocr_text = (last_text or "").strip()
+    if input_source != "ocr":
+        ocr_text = ""
+
+    return input_source, ocr_text
 
 
 def _rate(setting_name):
@@ -1322,6 +1523,7 @@ def generate_text_with_credits(request):
         her_info = request.data.get("her_info", "")
         tone = request.data.get("tone", "Natural")  # Default to Natural
         custom_instructions = request.data.get("custom_instructions", "")[:250]  # Max 250 chars
+        input_source, ocr_text = _parse_reply_input_context(request, last_text=last_text)
 
         if not last_text or not situation:
             return HttpResponseBadRequest("Missing required fields")
@@ -1354,7 +1556,7 @@ def generate_text_with_credits(request):
                     model, thinking = _get_subscriber_tier(chat_credit, cfg, 'reply', 'subscriber_daily_replies')
                     _log_ai_action("replies", model, True, True, request.user.username)
 
-                    reply, success = generate_mobile_response(
+                    result = generate_mobile_response(
                         last_text,
                         situation,
                         her_info,
@@ -1363,13 +1565,36 @@ def generate_text_with_credits(request):
                         thinking_level=thinking,
                         primary_model=model,
                         fallback_model=cfg.fallback_model,
+                        return_meta=True,
                     )
+                    reply, success, meta = _normalize_generation_result(result)
+                    generation_event = None
                     if success:
                         _consume_subscriber_daily_usage(chat_credit, 'subscriber_daily_replies')
+                        generation_event = _persist_mobile_generation_event(
+                            request=request,
+                            chat_credit=chat_credit,
+                            action_type=MobileGenerationEvent.ActionType.REPLY,
+                            source_type=meta["source_type"],
+                            generated_payload=reply,
+                            model_used=meta["model_used"],
+                            thinking_used=meta["thinking_used"],
+                            usage=meta["usage"],
+                            reply_ocr_text=ocr_text if input_source == "ocr" else None,
+                            metadata={
+                                "endpoint": "generate_text_with_credits",
+                                "input_source": input_source,
+                            },
+                        )
 
                     return Response({
                         "success": success,
                         "reply": reply,
+                        **(
+                            {"generation_event_id": generation_event.pk}
+                            if generation_event is not None
+                            else {}
+                        ),
                         **_subscription_payload(chat_credit, request=request),
                     })
 
@@ -1395,7 +1620,7 @@ def generate_text_with_credits(request):
 
                     # First time at limit today — generate ONE blurred reply, store server-side
                     _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
-                    reply, success = generate_mobile_response(
+                    result = generate_mobile_response(
                         last_text,
                         situation,
                         her_info,
@@ -1404,9 +1629,28 @@ def generate_text_with_credits(request):
                         thinking_level=cfg.registered_reply_thinking,
                         primary_model=cfg.registered_reply_model,
                         fallback_model=cfg.fallback_model,
+                        return_meta=True,
                     )
+                    reply, success, meta = _normalize_generation_result(result)
 
                     if success:
+                        generation_event = _persist_mobile_generation_event(
+                            request=request,
+                            chat_credit=chat_credit,
+                            action_type=MobileGenerationEvent.ActionType.REPLY,
+                            source_type=meta["source_type"],
+                            generated_payload=reply,
+                            model_used=meta["model_used"],
+                            thinking_used=meta["thinking_used"],
+                            usage=meta["usage"],
+                            reply_ocr_text=ocr_text if input_source == "ocr" else None,
+                            metadata={
+                                "endpoint": "generate_text_with_credits",
+                                "input_source": input_source,
+                                "is_locked_preview": True,
+                                "reason": "daily_limit_reached",
+                            },
+                        )
                         preview = _extract_blur_preview(reply, cfg.blur_preview_word_count)
                         locked = _create_locked_reply(request.user, reply, preview, 'reply')
                         return Response({
@@ -1414,6 +1658,11 @@ def generate_text_with_credits(request):
                             "is_locked": True,
                             "locked_reply_id": locked.pk,
                             "locked_preview": preview,
+                            **(
+                                {"generation_event_id": generation_event.pk}
+                                if generation_event is not None
+                                else {}
+                            ),
                             **_subscription_payload(chat_credit, request=request),
                         })
                     else:
@@ -1426,7 +1675,7 @@ def generate_text_with_credits(request):
 
                 # Normal free user path (has daily credits remaining)
                 _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
-                reply, success = generate_mobile_response(
+                result = generate_mobile_response(
                     last_text,
                     situation,
                     her_info,
@@ -1435,17 +1684,40 @@ def generate_text_with_credits(request):
                     thinking_level=cfg.registered_reply_thinking,
                     primary_model=cfg.registered_reply_model,
                     fallback_model=cfg.fallback_model,
+                    return_meta=True,
                 )
+                reply, success, meta = _normalize_generation_result(result)
+                generation_event = None
                 if success:
                     consumed, remaining = _consume_free_credit_allowance(chat_credit, cfg, request=request)
                     if not consumed:
                         logger.warning("Free reply usage was successful but could not be consumed due to limit race user=%s", request.user.username)
+                    generation_event = _persist_mobile_generation_event(
+                        request=request,
+                        chat_credit=chat_credit,
+                        action_type=MobileGenerationEvent.ActionType.REPLY,
+                        source_type=meta["source_type"],
+                        generated_payload=reply,
+                        model_used=meta["model_used"],
+                        thinking_used=meta["thinking_used"],
+                        usage=meta["usage"],
+                        reply_ocr_text=ocr_text if input_source == "ocr" else None,
+                        metadata={
+                            "endpoint": "generate_text_with_credits",
+                            "input_source": input_source,
+                        },
+                    )
 
                 return Response({
                     "success": success,
                     "reply": reply,
                     "is_locked": False,
                     "credits_remaining": remaining,
+                    **(
+                        {"generation_event_id": generation_event.pk}
+                        if generation_event is not None
+                        else {}
+                    ),
                     **_subscription_payload(chat_credit, request=request),
                 })
 
@@ -1455,7 +1727,7 @@ def generate_text_with_credits(request):
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)  # 6-1
                 cfg = _get_config()
                 _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
-                reply, success = generate_mobile_response(
+                result = generate_mobile_response(
                     last_text,
                     situation,
                     her_info,
@@ -1464,14 +1736,37 @@ def generate_text_with_credits(request):
                     thinking_level=cfg.registered_reply_thinking,
                     primary_model=cfg.registered_reply_model,
                     fallback_model=cfg.fallback_model,
+                    return_meta=True,
                 )
+                reply, success, meta = _normalize_generation_result(result)
+                generation_event = None
                 if success:
                     _consume_free_credit_allowance(chat_credit, cfg, request=request)
+                    generation_event = _persist_mobile_generation_event(
+                        request=request,
+                        chat_credit=chat_credit,
+                        action_type=MobileGenerationEvent.ActionType.REPLY,
+                        source_type=meta["source_type"],
+                        generated_payload=reply,
+                        model_used=meta["model_used"],
+                        thinking_used=meta["thinking_used"],
+                        usage=meta["usage"],
+                        reply_ocr_text=ocr_text if input_source == "ocr" else None,
+                        metadata={
+                            "endpoint": "generate_text_with_credits",
+                            "input_source": input_source,
+                        },
+                    )
 
                 return Response({
                     "success": success,
                     "reply": reply,
                     "credits_remaining": chat_credit.balance,
+                    **(
+                        {"generation_event_id": generation_event.pk}
+                        if generation_event is not None
+                        else {}
+                    ),
                     **_subscription_payload(chat_credit, request=request),
                 })
         else:
@@ -1505,7 +1800,7 @@ def generate_text_with_credits(request):
 
             # Generate response with tone and custom instructions
             _log_ai_action("replies", cfg.free_reply_model, False, False)
-            reply, success = generate_mobile_response(
+            result = generate_mobile_response(
                 last_text,
                 situation,
                 her_info,
@@ -1514,7 +1809,10 @@ def generate_text_with_credits(request):
                 thinking_level=cfg.free_reply_thinking,
                 primary_model=cfg.free_reply_model,
                 fallback_model=cfg.fallback_model,
+                return_meta=True,
             )
+            reply, success, meta = _normalize_generation_result(result)
+            generation_event = None
 
             if success:
                 # Increment trial credits used
@@ -1523,12 +1821,33 @@ def generate_text_with_credits(request):
                     trial_ip.trial_used = True
                 trial_ip.save()
                 logger.info(f"Trial credit used. Remaining: {guest_limit - trial_ip.credits_used}")
+                generation_event = _persist_mobile_generation_event(
+                    request=request,
+                    chat_credit=None,
+                    action_type=MobileGenerationEvent.ActionType.REPLY,
+                    source_type=meta["source_type"],
+                    generated_payload=reply,
+                    model_used=meta["model_used"],
+                    thinking_used=meta["thinking_used"],
+                    usage=meta["usage"],
+                    reply_ocr_text=ocr_text if input_source == "ocr" else None,
+                    metadata={
+                        "endpoint": "generate_text_with_credits",
+                        "input_source": input_source,
+                        "guest_trial_created": created,
+                    },
+                )
 
             return Response({
                 "success": success,
                 "reply": reply,
                 "is_trial": True,
-                "trial_credits_remaining": guest_limit - trial_ip.credits_used
+                "trial_credits_remaining": guest_limit - trial_ip.credits_used,
+                **(
+                    {"generation_event_id": generation_event.pk}
+                    if generation_event is not None
+                    else {}
+                ),
             })
             
     except Exception as e:
@@ -2052,19 +2371,38 @@ def generate_openers_from_profile_image(request):
                     model, thinking = _get_subscriber_tier(chat_credit, cfg, 'opener', 'subscriber_daily_openers')
                     _log_ai_action("openers", model, True, True, request.user.username)
 
-                    reply, success = generate_mobile_openers_from_image(
+                    result = generate_mobile_openers_from_image(
                         img_bytes,
                         custom_instructions=custom_instructions,
                         thinking_level=thinking,
                         primary_model=model,
                         fallback_model=cfg.fallback_model,
+                        return_meta=True,
                     )
+                    reply, success, meta = _normalize_generation_result(result)
+                    generation_event = None
                     if success:
                         _consume_subscriber_daily_usage(chat_credit, 'subscriber_daily_openers')
+                        generation_event = _persist_mobile_generation_event(
+                            request=request,
+                            chat_credit=chat_credit,
+                            action_type=MobileGenerationEvent.ActionType.OPENER,
+                            source_type=meta["source_type"],
+                            generated_payload=reply,
+                            model_used=meta["model_used"],
+                            thinking_used=meta["thinking_used"],
+                            usage=meta["usage"],
+                            metadata={"endpoint": "generate_openers_from_profile_image"},
+                        )
 
                     return Response({
                         "success": success,
                         "reply": reply,
+                        **(
+                            {"generation_event_id": generation_event.pk}
+                            if generation_event is not None
+                            else {}
+                        ),
                         **_subscription_payload(chat_credit, request=request),
                     })
 
@@ -2090,15 +2428,32 @@ def generate_openers_from_profile_image(request):
 
                     # First time at limit today — generate ONE blurred opener, store server-side
                     _log_ai_action("openers", cfg.registered_opener_model, False, True, request.user.username)
-                    reply, success = generate_mobile_openers_from_image(
+                    result = generate_mobile_openers_from_image(
                         img_bytes,
                         custom_instructions=custom_instructions,
                         thinking_level=cfg.registered_opener_thinking,
                         primary_model=cfg.registered_opener_model,
                         fallback_model=cfg.fallback_model,
+                        return_meta=True,
                     )
+                    reply, success, meta = _normalize_generation_result(result)
 
                     if success:
+                        generation_event = _persist_mobile_generation_event(
+                            request=request,
+                            chat_credit=chat_credit,
+                            action_type=MobileGenerationEvent.ActionType.OPENER,
+                            source_type=meta["source_type"],
+                            generated_payload=reply,
+                            model_used=meta["model_used"],
+                            thinking_used=meta["thinking_used"],
+                            usage=meta["usage"],
+                            metadata={
+                                "endpoint": "generate_openers_from_profile_image",
+                                "is_locked_preview": True,
+                                "reason": "daily_limit_reached",
+                            },
+                        )
                         preview = _extract_blur_preview(reply, cfg.blur_preview_word_count)
                         locked = _create_locked_reply(request.user, reply, preview, 'opener')
                         return Response({
@@ -2106,6 +2461,11 @@ def generate_openers_from_profile_image(request):
                             "is_locked": True,
                             "locked_reply_id": locked.pk,
                             "locked_preview": preview,
+                            **(
+                                {"generation_event_id": generation_event.pk}
+                                if generation_event is not None
+                                else {}
+                            ),
                             **_subscription_payload(chat_credit, request=request),
                         })
                     else:
@@ -2118,23 +2478,42 @@ def generate_openers_from_profile_image(request):
 
                 # Normal free user path (has daily credits remaining)
                 _log_ai_action("openers", cfg.registered_opener_model, False, True, request.user.username)
-                reply, success = generate_mobile_openers_from_image(
+                result = generate_mobile_openers_from_image(
                     img_bytes,
                     custom_instructions=custom_instructions,
                     thinking_level=cfg.registered_opener_thinking,
                     primary_model=cfg.registered_opener_model,
                     fallback_model=cfg.fallback_model,
+                    return_meta=True,
                 )
+                reply, success, meta = _normalize_generation_result(result)
+                generation_event = None
                 if success:
                     consumed, remaining = _consume_free_credit_allowance(chat_credit, cfg, request=request)
                     if not consumed:
                         logger.warning("Free opener usage was successful but could not be consumed due to limit race user=%s", request.user.username)
+                    generation_event = _persist_mobile_generation_event(
+                        request=request,
+                        chat_credit=chat_credit,
+                        action_type=MobileGenerationEvent.ActionType.OPENER,
+                        source_type=meta["source_type"],
+                        generated_payload=reply,
+                        model_used=meta["model_used"],
+                        thinking_used=meta["thinking_used"],
+                        usage=meta["usage"],
+                        metadata={"endpoint": "generate_openers_from_profile_image"},
+                    )
 
                 return Response({
                     "success": success,
                     "reply": reply,
                     "is_locked": False,
                     "credits_remaining": remaining,
+                    **(
+                        {"generation_event_id": generation_event.pk}
+                        if generation_event is not None
+                        else {}
+                    ),
                     **_subscription_payload(chat_credit, request=request),
                 })
 
@@ -2143,20 +2522,39 @@ def generate_openers_from_profile_image(request):
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
                 cfg = _get_config()
                 _log_ai_action("openers", cfg.registered_opener_model, False, True, request.user.username)
-                reply, success = generate_mobile_openers_from_image(
+                result = generate_mobile_openers_from_image(
                     img_bytes,
                     custom_instructions=custom_instructions,
                     thinking_level=cfg.registered_opener_thinking,
                     primary_model=cfg.registered_opener_model,
                     fallback_model=cfg.fallback_model,
+                    return_meta=True,
                 )
+                reply, success, meta = _normalize_generation_result(result)
+                generation_event = None
                 if success:
                     _consume_free_credit_allowance(chat_credit, cfg, request=request)
+                    generation_event = _persist_mobile_generation_event(
+                        request=request,
+                        chat_credit=chat_credit,
+                        action_type=MobileGenerationEvent.ActionType.OPENER,
+                        source_type=meta["source_type"],
+                        generated_payload=reply,
+                        model_used=meta["model_used"],
+                        thinking_used=meta["thinking_used"],
+                        usage=meta["usage"],
+                        metadata={"endpoint": "generate_openers_from_profile_image"},
+                    )
 
                 return Response({
                     "success": success,
                     "reply": reply,
                     "credits_remaining": chat_credit.balance,
+                    **(
+                        {"generation_event_id": generation_event.pk}
+                        if generation_event is not None
+                        else {}
+                    ),
                     **_subscription_payload(chat_credit, request=request),
                 })
         else:
@@ -2188,13 +2586,16 @@ def generate_openers_from_profile_image(request):
 
             # Generate openers from image using configured free tier model/thinking
             _log_ai_action("openers", cfg.free_opener_model, False, False)
-            reply, success = generate_mobile_openers_from_image(
+            result = generate_mobile_openers_from_image(
                 img_bytes,
                 custom_instructions=custom_instructions,
                 thinking_level=cfg.free_opener_thinking,
                 primary_model=cfg.free_opener_model,
                 fallback_model=cfg.fallback_model,
+                return_meta=True,
             )
+            reply, success, meta = _normalize_generation_result(result)
+            generation_event = None
 
             if success:
                 trial_ip.credits_used += 1
@@ -2202,12 +2603,31 @@ def generate_openers_from_profile_image(request):
                     trial_ip.trial_used = True
                 trial_ip.save()
                 logger.info(f"Trial credit used. Remaining: {guest_limit - trial_ip.credits_used}")
+                generation_event = _persist_mobile_generation_event(
+                    request=request,
+                    chat_credit=None,
+                    action_type=MobileGenerationEvent.ActionType.OPENER,
+                    source_type=meta["source_type"],
+                    generated_payload=reply,
+                    model_used=meta["model_used"],
+                    thinking_used=meta["thinking_used"],
+                    usage=meta["usage"],
+                    metadata={
+                        "endpoint": "generate_openers_from_profile_image",
+                        "guest_trial_created": created,
+                    },
+                )
 
             return Response({
                 "success": success,
                 "reply": reply,
                 "is_trial": True,
-                "trial_credits_remaining": guest_limit - trial_ip.credits_used
+                "trial_credits_remaining": guest_limit - trial_ip.credits_used,
+                **(
+                    {"generation_event_id": generation_event.pk}
+                    if generation_event is not None
+                    else {}
+                ),
             })
 
     except Exception as e:
@@ -2271,38 +2691,63 @@ def recommended_openers(request):
                 {"success": False, "error": "no_openers", "message": "No openers available"},
                 status=404,
             )
+        opener_payload = [
+            {
+                "id": opener.id,
+                "message": opener.text,
+                "why_it_works": opener.why_it_works,
+                "image_url": opener.image.url if opener.image else None,
+            }
+            for opener in openers
+        ]
 
         if request.user.is_authenticated:
             chat_credit = ChatCredit.objects.get(user=request.user)
+            generation_event = _persist_mobile_generation_event(
+                request=request,
+                chat_credit=chat_credit,
+                action_type=MobileGenerationEvent.ActionType.OPENER,
+                source_type=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
+                generated_payload=opener_payload,
+                model_used=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
+                thinking_used="n/a",
+                usage=_empty_usage(),
+                metadata={"endpoint": "recommended_openers"},
+            )
             return Response(
                 {
                     "success": True,
-                    "openers": [
-                        {
-                            "id": opener.id,
-                            "message": opener.text,
-                            "why_it_works": opener.why_it_works,
-                            "image_url": opener.image.url if opener.image else None,
-                        }
-                        for opener in openers
-                    ],
+                    "openers": opener_payload,
+                    **(
+                        {"generation_event_id": generation_event.pk}
+                        if generation_event is not None
+                        else {}
+                    ),
                     **_subscription_payload(chat_credit, request=request),
                 }
             )
 
         # Guest path (no credit usage)
+        generation_event = _persist_mobile_generation_event(
+            request=request,
+            chat_credit=None,
+            action_type=MobileGenerationEvent.ActionType.OPENER,
+            source_type=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
+            generated_payload=opener_payload,
+            model_used=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
+            thinking_used="n/a",
+            usage=_empty_usage(),
+            metadata={"endpoint": "recommended_openers"},
+        )
         return Response(
             {
                 "success": True,
-                "openers": [
-                    {
-                        "id": opener.id,
-                        "message": opener.text,
-                        "why_it_works": opener.why_it_works,
-                        "image_url": opener.image.url if opener.image else None,
-                    }
-                    for opener in openers
-                ],
+                "openers": opener_payload,
+                **(
+                    {"generation_event_id": generation_event.pk}
+                    if generation_event is not None
+                    else {}
+                ),
             }
         )
     except ChatCredit.DoesNotExist:
@@ -2313,4 +2758,169 @@ def recommended_openers(request):
     except Exception as exc:
         logger.error("Recommended openers error: %s", exc, exc_info=True)
         return Response({"success": False, "error": "generation_failed"}, status=500)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def copy_event(request):
+    """Persist mobile copy events for opener/reply suggestions."""
+    try:
+        _normalize_mobile_auth_header(request)
+        copied_text = (request.data.get("copied_text") or "").strip()
+        copy_type = (request.data.get("copy_type") or "").strip().lower()
+        generation_event_id = request.data.get("generation_event_id")
+        reply_context_ocr_text = (request.data.get("reply_context_ocr_text") or "").strip()
+
+        if not copied_text:
+            logger.warning(
+                "Invalid mobile copy-event payload reason=missing_copied_text is_authenticated=%s",
+                request.user.is_authenticated,
+            )
+            return Response(
+                {
+                    "success": False,
+                    "error": "copied_text_required",
+                    "message": "copied_text is required.",
+                },
+                status=400,
+            )
+
+        if copy_type not in {MobileCopyEvent.CopyType.REPLY, MobileCopyEvent.CopyType.OPENER}:
+            logger.warning(
+                "Invalid mobile copy-event payload reason=invalid_copy_type copy_type=%s is_authenticated=%s",
+                copy_type,
+                request.user.is_authenticated,
+            )
+            return Response(
+                {
+                    "success": False,
+                    "error": "invalid_copy_type",
+                    "message": "copy_type must be reply or opener.",
+                },
+                status=400,
+            )
+
+        if copy_type == MobileCopyEvent.CopyType.REPLY and not reply_context_ocr_text:
+            logger.warning(
+                "Invalid mobile copy-event payload reason=missing_reply_context_ocr_text is_authenticated=%s",
+                request.user.is_authenticated,
+            )
+            return Response(
+                {
+                    "success": False,
+                    "error": "reply_context_ocr_text_required",
+                    "message": "reply_context_ocr_text is required for reply copy events.",
+                },
+                status=400,
+            )
+
+        if copy_type != MobileCopyEvent.CopyType.REPLY:
+            reply_context_ocr_text = ""
+
+        chat_credit = None
+        if request.user.is_authenticated:
+            try:
+                chat_credit = ChatCredit.objects.get(user=request.user)
+            except ChatCredit.DoesNotExist:
+                chat_credit = None
+
+        generation_event = None
+        if generation_event_id not in (None, ""):
+            try:
+                generation_event_id_int = int(generation_event_id)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Invalid mobile copy-event payload reason=invalid_generation_event_id value=%s",
+                    generation_event_id,
+                )
+                return Response(
+                    {
+                        "success": False,
+                        "error": "invalid_generation_event_id",
+                        "message": "generation_event_id must be a valid integer.",
+                    },
+                    status=400,
+                )
+
+            generation_event = MobileGenerationEvent.objects.filter(pk=generation_event_id_int).first()
+            if generation_event is None:
+                logger.warning(
+                    "Invalid mobile copy-event payload reason=generation_event_not_found id=%s",
+                    generation_event_id_int,
+                )
+                return Response(
+                    {
+                        "success": False,
+                        "error": "invalid_generation_event_id",
+                        "message": "generation_event_id was not found.",
+                    },
+                    status=400,
+                )
+
+            if request.user.is_authenticated:
+                if generation_event.user_id != request.user.id:
+                    logger.warning(
+                        "Invalid mobile copy-event payload reason=generation_event_user_mismatch id=%s user=%s event_user_id=%s",
+                        generation_event_id_int,
+                        request.user.username,
+                        generation_event.user_id,
+                    )
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "invalid_generation_event_id",
+                            "message": "generation_event_id does not belong to the current user.",
+                        },
+                        status=400,
+                    )
+            else:
+                guest_hash = _get_guest_hash_for_mobile_analytics(request)
+                if (
+                    not guest_hash
+                    or generation_event.user_id is not None
+                    or generation_event.guest_id_hash != guest_hash
+                ):
+                    logger.warning(
+                        "Invalid mobile copy-event payload reason=generation_event_guest_mismatch id=%s",
+                        generation_event_id_int,
+                    )
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "invalid_generation_event_id",
+                            "message": "generation_event_id does not belong to this guest.",
+                        },
+                        status=400,
+                    )
+
+        event = _persist_mobile_copy_event(
+            request=request,
+            chat_credit=chat_credit,
+            copy_type=copy_type,
+            copied_text=copied_text,
+            generation_event=generation_event,
+            reply_context_ocr_text=reply_context_ocr_text,
+        )
+
+        if event is None:
+            return Response(
+                {
+                    "success": False,
+                    "error": "copy_event_persist_failed",
+                    "message": "Could not persist copy event.",
+                },
+                status=500,
+            )
+
+        return Response({"success": True})
+    except Exception as exc:
+        logger.error("copy_event failed: %s", exc, exc_info=True)
+        return Response(
+            {
+                "success": False,
+                "error": "copy_event_failed",
+                "message": "Could not store copy event.",
+            },
+            status=500,
+        )
 
