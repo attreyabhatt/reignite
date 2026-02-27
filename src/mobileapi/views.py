@@ -100,6 +100,43 @@ def _mask_ip(ip_address):
     return _mask_guest_id(ip_address)
 
 
+def _normalize_mobile_auth_header(request):
+    """Normalize legacy/malformed mobile auth headers to `Token <key>`."""
+    raw_header = (request.META.get("HTTP_AUTHORIZATION") or "").strip()
+    if not raw_header:
+        return None
+
+    parts = raw_header.split()
+    if len(parts) < 2:
+        return None
+
+    scheme = parts[0].lower()
+    if scheme not in {"token", "bearer"}:
+        return None
+
+    token_value = " ".join(parts[1:]).strip().strip("'\"")
+
+    # Handle values like "Token Token <key>" / "Token Bearer <key>".
+    while True:
+        lowered = token_value.lower()
+        if lowered.startswith("token "):
+            token_value = token_value[6:].strip().strip("'\"")
+            continue
+        if lowered.startswith("bearer "):
+            token_value = token_value[7:].strip().strip("'\"")
+            continue
+        break
+
+    if not token_value or " " in token_value:
+        return None
+
+    normalized = f"Token {token_value}"
+    if normalized != raw_header:
+        request.META["HTTP_AUTHORIZATION"] = normalized
+        logger.info("Normalized mobile auth header for compatibility")
+    return normalized
+
+
 def _safe_http_error(exc):
     status = getattr(exc, "status_code", None)
     if status is None:
@@ -1295,6 +1332,7 @@ def delete_account(request):
 def generate_text_with_credits(request):
     """Generate text with credit system"""
     try:
+        _normalize_mobile_auth_header(request)
         auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
         logger.info(
             "Generate request received path=%s auth_header=%s is_authenticated=%s user=%s",
@@ -1529,6 +1567,7 @@ def generate_text_with_credits(request):
 def extract_from_image_with_credits(request):
     """Extract from image with credit system"""
     try:
+        _normalize_mobile_auth_header(request)
         auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
         logger.info(
             "Extract image request received path=%s auth_header=%s is_authenticated=%s user=%s",
@@ -1626,6 +1665,7 @@ def extract_from_image_with_credits(request):
 @renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
 def extract_from_image_with_credits_stream(request):
     """Stream OCR extraction with credit system"""
+    _normalize_mobile_auth_header(request)
     screenshot = request.FILES.get("screenshot")
 
     if not screenshot:
@@ -1749,6 +1789,7 @@ def extract_from_image_with_credits_stream(request):
 def analyze_profile(request):
     """Analyze profile image/screenshot to extract information"""
     try:
+        _normalize_mobile_auth_header(request)
         chat_credit = None
         is_sub_active = False
         profile_image = request.FILES.get("profile_image")
@@ -1894,6 +1935,7 @@ def report_issue(request):
 @renderer_classes([EventStreamRenderer, renderers.JSONRenderer])
 def analyze_profile_stream(request):
     """Stream profile analysis"""
+    _normalize_mobile_auth_header(request)
     chat_credit = None
     is_sub_active = False
     profile_image = request.FILES.get("profile_image")
@@ -1984,6 +2026,7 @@ def analyze_profile_stream(request):
 def generate_openers_from_profile_image(request):
     """Generate opener messages directly from a profile image (no extraction step)."""
     try:
+        _normalize_mobile_auth_header(request)
         auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
         logger.info(
             "Generate openers request received path=%s auth_header=%s is_authenticated=%s user=%s",
@@ -2239,6 +2282,7 @@ def unlock_reply(request):
 def recommended_openers(request):
     """Return recommended openers and count towards free use/subscription limits."""
     try:
+        _normalize_mobile_auth_header(request)
         count_raw = request.data.get("count", 3)
         try:
             count = int(count_raw)
