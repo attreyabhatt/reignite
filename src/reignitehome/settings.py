@@ -123,7 +123,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',  # First - for mobile API
+        'mobileapi.auth.LenientTokenAuthentication',  # First - for mobile API
         'rest_framework.authentication.SessionAuthentication',  # Second - for web browsable API
     ],
     "DEFAULT_RENDERER_CLASSES": [

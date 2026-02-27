@@ -24,6 +24,7 @@ from conversation.utils.mobile.custom_mobile import generate_mobile_response, ge
 from conversation.utils.mobile.image_mobile import extract_conversation_from_image_mobile
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
+from .auth import normalize_authorization_header
 from .renderers import EventStreamRenderer
 from conversation.models import (
     ChatCredit,
@@ -101,38 +102,8 @@ def _mask_ip(ip_address):
 
 
 def _normalize_mobile_auth_header(request):
-    """Normalize legacy/malformed mobile auth headers to `Token <key>`."""
-    raw_header = (request.META.get("HTTP_AUTHORIZATION") or "").strip()
-    if not raw_header:
-        return None
-
-    parts = raw_header.split()
-    if len(parts) < 2:
-        return None
-
-    scheme = parts[0].lower()
-    if scheme not in {"token", "bearer"}:
-        return None
-
-    token_value = " ".join(parts[1:]).strip().strip("'\"")
-
-    # Handle values like "Token Token <key>" / "Token Bearer <key>".
-    while True:
-        lowered = token_value.lower()
-        if lowered.startswith("token "):
-            token_value = token_value[6:].strip().strip("'\"")
-            continue
-        if lowered.startswith("bearer "):
-            token_value = token_value[7:].strip().strip("'\"")
-            continue
-        break
-
-    if not token_value or " " in token_value:
-        return None
-
-    normalized = f"Token {token_value}"
-    if normalized != raw_header:
-        request.META["HTTP_AUTHORIZATION"] = normalized
+    normalized = normalize_authorization_header(request)
+    if normalized:
         logger.info("Normalized mobile auth header for compatibility")
     return normalized
 
@@ -202,6 +173,12 @@ def _rotate_user_token(user):
         User.objects.select_for_update().filter(pk=user.pk).exists()
         Token.objects.filter(user=user).delete()
         return Token.objects.create(user=user)
+
+
+def _get_or_create_user_token(user):
+    """Return a stable token for routine logins."""
+    token, _ = Token.objects.get_or_create(user=user)
+    return token
 
 
 def _sse_event(payload):
@@ -848,8 +825,9 @@ def login(request):
         if not user:
             return Response({"success": False, "error": "Invalid credentials"})
         
-        # Rotate token on each successful login.
-        token = _rotate_user_token(user)
+        # Keep token stable across routine logins so restored app backups
+        # don't resurrect a now-invalid token after reinstall.
+        token = _get_or_create_user_token(user)
         
         # Get chat credits
         chat_credit, created = ChatCredit.objects.get_or_create(
