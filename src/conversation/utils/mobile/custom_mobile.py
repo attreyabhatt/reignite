@@ -161,11 +161,6 @@ def _call_gemini_openers(image_bytes: bytes, custom_instructions: str, model: st
 
     ai_reply = _validate_and_clean_json(response.text)
 
-    # Log usage if available
-    usage = getattr(response, "usage_metadata", None)
-    if usage:
-        print(f"[DEBUG] Gemini image opener usage | model={model} | input={getattr(usage, 'prompt_token_count', 0)} | output={getattr(usage, 'candidates_token_count', 0)}")
-
     return ai_reply
 
 
@@ -266,9 +261,16 @@ def generate_mobile_openers_from_image(
 
     # Log final result
     if success:
-        print(f"[AI-ACTION] action=openers model_used={model_used} status=success")
+        thinking_for_log = thinking_level if _is_gemini_model(model_used or "") else "n/a"
+        print(
+            f"[AI-ACTION] action=openers model_used={model_used} "
+            f"thinking={thinking_for_log} status=success"
+        )
     else:
-        print(f"[AI-ACTION] action=openers model_used=none status=all_failed attempts={len(models)}")
+        print(
+            f"[AI-ACTION] action=openers model_used=none "
+            f"thinking={thinking_level} status=all_failed attempts={len(models)}"
+        )
         ai_reply = json.dumps([
             {"message": "We hit a hiccup generating openers. Try again in a moment."}
         ])
@@ -399,11 +401,18 @@ def generate_mobile_response(
 
     # Log final result
     if success:
-        print(f"[AI-ACTION] action=replies model_used={model_used} status=success")
+        thinking_for_log = thinking_level if _is_gemini_model(model_used or "") else "n/a"
+        print(
+            f"[AI-ACTION] action=replies model_used={model_used} "
+            f"thinking={thinking_for_log} status=success"
+        )
         if usage_info:
             print("[USAGE]", usage_info)
     else:
-        print(f"[AI-ACTION] action=replies model_used=none status=all_failed attempts={len(models)}")
+        print(
+            f"[AI-ACTION] action=replies model_used=none "
+            f"thinking={thinking_level} status=all_failed attempts={len(models)}"
+        )
         ai_reply = json.dumps([
             {"message": "We hit a hiccup generating replies. Try again in a moment."}
         ])
@@ -440,8 +449,6 @@ def _generate_gemini_response(
     )
 
     usage_info = _extract_usage(response)
-    print(f"[DEBUG] Gemini usage | model={model} | input={usage_info['input_tokens']} | output={usage_info['output_tokens']} | total={usage_info['total_tokens']}")
-
     return response, usage_info
 
 
@@ -455,16 +462,49 @@ def _extract_usage(response) -> Dict[str, Any]:
     Returns:
         Dictionary with token usage information
     """
+    def _to_int(value: Any) -> int:
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def _read_usage_int(usage_obj: Any, *attr_names: str) -> int:
+        for name in attr_names:
+            value = getattr(usage_obj, name, None)
+            if value is not None:
+                return _to_int(value)
+        return 0
+
     usage = getattr(response, "usage_metadata", None)
     if not usage:
-        return {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        return {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "thinking_tokens": 0,
+            "total_tokens": 0,
+        }
 
-    input_tokens = getattr(usage, "prompt_token_count", 0)
-    output_tokens = getattr(usage, "candidates_token_count", 0)
-    total_tokens = input_tokens + output_tokens
+    input_tokens = _read_usage_int(
+        usage,
+        "prompt_token_count",
+        "input_token_count",
+    )
+    output_tokens = _read_usage_int(
+        usage,
+        "candidates_token_count",
+        "output_token_count",
+    )
+    thinking_tokens = _read_usage_int(
+        usage,
+        "thoughts_token_count",
+        "thinking_token_count",
+        "thought_token_count",
+    )
+    total_tokens = input_tokens + output_tokens + thinking_tokens
 
     return {
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
-        "total_tokens": total_tokens
+        "thinking_tokens": thinking_tokens,
+        "total_tokens": total_tokens,
     }

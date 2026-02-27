@@ -77,9 +77,15 @@ class DegradationTierInline(admin.TabularInline):
 class MobileAppConfigAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Free User Limits", {"fields": ("free_daily_credit_limit", "guest_lifetime_credits")}),
-        ("Free User Models & Thinking", {"fields": (
+        ("Guest Models & Thinking", {"fields": (
             "free_reply_model", "free_reply_thinking",
             "free_opener_model", "free_opener_thinking",
+        )}),
+        ("Signed-In Non-Subscriber Models & Thinking", {"fields": (
+            "registered_reply_model", "registered_reply_thinking",
+            "registered_opener_model", "registered_opener_thinking",
+        )}),
+        ("OCR Thinking", {"fields": (
             "ocr_thinking",
         )}),
         ("Fallback & Legacy", {"fields": ("fallback_model", "subscriber_weekly_limit")}),

@@ -157,32 +157,50 @@ class MobileAppConfig(models.Model):
         default=400, help_text="Legacy weekly fair-use cap for subscribers"
     )
 
-    # --- Model selection ---
+    # --- Guest (unauthenticated) model selection ---
     free_reply_model = models.CharField(
         max_length=100, default="gemini-3-flash-preview",
-        help_text="AI model for free user replies"
+        help_text="AI model for guest (unauthenticated) replies"
     )
     free_opener_model = models.CharField(
         max_length=100, default="gemini-3-flash-preview",
-        help_text="AI model for free user openers"
+        help_text="AI model for guest (unauthenticated) openers"
+    )
+    # --- Signed-in non-subscriber model selection ---
+    registered_reply_model = models.CharField(
+        max_length=100, default="gemini-3-flash-preview",
+        help_text="AI model for signed-in non-subscriber replies"
+    )
+    registered_opener_model = models.CharField(
+        max_length=100, default="gemini-3-flash-preview",
+        help_text="AI model for signed-in non-subscriber openers"
     )
     fallback_model = models.CharField(
         max_length=100, default="gpt-4.1-mini-2025-04-14",
         help_text="Fallback model (GPT) used after tier2 threshold"
     )
 
-    # --- Thinking levels ---
+    # --- Guest thinking levels ---
     free_reply_thinking = models.CharField(
         max_length=20, default="high",
-        help_text="Thinking level for free user replies (low/medium/high)"
+        help_text="Thinking level for guest replies (minimal/low/medium/high)"
     )
     free_opener_thinking = models.CharField(
         max_length=20, default="high",
-        help_text="Thinking level for free user openers (low/medium/high)"
+        help_text="Thinking level for guest openers (minimal/low/medium/high)"
+    )
+    # --- Signed-in non-subscriber thinking levels ---
+    registered_reply_thinking = models.CharField(
+        max_length=20, default="high",
+        help_text="Thinking level for signed-in non-subscriber replies (minimal/low/medium/high)"
+    )
+    registered_opener_thinking = models.CharField(
+        max_length=20, default="high",
+        help_text="Thinking level for signed-in non-subscriber openers (minimal/low/medium/high)"
     )
     ocr_thinking = models.CharField(
         max_length=20, default="low",
-        help_text="Thinking level for OCR extraction (low/medium/high)"
+        help_text="Thinking level for OCR extraction (minimal/low/medium/high)"
     )
 
     # --- Blur settings ---

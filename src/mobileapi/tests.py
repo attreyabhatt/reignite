@@ -496,6 +496,84 @@ class MobileConfigRoutingTests(TestCase):
         self.assertEqual(kwargs.get("fallback_model"), self.cfg.fallback_model)
         self.assertEqual(kwargs.get("thinking_level"), self.cfg.free_opener_thinking)
 
+    def test_registered_non_subscriber_reply_uses_registered_model_and_not_tier(self):
+        self.cfg.registered_reply_model = "gemini-3-pro-preview"
+        self.cfg.registered_reply_thinking = "minimal"
+        self.cfg.free_reply_model = "gemini-3-flash-preview"
+        self.cfg.free_reply_thinking = "high"
+        self.cfg.save()
+
+        user = User.objects.create_user(
+            username="regfreeuser",
+            email="regfree@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        chat_credit = user.chat_credit
+        chat_credit.is_subscribed = False
+        chat_credit.save(update_fields=["is_subscribed"])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        with patch("mobileapi.views._get_subscriber_tier") as mocked_tier, patch(
+            "mobileapi.views.generate_mobile_response",
+            return_value=("reply", True),
+        ) as mocked_generate:
+            response = self.client.post(
+                reverse("generate_text_with_credits"),
+                {
+                    "last_text": "hello",
+                    "situation": "just_matched",
+                    "tone": "Natural",
+                },
+                format="json",
+                REMOTE_ADDR="203.0.113.25",
+                HTTP_X_DEVICE_FINGERPRINT="cfg-device-registered-reply",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        kwargs = mocked_generate.call_args.kwargs
+        self.assertEqual(kwargs.get("primary_model"), self.cfg.registered_reply_model)
+        self.assertEqual(kwargs.get("fallback_model"), self.cfg.fallback_model)
+        self.assertEqual(kwargs.get("thinking_level"), self.cfg.registered_reply_thinking)
+        mocked_tier.assert_not_called()
+
+    def test_registered_non_subscriber_openers_use_registered_model_and_not_tier(self):
+        self.cfg.registered_opener_model = "gemini-3-pro-preview"
+        self.cfg.registered_opener_thinking = "minimal"
+        self.cfg.free_opener_model = "gemini-3-flash-preview"
+        self.cfg.free_opener_thinking = "high"
+        self.cfg.save()
+
+        user = User.objects.create_user(
+            username="regfreeopeners",
+            email="regfreeopeners@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        chat_credit = user.chat_credit
+        chat_credit.is_subscribed = False
+        chat_credit.save(update_fields=["is_subscribed"])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        with patch("mobileapi.views._get_subscriber_tier") as mocked_tier, patch(
+            "mobileapi.views.generate_mobile_openers_from_image",
+            return_value=("reply", True),
+        ) as mocked_generate:
+            response = self.client.post(
+                reverse("generate_openers_from_image"),
+                {"profile_image": self._image("openers-registered-cfg.png")},
+                format="multipart",
+                REMOTE_ADDR="203.0.113.26",
+                HTTP_X_DEVICE_FINGERPRINT="cfg-device-registered-openers",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        kwargs = mocked_generate.call_args.kwargs
+        self.assertEqual(kwargs.get("primary_model"), self.cfg.registered_opener_model)
+        self.assertEqual(kwargs.get("fallback_model"), self.cfg.fallback_model)
+        self.assertEqual(kwargs.get("thinking_level"), self.cfg.registered_opener_thinking)
+        mocked_tier.assert_not_called()
+
     def test_subscriber_reply_uses_tier_model_and_thinking(self):
         user = User.objects.create_user(
             username="subtieruser",

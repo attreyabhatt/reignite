@@ -1368,7 +1368,7 @@ def generate_text_with_credits(request):
                         **_subscription_payload(chat_credit, request=request),
                     })
 
-                # --- Free registered user path (daily shared pool + blurred cliff) ---
+                # --- Signed-in non-subscriber path (daily shared pool + blurred cliff) ---
                 cfg = _get_config()
                 allowed, remaining = _check_free_credit_allowance(chat_credit, cfg, request=request)
 
@@ -1389,15 +1389,15 @@ def generate_text_with_credits(request):
                         })
 
                     # First time at limit today — generate ONE blurred reply, store server-side
-                    _log_ai_action("replies", cfg.free_reply_model, False, True, request.user.username)
+                    _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
                     reply, success = generate_mobile_response(
                         last_text,
                         situation,
                         her_info,
                         tone=tone,
                         custom_instructions=custom_instructions,
-                        thinking_level=cfg.free_reply_thinking,
-                        primary_model=cfg.free_reply_model,
+                        thinking_level=cfg.registered_reply_thinking,
+                        primary_model=cfg.registered_reply_model,
                         fallback_model=cfg.fallback_model,
                     )
 
@@ -1420,15 +1420,15 @@ def generate_text_with_credits(request):
                         })
 
                 # Normal free user path (has daily credits remaining)
-                _log_ai_action("replies", cfg.free_reply_model, False, True, request.user.username)
+                _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
                 reply, success = generate_mobile_response(
                     last_text,
                     situation,
                     her_info,
                     tone=tone,
                     custom_instructions=custom_instructions,
-                    thinking_level=cfg.free_reply_thinking,
-                    primary_model=cfg.free_reply_model,
+                    thinking_level=cfg.registered_reply_thinking,
+                    primary_model=cfg.registered_reply_model,
                     fallback_model=cfg.fallback_model,
                 )
                 if success:
@@ -1449,15 +1449,15 @@ def generate_text_with_credits(request):
                 # Create chat credit for user
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)  # 6-1
                 cfg = _get_config()
-                _log_ai_action("replies", cfg.free_reply_model, False, True, request.user.username)
+                _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
                 reply, success = generate_mobile_response(
                     last_text,
                     situation,
                     her_info,
                     tone=tone,
                     custom_instructions=custom_instructions,
-                    thinking_level=cfg.free_reply_thinking,
-                    primary_model=cfg.free_reply_model,
+                    thinking_level=cfg.registered_reply_thinking,
+                    primary_model=cfg.registered_reply_model,
                     fallback_model=cfg.fallback_model,
                 )
                 if success:
@@ -2063,7 +2063,7 @@ def generate_openers_from_profile_image(request):
                         **_subscription_payload(chat_credit, request=request),
                     })
 
-                # --- Free registered user path (daily shared pool + blurred cliff) ---
+                # --- Signed-in non-subscriber path (daily shared pool + blurred cliff) ---
                 cfg = _get_config()
                 allowed, remaining = _check_free_credit_allowance(chat_credit, cfg, request=request)
 
@@ -2084,12 +2084,12 @@ def generate_openers_from_profile_image(request):
                         })
 
                     # First time at limit today — generate ONE blurred opener, store server-side
-                    _log_ai_action("openers", cfg.free_opener_model, False, True, request.user.username)
+                    _log_ai_action("openers", cfg.registered_opener_model, False, True, request.user.username)
                     reply, success = generate_mobile_openers_from_image(
                         img_bytes,
                         custom_instructions=custom_instructions,
-                        thinking_level=cfg.free_opener_thinking,
-                        primary_model=cfg.free_opener_model,
+                        thinking_level=cfg.registered_opener_thinking,
+                        primary_model=cfg.registered_opener_model,
                         fallback_model=cfg.fallback_model,
                     )
 
@@ -2112,12 +2112,12 @@ def generate_openers_from_profile_image(request):
                         })
 
                 # Normal free user path (has daily credits remaining)
-                _log_ai_action("openers", cfg.free_opener_model, False, True, request.user.username)
+                _log_ai_action("openers", cfg.registered_opener_model, False, True, request.user.username)
                 reply, success = generate_mobile_openers_from_image(
                     img_bytes,
                     custom_instructions=custom_instructions,
-                    thinking_level=cfg.free_opener_thinking,
-                    primary_model=cfg.free_opener_model,
+                    thinking_level=cfg.registered_opener_thinking,
+                    primary_model=cfg.registered_opener_model,
                     fallback_model=cfg.fallback_model,
                 )
                 if success:
@@ -2137,12 +2137,12 @@ def generate_openers_from_profile_image(request):
                 logger.warning(f"ChatCredit not found for user {request.user.username}, creating one")
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
                 cfg = _get_config()
-                _log_ai_action("openers", cfg.free_opener_model, False, True, request.user.username)
+                _log_ai_action("openers", cfg.registered_opener_model, False, True, request.user.username)
                 reply, success = generate_mobile_openers_from_image(
                     img_bytes,
                     custom_instructions=custom_instructions,
-                    thinking_level=cfg.free_opener_thinking,
-                    primary_model=cfg.free_opener_model,
+                    thinking_level=cfg.registered_opener_thinking,
+                    primary_model=cfg.registered_opener_model,
                     fallback_model=cfg.fallback_model,
                 )
                 if success:
