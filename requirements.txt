@@ -17,3 +17,5 @@ google-api-python-client
 google-auth
 google-auth-httplib2
 google-genai
+cloudinary
+django-cloudinary-storage
