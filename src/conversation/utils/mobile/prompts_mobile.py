@@ -9,7 +9,9 @@ def get_mobile_opener_prompt(custom_instructions=""):
     Uses XML-structured reasoning for better quality with Gemini 3 Pro.
     """
     prompt = """Generate 3 unique openers for a dating app based on the profile image provided.
-
+    Constraints:
+    - No em dashes or dashes.
+    - Only use single quotes when necessary.
 """
 
     return prompt
