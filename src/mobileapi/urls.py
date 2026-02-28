@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import community_views
 
 urlpatterns = [
     # Authentication
@@ -24,4 +25,12 @@ urlpatterns = [
     path("analyze-profile/", views.analyze_profile, name="analyze_profile"),
     path("analyze-profile-stream/", views.analyze_profile_stream, name="analyze_profile_stream"),
     path("report/", views.report_issue, name="report_issue"),
+
+    # Community
+    path("community/posts/", community_views.community_post_list, name="community_post_list"),
+    path("community/posts/<int:post_id>/", community_views.community_post_detail, name="community_post_detail"),
+    path("community/posts/<int:post_id>/vote/", community_views.community_post_vote, name="community_post_vote"),
+    path("community/posts/<int:post_id>/comments/", community_views.community_post_comment, name="community_post_comment"),
+    path("community/comments/<int:comment_id>/delete/", community_views.community_comment_delete, name="community_comment_delete"),
+    path("community/comments/<int:comment_id>/like/", community_views.community_comment_like, name="community_comment_like"),
 ]

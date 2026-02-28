@@ -91,7 +91,18 @@ INSTALLED_APPS = [
     
     'rest_framework',
     'rest_framework.authtoken',
+
+    'cloudinary_storage',
+    'cloudinary',
+    'community',
 ]
+
+# Cloudinary (image storage for community posts)
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY': config('CLOUDINARY_API_KEY', default=''),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
+}
 
 # settings.py
 # Mobile API public endpoint rate limits (Phase 1).
@@ -118,6 +129,10 @@ MOBILE_RATELIMIT_RECOMMENDED_OPENERS_IP = config(
     "MOBILE_RATELIMIT_RECOMMENDED_OPENERS_IP",
     default="60/10m",
 )
+
+# Community rate limits
+COMMUNITY_RATELIMIT_POST_CREATE = config("COMMUNITY_RATELIMIT_POST_CREATE", default="10/1h")
+COMMUNITY_RATELIMIT_COMMENT_CREATE = config("COMMUNITY_RATELIMIT_COMMENT_CREATE", default="30/1h")
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
