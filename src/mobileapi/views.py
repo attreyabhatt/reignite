@@ -16,9 +16,11 @@ import json
 import logging
 import hmac
 import hashlib
+import uuid
 from typing import Any, Dict, Optional, Tuple
 from functools import lru_cache
 from datetime import datetime, timedelta, timezone as dt_timezone
+from urllib.parse import parse_qs
 
 from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
 from conversation.utils.mobile.custom_mobile import generate_mobile_response, generate_mobile_openers_from_image
@@ -27,7 +29,7 @@ from conversation.utils.image_gpt import extract_conversation_from_image, stream
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .auth import normalize_authorization_header
 from .renderers import EventStreamRenderer
-from .models import MobileCopyEvent, MobileGenerationEvent
+from .models import MobileCopyEvent, MobileGenerationEvent, MobileInstallAttributionEvent
 from conversation.models import (
     ChatCredit,
     TrialIP,
@@ -37,7 +39,7 @@ from conversation.models import (
     LockedReply,
     DeviceDailyUsage,
 )
-from reignitehome.models import ContactMessage
+from reignitehome.models import ContactMessage, MarketingClickEvent
 from pricing.models import CreditPurchase
 from django.conf import settings
 from django.contrib.auth import password_validation
@@ -317,6 +319,77 @@ def _parse_reply_input_context(request, last_text: str = "") -> Tuple[str, str]:
         ocr_text = ""
 
     return input_source, ocr_text
+
+
+def _sanitize_attribution_value(raw_value: Any, *, max_len: int = 160, lowercase: bool = True) -> str:
+    value = str(raw_value or "").strip()
+    if lowercase:
+        value = value.lower()
+    return value[:max_len]
+
+
+def _parse_install_referrer_payload(install_referrer_raw: str) -> Dict[str, str]:
+    parsed = parse_qs(str(install_referrer_raw or "").strip(), keep_blank_values=True)
+
+    def _first(key: str) -> str:
+        values = parsed.get(key) or []
+        return values[0] if values else ""
+
+    return {
+        "utm_source": _sanitize_attribution_value(_first("utm_source"), max_len=120),
+        "utm_medium": _sanitize_attribution_value(_first("utm_medium"), max_len=120),
+        "utm_campaign": _sanitize_attribution_value(_first("utm_campaign"), max_len=160),
+        "utm_content": _sanitize_attribution_value(_first("utm_content"), max_len=160),
+        "utm_term": _sanitize_attribution_value(_first("utm_term"), max_len=160),
+        "ffclid_raw": _sanitize_attribution_value(_first("ffclid"), max_len=64, lowercase=False),
+    }
+
+
+def _epoch_seconds_to_datetime(raw_value: Any) -> Optional[datetime]:
+    if raw_value in (None, ""):
+        return None
+    try:
+        seconds = int(raw_value)
+    except (TypeError, ValueError):
+        return None
+    if seconds <= 0:
+        return None
+    return datetime.fromtimestamp(seconds, tz=dt_timezone.utc)
+
+
+def _parse_ffclid(raw_value: str) -> Optional[uuid.UUID]:
+    if not raw_value:
+        return None
+    try:
+        return uuid.UUID(str(raw_value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _install_attribution_actor_key(request, guest_hash: str) -> str:
+    if request.user.is_authenticated:
+        return f"user:{request.user.id}"
+    if guest_hash:
+        return f"guest:{guest_hash}"
+    return f"ip:{_hash_device_fingerprint(get_client_ip(request))}"
+
+
+def _build_install_idempotency_key(
+    *,
+    actor_key: str,
+    install_referrer_raw: str,
+    install_begin_timestamp_seconds: Any,
+    referrer_click_timestamp_seconds: Any,
+) -> str:
+    payload = "|".join(
+        [
+            actor_key,
+            str(install_referrer_raw or "").strip(),
+            str(install_begin_timestamp_seconds or ""),
+            str(referrer_click_timestamp_seconds or ""),
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _rate(setting_name):
@@ -2920,6 +2993,103 @@ def copy_event(request):
                 "success": False,
                 "error": "copy_event_failed",
                 "message": "Could not store copy event.",
+            },
+            status=500,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def install_attribution(request):
+    """Persist install attribution payload from mobile clients."""
+    try:
+        _normalize_mobile_auth_header(request)
+        install_referrer_raw = str(request.data.get("install_referrer_raw") or "").strip()
+        install_begin_timestamp_seconds = request.data.get("install_begin_timestamp_seconds")
+        referrer_click_timestamp_seconds = request.data.get("referrer_click_timestamp_seconds")
+        app_version = _sanitize_attribution_value(
+            request.data.get("app_version"), max_len=50, lowercase=False
+        )
+
+        parsed_referrer = _parse_install_referrer_payload(install_referrer_raw)
+        ffclid = _parse_ffclid(parsed_referrer["ffclid_raw"])
+
+        click_event = None
+        if ffclid is not None:
+            click_event = MarketingClickEvent.objects.filter(click_id=ffclid).first()
+
+        if request.user.is_authenticated:
+            user = request.user
+            guest_hash = ""
+        else:
+            user = None
+            guest_hash = _get_guest_hash_for_mobile_analytics(request)
+
+        actor_key = _install_attribution_actor_key(request, guest_hash)
+        idempotency_key = _build_install_idempotency_key(
+            actor_key=actor_key,
+            install_referrer_raw=install_referrer_raw,
+            install_begin_timestamp_seconds=install_begin_timestamp_seconds,
+            referrer_click_timestamp_seconds=referrer_click_timestamp_seconds,
+        )
+
+        install_begin_at = _epoch_seconds_to_datetime(install_begin_timestamp_seconds)
+        referrer_click_at = _epoch_seconds_to_datetime(referrer_click_timestamp_seconds)
+        is_organic = not any(
+            [
+                parsed_referrer["utm_source"],
+                parsed_referrer["utm_medium"],
+                parsed_referrer["utm_campaign"],
+                ffclid,
+            ]
+        )
+
+        event, _ = MobileInstallAttributionEvent.objects.update_or_create(
+            idempotency_key=idempotency_key,
+            defaults={
+                "user": user,
+                "guest_id_hash": guest_hash or None,
+                "install_referrer_raw": install_referrer_raw,
+                "utm_source": parsed_referrer["utm_source"],
+                "utm_medium": parsed_referrer["utm_medium"],
+                "utm_campaign": parsed_referrer["utm_campaign"],
+                "utm_content": parsed_referrer["utm_content"],
+                "utm_term": parsed_referrer["utm_term"],
+                "ffclid": ffclid,
+                "click_event": click_event,
+                "install_begin_at": install_begin_at,
+                "referrer_click_at": referrer_click_at,
+                "is_organic": is_organic,
+                "app_version": app_version,
+                "metadata": {
+                    "click_event_found": bool(click_event),
+                    "raw_ffclid": parsed_referrer["ffclid_raw"],
+                },
+            },
+        )
+
+        return Response(
+            {
+                "success": True,
+                "install_event_id": event.pk,
+                "attributed_click_id": str(click_event.click_id) if click_event else None,
+                "is_organic": event.is_organic,
+                "campaign": {
+                    "utm_source": event.utm_source,
+                    "utm_medium": event.utm_medium,
+                    "utm_campaign": event.utm_campaign,
+                    "utm_content": event.utm_content,
+                    "utm_term": event.utm_term,
+                },
+            }
+        )
+    except Exception as exc:
+        logger.error("install_attribution failed: %s", exc, exc_info=True)
+        return Response(
+            {
+                "success": False,
+                "error": "install_attribution_failed",
+                "message": "Could not store install attribution.",
             },
             status=500,
         )

@@ -1,16 +1,22 @@
-from django.shortcuts import render,redirect
-from django.http import JsonResponse
+import hashlib
+import hmac
 import json
-from conversation.utils.reignite_gpt import generate_reignite_comeback
-from reignitehome.utils.ip_check import get_client_ip
-from django.urls import reverse
-from reignitehome.models import TrialIP,ContactMessage
-from django_ratelimit.decorators import ratelimit
-from conversation.utils.custom_gpt import generate_custom_response
-from django.views.decorators.http import require_POST
+import uuid
+from urllib.parse import urlencode, urlparse
+
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.views.decorators.http import require_http_methods, require_POST
+from django_ratelimit.decorators import ratelimit
+
+from conversation.utils.custom_gpt import generate_custom_response
+from conversation.utils.reignite_gpt import generate_reignite_comeback
+from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
+from reignitehome.utils.ip_check import get_client_ip
 
 # Whitelists (match your <select> values in home.html)
 PLATFORM_ALLOWED = {
@@ -31,6 +37,96 @@ WHAT_ALLOWED = {
     "Not sure / Just stopped",
     "Other",
 }
+
+PLAY_STORE_BASE_URL = "https://play.google.com/store/apps/details"
+PLAY_STORE_APP_ID = "com.tryagaintext.flirtfix"
+FLIRTFIX_ROUTE_KEY = "flirtfix"
+
+
+def _sanitize_utm_value(raw_value, default="", max_len=160):
+    value = str(raw_value or "").strip().lower()
+    if not value:
+        value = default
+    return value[:max_len]
+
+
+def _extract_referrer_host(request):
+    raw_referrer = (request.META.get("HTTP_REFERER") or "").strip()
+    if not raw_referrer:
+        return ""
+
+    parsed = urlparse(raw_referrer)
+    host = (parsed.netloc or "").lower().strip()
+    return host[:255]
+
+
+def _hash_ip_address(ip_address):
+    value = str(ip_address or "").strip()
+    if not value:
+        return ""
+
+    secret_key = settings.SECRET_KEY.encode("utf-8")
+    return hmac.new(secret_key, value.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _build_play_store_redirect_url(utm_data, click_id):
+    referrer_params = {
+        "utm_source": utm_data["utm_source"],
+        "utm_medium": utm_data["utm_medium"],
+        "utm_campaign": utm_data["utm_campaign"],
+        "ffclid": str(click_id),
+    }
+    if utm_data["utm_content"]:
+        referrer_params["utm_content"] = utm_data["utm_content"]
+    if utm_data["utm_term"]:
+        referrer_params["utm_term"] = utm_data["utm_term"]
+
+    play_store_params = {
+        "id": PLAY_STORE_APP_ID,
+        "hl": "en_IN",
+        "referrer": urlencode(referrer_params),
+    }
+    return f"{PLAY_STORE_BASE_URL}?{urlencode(play_store_params)}"
+
+
+def flirtfix_redirect(request):
+    utm_data = {
+        "utm_source": _sanitize_utm_value(
+            request.GET.get("utm_source"), default="unknown", max_len=120
+        ),
+        "utm_medium": _sanitize_utm_value(
+            request.GET.get("utm_medium"), default="unknown", max_len=120
+        ),
+        "utm_campaign": _sanitize_utm_value(
+            request.GET.get("utm_campaign"), default="unknown", max_len=160
+        ),
+        "utm_content": _sanitize_utm_value(request.GET.get("utm_content"), default="", max_len=160),
+        "utm_term": _sanitize_utm_value(request.GET.get("utm_term"), default="", max_len=160),
+    }
+    click_id = uuid.uuid4()
+    target_url = _build_play_store_redirect_url(utm_data, click_id)
+
+    raw_query = {key: request.GET.getlist(key) for key in request.GET.keys()}
+    MarketingClickEvent.objects.create(
+        route_key=FLIRTFIX_ROUTE_KEY,
+        click_id=click_id,
+        utm_source=utm_data["utm_source"],
+        utm_medium=utm_data["utm_medium"],
+        utm_campaign=utm_data["utm_campaign"],
+        utm_content=utm_data["utm_content"],
+        utm_term=utm_data["utm_term"],
+        referrer_host=_extract_referrer_host(request),
+        ip_hash=_hash_ip_address(get_client_ip(request)),
+        user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+        target_url=target_url,
+        raw_query=raw_query,
+    )
+
+    response = redirect(target_url)
+    response["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
 
 
 def ratelimited_error(request, exception=None):

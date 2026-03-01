@@ -20,6 +20,7 @@ urlpatterns = [
     path("unlock-reply/", views.unlock_reply, name="unlock_reply"),
     path("recommended-openers/", views.recommended_openers, name="recommended_openers"),
     path("copy-event/", views.copy_event, name="mobile_copy_event"),
+    path("install-attribution/", views.install_attribution, name="mobile_install_attribution"),
     path("extract-image/", views.extract_from_image_with_credits, name="extract_from_image_with_credits"),
     path("extract-image-stream/", views.extract_from_image_with_credits_stream, name="extract_from_image_with_credits_stream"),
     path("analyze-profile/", views.analyze_profile, name="analyze_profile"),

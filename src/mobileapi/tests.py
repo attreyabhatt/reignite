@@ -15,13 +15,17 @@ from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from reignitehome.models import TrialIP as HomeTrialIP
+from reignitehome.models import MarketingClickEvent, TrialIP as HomeTrialIP
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from mobileapi import admin as mobile_admin
 from mobileapi import views
-from mobileapi.models import MobileCopyEvent, MobileGenerationEvent
+from mobileapi.models import (
+    MobileCopyEvent,
+    MobileGenerationEvent,
+    MobileInstallAttributionEvent,
+)
 
 
 class RedactionHelperTests(TestCase):
@@ -1134,6 +1138,116 @@ class MobileAnalyticsEventTests(TestCase):
             copy_event.user_type,
             MobileCopyEvent.UserType.AUTHENTICATED_NON_SUBSCRIBED,
         )
+
+
+class MobileInstallAttributionEventTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.click_id = "123e4567-e89b-12d3-a456-426614174000"
+        self.click_event = MarketingClickEvent.objects.create(
+            route_key="flirtfix",
+            click_id=self.click_id,
+            utm_source="instagram",
+            utm_medium="bio",
+            utm_campaign="launch_campaign",
+            target_url="https://play.google.com/store/apps/details?id=com.tryagaintext.flirtfix",
+            raw_query={"utm_source": ["instagram"]},
+        )
+
+    def test_install_attribution_links_to_click_event(self):
+        payload = {
+            "install_referrer_raw": (
+                "utm_source=instagram&utm_medium=bio&utm_campaign=launch_campaign"
+                f"&ffclid={self.click_id}"
+            ),
+            "install_begin_timestamp_seconds": 1700000000,
+            "referrer_click_timestamp_seconds": 1699999900,
+            "app_version": "1.2.3",
+        }
+        response = self.client.post(
+            reverse("mobile_install_attribution"),
+            payload,
+            format="json",
+            REMOTE_ADDR="203.0.113.110",
+            HTTP_X_DEVICE_FINGERPRINT="install-device-1",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+        self.assertEqual(response.data.get("attributed_click_id"), self.click_id)
+        self.assertFalse(response.data.get("is_organic"))
+        self.assertEqual(MobileInstallAttributionEvent.objects.count(), 1)
+
+        event = MobileInstallAttributionEvent.objects.get()
+        self.assertEqual(event.click_event_id, self.click_event.id)
+        self.assertEqual(str(event.ffclid), self.click_id)
+        self.assertEqual(event.utm_source, "instagram")
+        self.assertEqual(event.utm_medium, "bio")
+        self.assertEqual(event.utm_campaign, "launch_campaign")
+        self.assertEqual(event.app_version, "1.2.3")
+        self.assertIsNotNone(event.install_begin_at)
+        self.assertIsNotNone(event.referrer_click_at)
+
+    def test_install_attribution_is_idempotent_for_same_guest_payload(self):
+        payload = {
+            "install_referrer_raw": "utm_source=reddit&utm_medium=post&utm_campaign=winter_push",
+            "install_begin_timestamp_seconds": 1700000000,
+        }
+        for _ in range(2):
+            response = self.client.post(
+                reverse("mobile_install_attribution"),
+                payload,
+                format="json",
+                REMOTE_ADDR="203.0.113.111",
+                HTTP_X_DEVICE_FINGERPRINT="install-device-idempotent",
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.data.get("success"))
+
+        self.assertEqual(MobileInstallAttributionEvent.objects.count(), 1)
+
+    def test_install_attribution_supports_organic_payload(self):
+        response = self.client.post(
+            reverse("mobile_install_attribution"),
+            {"install_referrer_raw": ""},
+            format="json",
+            REMOTE_ADDR="203.0.113.112",
+            HTTP_X_DEVICE_FINGERPRINT="install-device-organic",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+        self.assertTrue(response.data.get("is_organic"))
+
+        event = MobileInstallAttributionEvent.objects.get()
+        self.assertTrue(event.is_organic)
+        self.assertIsNone(event.ffclid)
+        self.assertIsNone(event.click_event)
+
+    def test_install_attribution_supports_authenticated_users(self):
+        user = User.objects.create_user(
+            username="installauthuser",
+            email="installauth@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        response = self.client.post(
+            reverse("mobile_install_attribution"),
+            {
+                "install_referrer_raw": (
+                    "utm_source=instagram&utm_medium=bio&utm_campaign=launch_campaign"
+                    f"&ffclid={self.click_id}"
+                ),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = MobileInstallAttributionEvent.objects.get()
+        self.assertEqual(event.user_id, user.id)
+        self.assertIsNone(event.guest_id_hash)
 
 
 class MobileSignupAdminTests(TestCase):

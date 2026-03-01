@@ -107,3 +107,62 @@ class MobileCopyEvent(models.Model):
     def __str__(self):
         actor = self.user.username if self.user_id else (self.guest_id_hash or "guest")
         return f"{self.copy_type} copy ({self.user_type}) by {actor}"
+
+
+class MobileInstallAttributionEvent(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mobile_install_attribution_events",
+        db_index=True,
+    )
+    guest_id_hash = models.CharField(max_length=64, null=True, blank=True, db_index=True)
+
+    install_referrer_raw = models.TextField(blank=True, default="")
+
+    utm_source = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    utm_medium = models.CharField(max_length=120, blank=True, default="", db_index=True)
+    utm_campaign = models.CharField(max_length=160, blank=True, default="", db_index=True)
+    utm_content = models.CharField(max_length=160, blank=True, default="")
+    utm_term = models.CharField(max_length=160, blank=True, default="")
+
+    ffclid = models.UUIDField(null=True, blank=True, db_index=True)
+    click_event = models.ForeignKey(
+        "reignitehome.MarketingClickEvent",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mobile_install_events",
+        db_index=True,
+    )
+
+    install_begin_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    referrer_click_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    is_organic = models.BooleanField(default=False, db_index=True)
+    app_version = models.CharField(max_length=50, blank=True, default="")
+
+    idempotency_key = models.CharField(max_length=64, unique=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "Install Attribution Event"
+        verbose_name_plural = "Install Attribution Events"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["created_at", "utm_source", "utm_campaign"],
+                name="mobileapi_mi_created_utm_idx",
+            ),
+            models.Index(
+                fields=["guest_id_hash", "created_at"],
+                name="mobileapi_mi_guest_created_idx",
+            ),
+        ]
+
+    def __str__(self):
+        actor = self.user.username if self.user_id else (self.guest_id_hash or "guest")
+        campaign = self.utm_campaign or "organic"
+        return f"install attribution by {actor} ({campaign})"

@@ -12,7 +12,11 @@ from conversation.models import (
     MobileAppConfig,
     RecommendedOpener,
 )
-from mobileapi.models import MobileCopyEvent, MobileGenerationEvent
+from mobileapi.models import (
+    MobileCopyEvent,
+    MobileGenerationEvent,
+    MobileInstallAttributionEvent,
+)
 
 
 class MobileGuestTrial(GuestTrial):
@@ -226,6 +230,57 @@ class MobileCopyEventAdmin(admin.ModelAdmin):
         return bool((obj.reply_context_ocr_text or "").strip())
 
     has_reply_context.boolean = True
+
+
+@admin.register(MobileInstallAttributionEvent)
+class MobileInstallAttributionEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "user_or_guest",
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "is_organic",
+        "ffclid",
+        "click_event",
+    )
+    list_filter = ("is_organic", "utm_source", "utm_medium", "utm_campaign", "created_at")
+    date_hierarchy = "created_at"
+    search_fields = (
+        "user__username",
+        "user__email",
+        "guest_id_hash",
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "ffclid",
+        "idempotency_key",
+    )
+    readonly_fields = (
+        "created_at",
+        "user",
+        "guest_id_hash",
+        "install_referrer_raw",
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_content",
+        "utm_term",
+        "ffclid",
+        "click_event",
+        "install_begin_at",
+        "referrer_click_at",
+        "is_organic",
+        "app_version",
+        "idempotency_key",
+        "metadata",
+    )
+    ordering = ("-created_at",)
+
+    def user_or_guest(self, obj):
+        if obj.user_id:
+            return f"{obj.user.username} ({obj.user.email})".strip()
+        return obj.guest_id_hash or "guest"
 
 
 class MobileSignupSubscriptionFilter(admin.SimpleListFilter):
