@@ -120,9 +120,13 @@ def _comment_payload(comment, user_liked=False):
 
 def _annotated_posts_qs(base_qs):
     return base_qs.select_related('author').annotate(
-        upvotes=Count('votes', filter=Q(votes__vote_type='up')),
-        downvotes=Count('votes', filter=Q(votes__vote_type='down')),
-        comment_count=Count('comments', filter=Q(comments__is_deleted=False)),
+        upvotes=Count('votes', filter=Q(votes__vote_type='up'), distinct=True),
+        downvotes=Count('votes', filter=Q(votes__vote_type='down'), distinct=True),
+        comment_count=Count(
+            'comments',
+            filter=Q(comments__is_deleted=False),
+            distinct=True,
+        ),
     )
 
 
@@ -314,19 +318,29 @@ def community_post_vote(request, post_id):
     existing = PostVote.objects.filter(user=request.user, post=post).first()
 
     if existing is None:
-        PostVote.objects.create(user=request.user, post=post, vote_type=vote_type)
-        user_vote = vote_type
-    elif existing.vote_type == vote_type:
-        # Same vote → toggle off
-        existing.delete()
-        user_vote = None
-    else:
-        # Switch vote direction
-        existing.vote_type = vote_type
-        existing.save(update_fields=['vote_type'])
-        user_vote = vote_type
+        try:
+            PostVote.objects.create(user=request.user, post=post, vote_type=vote_type)
+            user_vote = vote_type
+        except IntegrityError:
+            # Rare race: another request created the vote between read and create.
+            existing = PostVote.objects.filter(user=request.user, post=post).first()
 
-    annotated = _annotated_posts_qs(CommunityPost.objects.filter(pk=post_id)).first()
+    if existing is not None:
+        if existing.vote_type == vote_type:
+            # Same vote -> toggle off
+            existing.delete()
+            user_vote = None
+        else:
+            # Switch vote direction
+            existing.vote_type = vote_type
+            existing.save(update_fields=['vote_type'])
+            user_vote = vote_type
+
+    annotated = _annotated_posts_qs(
+        CommunityPost.objects.filter(pk=post_id, is_deleted=False)
+    ).first()
+    if annotated is None:
+        return Response({'error': 'Post not found.'}, status=404)
     return Response({
         'vote_score': annotated.upvotes - annotated.downvotes,
         'user_vote': user_vote,
@@ -390,3 +404,4 @@ def community_comment_like(request, comment_id):
         'liked': liked,
         'like_count': comment.likes.count(),
     })
+
