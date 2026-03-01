@@ -77,17 +77,22 @@ def _post_payload(post, user_vote=None, now=None):
     if now is None:
         now = datetime.now(tz=timezone.utc)
 
-    vote_score = post.upvotes - post.downvotes
+    upvotes = getattr(post, 'upvotes', 0) or 0
+    downvotes = getattr(post, 'downvotes', 0) or 0
+    vote_score = upvotes - downvotes
+    body_text = post.body or ''
     hours_old = max(0, (now - post.created_at).total_seconds() / 3600)
 
     return {
         'id': post.id,
-        'title': post.title,
-        'body_preview': post.body[:200] + '...' if len(post.body) > 200 else post.body,
+        'title': post.title or '',
+        'body_preview': (
+            body_text[:200] + '...' if len(body_text) > 200 else body_text
+        ),
         'category': post.category,
         'author': _author_payload(post.author),
         'vote_score': vote_score,
-        'comment_count': post.comment_count,
+        'comment_count': getattr(post, 'comment_count', 0) or 0,
         'image_url': post.image_url or None,
         'is_featured': post.is_featured,
         'is_trending': (
@@ -100,11 +105,14 @@ def _post_payload(post, user_vote=None, now=None):
 
 
 def _comment_payload(comment, user_liked=False):
+    like_count = getattr(comment, 'like_count', None)
+    if like_count is None:
+        like_count = comment.likes.count()
     return {
         'id': comment.id,
         'author': _author_payload(comment.author),
         'body': comment.body,
-        'like_count': comment.like_count,
+        'like_count': like_count,
         'user_liked': user_liked,
         'created_at': comment.created_at.isoformat(),
     }
@@ -200,6 +208,8 @@ def _create_post(request):
 
     if not title:
         return Response({'error': 'title is required.'}, status=400)
+    if len(title) > 200:
+        return Response({'error': 'title must be 200 characters or fewer.'}, status=400)
     if not body:
         return Response({'error': 'body is required.'}, status=400)
 
@@ -239,12 +249,9 @@ def _create_post(request):
 @api_view(['GET', 'DELETE'])
 @permission_classes([AllowAny])
 def community_post_detail(request, post_id):
-    try:
-        post = _annotated_posts_qs(
-            CommunityPost.objects.filter(pk=post_id, is_deleted=False)
-        ).select_related('author').first()
-    except Exception:
-        post = None
+    post = _annotated_posts_qs(
+        CommunityPost.objects.filter(pk=post_id, is_deleted=False)
+    ).select_related('author').first()
 
     if post is None:
         return Response({'error': 'Post not found.'}, status=404)
@@ -269,13 +276,13 @@ def community_post_detail(request, post_id):
 
     now = datetime.now(tz=timezone.utc)
     payload = _post_payload(post, user_vote, now)
-    payload['body'] = post.body  # include full body in detail
+    payload['body'] = post.body or ''  # include full body in detail
 
     # Comments
     comments = list(
         CommunityComment.objects.filter(post_id=post_id, is_deleted=False)
         .select_related('author')
-        .prefetch_related('likes')
+        .annotate(like_count=Count('likes'))
     )
     liked_ids = set()
     if request.user.is_authenticated and comments:
