@@ -65,7 +65,7 @@ class FlirtfixRedirectTests(TestCase):
         self.assertEqual(event.raw_query.get("utm_source"), ["Instagram"])
         self.assertEqual(event.raw_query.get("utm_medium"), ["Bio"])
 
-    def test_flirtfix_redirect_tracks_defaults_with_trailing_slash(self):
+    def test_flirtfix_redirect_skips_persist_when_all_utm_defaults_are_unknown(self):
         response = self.client.get("/flirtfix/")
         referrer_query = self._assert_valid_play_redirect(response)
 
@@ -73,11 +73,7 @@ class FlirtfixRedirectTests(TestCase):
         self.assertEqual(referrer_query.get("utm_medium", [""])[0], "unknown")
         self.assertEqual(referrer_query.get("utm_campaign", [""])[0], "unknown")
 
-        self.assertEqual(MarketingClickEvent.objects.count(), 1)
-        event = MarketingClickEvent.objects.get()
-        self.assertEqual(event.utm_source, "unknown")
-        self.assertEqual(event.utm_medium, "unknown")
-        self.assertEqual(event.utm_campaign, "unknown")
+        self.assertEqual(MarketingClickEvent.objects.count(), 0)
 
     def test_flirtfix_extra_path_is_not_matched(self):
         response = self.client.get("/flirtfix/extra")

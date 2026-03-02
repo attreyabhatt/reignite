@@ -106,21 +106,25 @@ def flirtfix_redirect(request):
     click_id = uuid.uuid4()
     target_url = _build_play_store_redirect_url(utm_data, click_id)
 
-    raw_query = {key: request.GET.getlist(key) for key in request.GET.keys()}
-    MarketingClickEvent.objects.create(
-        route_key=FLIRTFIX_ROUTE_KEY,
-        click_id=click_id,
-        utm_source=utm_data["utm_source"],
-        utm_medium=utm_data["utm_medium"],
-        utm_campaign=utm_data["utm_campaign"],
-        utm_content=utm_data["utm_content"],
-        utm_term=utm_data["utm_term"],
-        referrer_host=_extract_referrer_host(request),
-        ip_hash=_hash_ip_address(get_client_ip(request)),
-        user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
-        target_url=target_url,
-        raw_query=raw_query,
+    should_persist_click = any(
+        utm_data[key] != "unknown" for key in ("utm_source", "utm_medium", "utm_campaign")
     )
+    if should_persist_click:
+        raw_query = {key: request.GET.getlist(key) for key in request.GET.keys()}
+        MarketingClickEvent.objects.create(
+            route_key=FLIRTFIX_ROUTE_KEY,
+            click_id=click_id,
+            utm_source=utm_data["utm_source"],
+            utm_medium=utm_data["utm_medium"],
+            utm_campaign=utm_data["utm_campaign"],
+            utm_content=utm_data["utm_content"],
+            utm_term=utm_data["utm_term"],
+            referrer_host=_extract_referrer_host(request),
+            ip_hash=_hash_ip_address(get_client_ip(request)),
+            user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+            target_url=target_url,
+            raw_query=raw_query,
+        )
 
     response = redirect(target_url)
     response["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate"
