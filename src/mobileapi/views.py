@@ -52,6 +52,10 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+_VAULT_MODE = "vault"
+_VAULT_ARCHIVE_LIMIT = 20
+_VAULT_DAILY_DROP_COUNT = 3
+
 def _log_ai_action(action_type: str, model: str, is_subscribed: bool, is_signed_up: bool, username: str = None):
     """
     Log AI action with formatted debug info.
@@ -964,6 +968,78 @@ def _select_recommended_openers(count):
     if len(qs) <= count:
         return qs
     return random.sample(qs, count)
+
+
+def _select_vault_archive_openers(limit=_VAULT_ARCHIVE_LIMIT):
+    qs = list(
+        RecommendedOpener.objects.filter(is_active=True).order_by("sort_order", "id")
+    )
+    if limit is None or limit <= 0:
+        return qs
+    return qs[:limit]
+
+
+def _select_vault_daily_drop(openers, day_key, count=_VAULT_DAILY_DROP_COUNT):
+    if not openers:
+        return []
+    if count is None or count <= 0:
+        return []
+    if len(openers) <= count:
+        return list(openers)
+
+    seed_material = f"vault_daily_drop:{day_key}".encode("utf-8")
+    seed = int(hashlib.sha256(seed_material).hexdigest()[:16], 16)
+    rng = random.Random(seed)
+    picked_indices = sorted(rng.sample(range(len(openers)), count))
+    return [openers[i] for i in picked_indices]
+
+
+def _build_vault_blur_preview(text, word_count):
+    if not text:
+        return ""
+    words = text.split()
+    visible_words = max(1, int(word_count or 0))
+    preview = " ".join(words[:visible_words])
+    if len(words) > visible_words:
+        preview += "..."
+    return preview
+
+
+def _build_vault_opener_payload(opener, is_locked, blur_word_count):
+    if is_locked:
+        return {
+            "id": opener.id,
+            "message": None,
+            "why_it_works": opener.why_it_works,
+            "image_url": opener.image.url if opener.image else None,
+            "is_locked": True,
+            "blur_preview": _build_vault_blur_preview(opener.text, blur_word_count),
+        }
+
+    return {
+        "id": opener.id,
+        "message": opener.text,
+        "why_it_works": opener.why_it_works,
+        "image_url": opener.image.url if opener.image else None,
+        "is_locked": False,
+        "blur_preview": None,
+    }
+
+
+def _build_vault_meta(*, tier, archive_total, daily_drop_date, display_count):
+    cta = "none"
+    if tier == "guest":
+        cta = "auth_then_paywall"
+    elif tier == "free":
+        cta = "paywall"
+    return {
+        "tier": tier,
+        "daily_drop_date": daily_drop_date,
+        "archive_total": archive_total,
+        "display_count": display_count,
+        "cta": cta,
+        "can_refresh": False,
+    }
 
 
 def _verify_google_play_subscription(product_id, purchase_token):
@@ -2850,40 +2926,67 @@ def recommended_openers(request):
     """Return recommended openers and count towards free use/subscription limits."""
     try:
         _normalize_mobile_auth_header(request)
+        mode = str(request.data.get("mode") or "").strip().lower()
         count_raw = request.data.get("count", 3)
         try:
             count = int(count_raw)
         except (TypeError, ValueError):
             count = 3
 
-        openers = _select_recommended_openers(count)
-        if not openers:
-            return Response(
-                {"success": False, "error": "no_openers", "message": "No openers available"},
-                status=404,
-            )
-        opener_payload = [
-            {
-                "id": opener.id,
-                "message": opener.text,
-                "why_it_works": opener.why_it_works,
-                "image_url": opener.image.url if opener.image else None,
-            }
-            for opener in openers
-        ]
+        if mode != _VAULT_MODE:
+            openers = _select_recommended_openers(count)
+            if not openers:
+                return Response(
+                    {"success": False, "error": "no_openers", "message": "No openers available"},
+                    status=404,
+                )
+            opener_payload = [
+                {
+                    "id": opener.id,
+                    "message": opener.text,
+                    "why_it_works": opener.why_it_works,
+                    "image_url": opener.image.url if opener.image else None,
+                }
+                for opener in openers
+            ]
 
-        if request.user.is_authenticated:
-            chat_credit = ChatCredit.objects.get(user=request.user)
+            if request.user.is_authenticated:
+                chat_credit = ChatCredit.objects.get(user=request.user)
+                generation_event = _persist_mobile_generation_event(
+                    request=request,
+                    chat_credit=chat_credit,
+                    action_type=MobileGenerationEvent.ActionType.OPENER,
+                    source_type=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
+                    generated_payload=opener_payload,
+                    model_used=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
+                    thinking_used="n/a",
+                    usage=_empty_usage(),
+                    metadata={"endpoint": "recommended_openers", "mode": "legacy"},
+                )
+                return Response(
+                    {
+                        "success": True,
+                        "openers": opener_payload,
+                        **(
+                            {"generation_event_id": generation_event.pk}
+                            if generation_event is not None
+                            else {}
+                        ),
+                        **_subscription_payload(chat_credit, request=request),
+                    }
+                )
+
+            # Guest path (no credit usage)
             generation_event = _persist_mobile_generation_event(
                 request=request,
-                chat_credit=chat_credit,
+                chat_credit=None,
                 action_type=MobileGenerationEvent.ActionType.OPENER,
                 source_type=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
                 generated_payload=opener_payload,
                 model_used=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
                 thinking_used="n/a",
                 usage=_empty_usage(),
-                metadata={"endpoint": "recommended_openers"},
+                metadata={"endpoint": "recommended_openers", "mode": "legacy"},
             )
             return Response(
                 {
@@ -2894,11 +2997,81 @@ def recommended_openers(request):
                         if generation_event is not None
                         else {}
                     ),
+                }
+            )
+
+        cfg = _get_config()
+        archive = _select_vault_archive_openers(limit=_VAULT_ARCHIVE_LIMIT)
+        if not archive:
+            return Response(
+                {"success": False, "error": "no_openers", "message": "No openers available"},
+                status=404,
+            )
+
+        daily_drop_date = timezone.now().date().isoformat()
+        daily_drop = _select_vault_daily_drop(
+            archive,
+            day_key=daily_drop_date,
+            count=_VAULT_DAILY_DROP_COUNT,
+        )
+
+        if request.user.is_authenticated:
+            chat_credit = ChatCredit.objects.get(user=request.user)
+            is_elite = _is_subscription_active(chat_credit)
+            tier = "elite" if is_elite else "free"
+            selected_openers = archive if is_elite else daily_drop
+            opener_payload = [
+                _build_vault_opener_payload(
+                    opener,
+                    is_locked=False,
+                    blur_word_count=cfg.blur_preview_word_count,
+                )
+                for opener in selected_openers
+            ]
+            generation_event = _persist_mobile_generation_event(
+                request=request,
+                chat_credit=chat_credit,
+                action_type=MobileGenerationEvent.ActionType.OPENER,
+                source_type=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
+                generated_payload=opener_payload,
+                model_used=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
+                thinking_used="n/a",
+                usage=_empty_usage(),
+                metadata={
+                    "endpoint": "recommended_openers",
+                    "mode": _VAULT_MODE,
+                    "tier": tier,
+                },
+            )
+            return Response(
+                {
+                    "success": True,
+                    "openers": opener_payload,
+                    "vault_meta": _build_vault_meta(
+                        tier=tier,
+                        archive_total=len(archive),
+                        daily_drop_date=daily_drop_date,
+                        display_count=len(opener_payload),
+                    ),
+                    **(
+                        {"generation_event_id": generation_event.pk}
+                        if generation_event is not None
+                        else {}
+                    ),
                     **_subscription_payload(chat_credit, request=request),
                 }
             )
 
-        # Guest path (no credit usage)
+        # Guest path (no credit usage): reveal first daily opener only.
+        opener_payload = []
+        for index, opener in enumerate(daily_drop):
+            opener_payload.append(
+                _build_vault_opener_payload(
+                    opener,
+                    is_locked=index > 0,
+                    blur_word_count=cfg.blur_preview_word_count,
+                )
+            )
         generation_event = _persist_mobile_generation_event(
             request=request,
             chat_credit=None,
@@ -2908,12 +3081,22 @@ def recommended_openers(request):
             model_used=MobileGenerationEvent.SourceType.RECOMMENDED_STATIC,
             thinking_used="n/a",
             usage=_empty_usage(),
-            metadata={"endpoint": "recommended_openers"},
+            metadata={
+                "endpoint": "recommended_openers",
+                "mode": _VAULT_MODE,
+                "tier": "guest",
+            },
         )
         return Response(
             {
                 "success": True,
                 "openers": opener_payload,
+                "vault_meta": _build_vault_meta(
+                    tier="guest",
+                    archive_total=len(archive),
+                    daily_drop_date=daily_drop_date,
+                    display_count=len(opener_payload),
+                ),
                 **(
                     {"generation_event_id": generation_event.pk}
                     if generation_event is not None

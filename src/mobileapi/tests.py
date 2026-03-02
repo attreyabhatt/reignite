@@ -1093,6 +1093,144 @@ class MobileAnalyticsEventTests(TestCase):
         self.assertEqual(event.total_tokens, 0)
         self.assertEqual(response.data.get("generation_event_id"), event.pk)
 
+    def test_recommended_openers_vault_guest_returns_one_open_and_two_locked(self):
+        RecommendedOpener.objects.all().delete()
+        for idx in range(1, 6):
+            RecommendedOpener.objects.create(
+                text=f"Vault opener {idx}",
+                why_it_works=f"Why {idx}",
+                is_active=True,
+                sort_order=idx,
+            )
+
+        response = self.client.post(
+            reverse("recommended_openers"),
+            {"mode": "vault"},
+            format="json",
+            REMOTE_ADDR="203.0.113.141",
+            HTTP_X_DEVICE_FINGERPRINT="vault-guest-device",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        openers = response.data.get("openers") or []
+        self.assertEqual(len(openers), 3)
+        self.assertEqual(openers[0].get("is_locked"), False)
+        self.assertEqual(openers[1].get("is_locked"), True)
+        self.assertEqual(openers[2].get("is_locked"), True)
+        self.assertTrue((openers[1].get("blur_preview") or "").strip())
+        self.assertTrue((openers[2].get("blur_preview") or "").strip())
+        self.assertIsNone(openers[1].get("message"))
+        self.assertIsNone(openers[2].get("message"))
+
+        vault_meta = response.data.get("vault_meta") or {}
+        self.assertEqual(vault_meta.get("tier"), "guest")
+        self.assertEqual(vault_meta.get("cta"), "auth_then_paywall")
+        self.assertEqual(vault_meta.get("archive_total"), 5)
+        self.assertEqual(vault_meta.get("display_count"), 3)
+
+    def test_recommended_openers_vault_free_is_stable_within_same_day(self):
+        RecommendedOpener.objects.all().delete()
+        user = User.objects.create_user(
+            username="vaultfreeuser",
+            email="vaultfree@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        for idx in range(1, 11):
+            RecommendedOpener.objects.create(
+                text=f"Daily opener {idx}",
+                why_it_works=f"Daily why {idx}",
+                is_active=True,
+                sort_order=idx,
+            )
+
+        response1 = self.client.post(
+            reverse("recommended_openers"),
+            {"mode": "vault"},
+            format="json",
+            REMOTE_ADDR="203.0.113.142",
+            HTTP_X_DEVICE_FINGERPRINT="vault-free-device",
+        )
+        response2 = self.client.post(
+            reverse("recommended_openers"),
+            {"mode": "vault"},
+            format="json",
+            REMOTE_ADDR="203.0.113.142",
+            HTTP_X_DEVICE_FINGERPRINT="vault-free-device",
+        )
+
+        self.assertEqual(response1.status_code, 200)
+        self.assertEqual(response2.status_code, 200)
+        openers1 = response1.data.get("openers") or []
+        openers2 = response2.data.get("openers") or []
+        self.assertEqual(len(openers1), 3)
+        self.assertEqual(len(openers2), 3)
+        self.assertEqual(
+            [item.get("id") for item in openers1],
+            [item.get("id") for item in openers2],
+        )
+        self.assertTrue(all(item.get("is_locked") is False for item in openers1))
+        self.assertEqual((response1.data.get("vault_meta") or {}).get("tier"), "free")
+        self.assertEqual((response1.data.get("vault_meta") or {}).get("cta"), "paywall")
+
+    def test_recommended_openers_vault_elite_returns_top_twenty_archive(self):
+        RecommendedOpener.objects.all().delete()
+        user = User.objects.create_user(
+            username="vaulteliteuser",
+            email="vaultelite@example.com",
+            password="StrongPass123!",
+        )
+        chat_credit = user.chat_credit
+        chat_credit.is_subscribed = True
+        chat_credit.subscription_expiry = timezone.now() + timedelta(days=30)
+        chat_credit.save(update_fields=["is_subscribed", "subscription_expiry"])
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        for idx in range(1, 26):
+            RecommendedOpener.objects.create(
+                text=f"Elite opener {idx}",
+                why_it_works=f"Elite why {idx}",
+                is_active=True,
+                sort_order=idx,
+            )
+
+        response = self.client.post(
+            reverse("recommended_openers"),
+            {"mode": "vault"},
+            format="json",
+            REMOTE_ADDR="203.0.113.143",
+            HTTP_X_DEVICE_FINGERPRINT="vault-elite-device",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        openers = response.data.get("openers") or []
+        self.assertEqual(len(openers), 20)
+        expected_ids = list(
+            RecommendedOpener.objects.filter(is_active=True)
+            .order_by("sort_order", "id")
+            .values_list("id", flat=True)[:20]
+        )
+        self.assertEqual([item.get("id") for item in openers], expected_ids)
+        self.assertTrue(all(item.get("is_locked") is False for item in openers))
+
+        vault_meta = response.data.get("vault_meta") or {}
+        self.assertEqual(vault_meta.get("tier"), "elite")
+        self.assertEqual(vault_meta.get("cta"), "none")
+        self.assertEqual(vault_meta.get("archive_total"), 20)
+        self.assertEqual(vault_meta.get("display_count"), 20)
+
+    def test_vault_daily_drop_helper_is_stable_and_day_sensitive(self):
+        candidates = list(range(1, 101))
+        day_a_first = views._select_vault_daily_drop(candidates, "2026-03-02", count=3)
+        day_a_second = views._select_vault_daily_drop(candidates, "2026-03-02", count=3)
+        day_b = views._select_vault_daily_drop(candidates, "2026-03-03", count=3)
+
+        self.assertEqual(day_a_first, day_a_second)
+        self.assertNotEqual(day_a_first, day_b)
+
     def test_copy_event_accepts_opener_copy_for_guest(self):
         guest_hash = views._hash_device_fingerprint("copy-device-guest")
         generation_event = MobileGenerationEvent.objects.create(
