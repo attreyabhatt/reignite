@@ -142,6 +142,9 @@ class MobileGenerationEventAdmin(admin.ModelAdmin):
         "user_or_guest",
         "model_used",
         "thinking_used",
+        "input_tokens",
+        "output_tokens",
+        "thinking_tokens",
         "total_tokens",
         "has_reply_ocr_text",
     )

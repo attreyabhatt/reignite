@@ -14,6 +14,7 @@ class MobileGenerationEvent(models.Model):
     class ActionType(models.TextChoices):
         REPLY = "reply", "Reply"
         OPENER = "opener", "Opener"
+        OCR = "ocr", "OCR"
 
     class SourceType(models.TextChoices):
         AI = "ai", "AI"

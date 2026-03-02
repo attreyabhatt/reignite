@@ -172,7 +172,8 @@ def extract_conversation_from_image_openai(
     img_bytes: bytes,
     mime: str = "image/jpeg",
     model: str = GPT_MODEL,
-) -> str:
+    return_usage: bool = False,
+) -> Union[str, Tuple[str, Dict[str, int]]]:
     """
     Extract conversation text from screenshot using GPT-4.1-mini vision.
     Fallback for when Gemini OCR fails.
@@ -229,10 +230,8 @@ Output ONLY the transcribed lines, no commentary."""
     )
 
     output = response.choices[0].message.content.strip()
+    usage_info = _build_usage_info(response)
 
-    # Log usage
-    usage = getattr(response, "usage", None)
-    if usage:
-        print(f"[DEBUG] OpenAI OCR usage | input={usage.prompt_tokens} | output={usage.completion_tokens}")
-
+    if return_usage:
+        return output, usage_info
     return output

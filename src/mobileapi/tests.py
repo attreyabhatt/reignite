@@ -998,6 +998,43 @@ class MobileAnalyticsEventTests(TestCase):
         self.assertEqual(event.reply_ocr_text, "you []: hello\nher []: hi there")
         self.assertEqual(event.metadata.get("input_source"), "ocr")
 
+    def test_extract_image_logs_ocr_event_with_usage_tokens(self):
+        with patch(
+            "mobileapi.views.extract_conversation_from_image_mobile",
+            return_value=(
+                "you []: hi\nher []: hey",
+                True,
+                {
+                    "model_used": "gemini-3-flash-preview",
+                    "thinking_used": "low",
+                    "usage": {
+                        "input_tokens": 222,
+                        "output_tokens": 40,
+                        "thinking_tokens": 18,
+                        "total_tokens": 280,
+                    },
+                    "source_type": "ai",
+                },
+            ),
+        ):
+            response = self.client.post(
+                reverse("extract_from_image_with_credits"),
+                {"screenshot": self._image("ocr-analytics.png")},
+                format="multipart",
+                REMOTE_ADDR="203.0.113.108",
+                HTTP_X_DEVICE_FINGERPRINT="analytics-ocr-usage-device",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        event = MobileGenerationEvent.objects.latest("id")
+        self.assertEqual(event.action_type, MobileGenerationEvent.ActionType.OCR)
+        self.assertEqual(event.model_used, "gemini-3-flash-preview")
+        self.assertEqual(event.input_tokens, 222)
+        self.assertEqual(event.output_tokens, 40)
+        self.assertEqual(event.thinking_tokens, 18)
+        self.assertEqual(event.total_tokens, 280)
+        self.assertEqual(response.data.get("generation_event_id"), event.pk)
+
     def test_generate_openers_logs_event_with_model_thinking_and_tokens(self):
         with patch(
             "mobileapi.views.generate_mobile_openers_from_image",

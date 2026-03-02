@@ -78,7 +78,20 @@ def _extract_usage(response: Any) -> Dict[str, int]:
     }
 
 
-def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str = "low"):
+def _empty_usage() -> Dict[str, int]:
+    return {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "thinking_tokens": 0,
+        "total_tokens": 0,
+    }
+
+
+def extract_conversation_from_image_mobile(
+    screenshot_file,
+    thinking_level: str = "low",
+    return_meta: bool = False,
+):
     """
     Extract conversation text from a screenshot using Gemini Flash with GPT-4.1-mini fallback.
 
@@ -129,6 +142,13 @@ def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str 
         print(f"[AI-ACTION] action=ocr model_used={model_used} status=success")
         if usage_info:
             print("[USAGE]", usage_info)
+        if return_meta:
+            return output, True, {
+                "model_used": model_used,
+                "thinking_used": thinking_level,
+                "usage": usage_info or _empty_usage(),
+                "source_type": "ai",
+            }
         return output
 
     except Exception as e:
@@ -152,6 +172,13 @@ def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str 
         print(f"[AI-ACTION] action=ocr model_used={model_used} status=success (original_image)")
         if usage_info:
             print("[USAGE]", usage_info)
+        if return_meta:
+            return output, True, {
+                "model_used": model_used,
+                "thinking_used": thinking_level,
+                "usage": usage_info or _empty_usage(),
+                "source_type": "ai",
+            }
         return output
 
     except Exception as e:
@@ -160,13 +187,24 @@ def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str 
     # Attempt 3: GPT-4.1-mini fallback
     try:
         print(f"[FAILSAFE] action=ocr attempt=3 model={GPT_MODEL} status=attempting")
-        output = extract_conversation_from_image_openai(img_bytes, mime)
+        output, usage_info = extract_conversation_from_image_openai(
+            img_bytes,
+            mime,
+            return_usage=True,
+        )
 
         if not any(tag in output.lower() for tag in ("you [", "her [", "system [")):
             raise ValueError("OCR output missing labeled lines")
 
         model_used = GPT_MODEL
         print(f"[AI-ACTION] action=ocr model_used={model_used} status=success")
+        if return_meta:
+            return output, True, {
+                "model_used": model_used,
+                "thinking_used": "n/a",
+                "usage": usage_info or _empty_usage(),
+                "source_type": "ai",
+            }
         return output
 
     except Exception as e:
@@ -174,8 +212,18 @@ def extract_conversation_from_image_mobile(screenshot_file, thinking_level: str 
 
     # All models failed
     print(f"[AI-ACTION] action=ocr model_used=none status=all_failed attempts=3")
-    return ("Failed to extract the conversation with timestamps. Please try uploading the screenshot again. "
-            "If it keeps happening, try a clearer, uncropped screenshot.")
+    failed_text = (
+        "Failed to extract the conversation with timestamps. Please try uploading the screenshot again. "
+        "If it keeps happening, try a clearer, uncropped screenshot."
+    )
+    if return_meta:
+        return failed_text, False, {
+            "model_used": "none",
+            "thinking_used": thinking_level,
+            "usage": _empty_usage(),
+            "source_type": "ai",
+        }
+    return failed_text
 
 
 def _run_ocr_call(prompt, img_bytes, mime, start_time, thinking_level: str = "low"):

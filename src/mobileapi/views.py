@@ -321,6 +321,35 @@ def _parse_reply_input_context(request, last_text: str = "") -> Tuple[str, str]:
     return input_source, ocr_text
 
 
+def _normalize_ocr_result(result: Any, fallback_thinking_level: str) -> Tuple[str, bool, Dict[str, Any]]:
+    if isinstance(result, tuple):
+        if len(result) == 3:
+            conversation, success, meta = result
+        elif len(result) == 2:
+            conversation, success = result
+            meta = {}
+        else:
+            conversation = result[0] if result else ""
+            success = False
+            meta = {}
+    else:
+        conversation = result
+        meta = {}
+        text = str(conversation or "").strip().lower()
+        success = bool(text) and not text.startswith("failed to extract")
+
+    if not isinstance(meta, dict):
+        meta = {}
+
+    normalized = {
+        "model_used": str(meta.get("model_used") or "unknown"),
+        "thinking_used": str(meta.get("thinking_used") or fallback_thinking_level or "n/a"),
+        "source_type": str(meta.get("source_type") or MobileGenerationEvent.SourceType.AI),
+        "usage": _normalize_usage_payload(meta.get("usage")),
+    }
+    return str(conversation or ""), bool(success), normalized
+
+
 def _sanitize_attribution_value(raw_value: Any, *, max_len: int = 160, lowercase: bool = True) -> str:
     value = str(raw_value or "").strip()
     if lowercase:
@@ -1981,10 +2010,28 @@ def extract_from_image_with_credits(request):
                         )
                 # For non-subscribers, OCR is free (do not check or deduct credits)
 
-                conversation = extract_conversation_from_image_mobile(
+                ocr_result = extract_conversation_from_image_mobile(
                     screenshot,
                     thinking_level=cfg.ocr_thinking,
+                    return_meta=True,
                 )
+                conversation, ocr_success, ocr_meta = _normalize_ocr_result(
+                    ocr_result,
+                    cfg.ocr_thinking,
+                )
+                generation_event = None
+                if ocr_success:
+                    generation_event = _persist_mobile_generation_event(
+                        request=request,
+                        chat_credit=chat_credit,
+                        action_type=MobileGenerationEvent.ActionType.OCR,
+                        source_type=ocr_meta["source_type"],
+                        generated_payload=conversation,
+                        model_used=ocr_meta["model_used"],
+                        thinking_used=ocr_meta["thinking_used"],
+                        usage=ocr_meta["usage"],
+                        metadata={"endpoint": "extract_from_image_with_credits"},
+                    )
                 if is_sub_active and conversation and not conversation.lower().startswith("failed to extract"):
                     consumed, _ = _consume_subscriber_allowance(chat_credit)
                     if not consumed:
@@ -1993,30 +2040,81 @@ def extract_from_image_with_credits(request):
                 return Response({
                     "conversation": conversation,
                     "credits_remaining": chat_credit.balance,
+                    **(
+                        {"generation_event_id": generation_event.pk}
+                        if generation_event is not None
+                        else {}
+                    ),
                     **_subscription_payload(chat_credit, request=request),
                 })
 
             except ChatCredit.DoesNotExist:
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=9)  # legacy field retained
-                conversation = extract_conversation_from_image_mobile(
+                ocr_result = extract_conversation_from_image_mobile(
                     screenshot,
                     thinking_level=cfg.ocr_thinking,
+                    return_meta=True,
                 )
+                conversation, ocr_success, ocr_meta = _normalize_ocr_result(
+                    ocr_result,
+                    cfg.ocr_thinking,
+                )
+                generation_event = None
+                if ocr_success:
+                    generation_event = _persist_mobile_generation_event(
+                        request=request,
+                        chat_credit=chat_credit,
+                        action_type=MobileGenerationEvent.ActionType.OCR,
+                        source_type=ocr_meta["source_type"],
+                        generated_payload=conversation,
+                        model_used=ocr_meta["model_used"],
+                        thinking_used=ocr_meta["thinking_used"],
+                        usage=ocr_meta["usage"],
+                        metadata={"endpoint": "extract_from_image_with_credits"},
+                    )
                 
                 return Response({
                     "conversation": conversation or "Failed to extract conversation.",
                     "credits_remaining": chat_credit.balance,
+                    **(
+                        {"generation_event_id": generation_event.pk}
+                        if generation_event is not None
+                        else {}
+                    ),
                     **_subscription_payload(chat_credit, request=request),
                 })
         else:
             # Guests: OCR is free and does not consume trial credits
-            conversation = extract_conversation_from_image_mobile(
+            ocr_result = extract_conversation_from_image_mobile(
                 screenshot,
                 thinking_level=cfg.ocr_thinking,
+                return_meta=True,
             )
+            conversation, ocr_success, ocr_meta = _normalize_ocr_result(
+                ocr_result,
+                cfg.ocr_thinking,
+            )
+            generation_event = None
+            if ocr_success:
+                generation_event = _persist_mobile_generation_event(
+                    request=request,
+                    chat_credit=None,
+                    action_type=MobileGenerationEvent.ActionType.OCR,
+                    source_type=ocr_meta["source_type"],
+                    generated_payload=conversation,
+                    model_used=ocr_meta["model_used"],
+                    thinking_used=ocr_meta["thinking_used"],
+                    usage=ocr_meta["usage"],
+                    metadata={"endpoint": "extract_from_image_with_credits"},
+                )
             return Response({
                 "conversation": conversation or "Failed to extract conversation.",
                 "is_trial": True,
+                **(
+                    {"generation_event_id": generation_event.pk}
+                    if generation_event is not None
+                    else {}
+                ),
             })
             
     except Exception as e:
