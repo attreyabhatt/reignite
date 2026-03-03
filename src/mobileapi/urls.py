@@ -34,4 +34,13 @@ urlpatterns = [
     path("community/posts/<int:post_id>/comments/", community_views.community_post_comment, name="community_post_comment"),
     path("community/comments/<int:comment_id>/delete/", community_views.community_comment_delete, name="community_comment_delete"),
     path("community/comments/<int:comment_id>/like/", community_views.community_comment_like, name="community_comment_like"),
+
+    # Report / Block
+    path("community/posts/<int:post_id>/report/", community_views.report_post, name="community_report_post"),
+    path("community/comments/<int:comment_id>/report/", community_views.report_comment, name="community_report_comment"),
+    path("community/users/<int:user_id>/block/", community_views.toggle_block_user, name="community_block_user"),
+    path("community/blocked-users/", community_views.blocked_users_list, name="community_blocked_users"),
+
+    # Poll
+    path("community/posts/<int:post_id>/poll/vote/", community_views.community_poll_vote, name="community_poll_vote"),
 ]

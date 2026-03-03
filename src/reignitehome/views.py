@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 from urllib.parse import urlencode, urlparse
 
@@ -41,6 +42,40 @@ WHAT_ALLOWED = {
 PLAY_STORE_BASE_URL = "https://play.google.com/store/apps/details"
 PLAY_STORE_APP_ID = "com.tryagaintext.flirtfix"
 FLIRTFIX_ROUTE_KEY = "flirtfix"
+BOT_UA_SUBSTRINGS = (
+    "googlebot",
+    "bingbot",
+    "duckduckbot",
+    "yandexbot",
+    "baiduspider",
+    "applebot",
+    "facebookexternalhit",
+    "facebot",
+    "linkedinbot",
+    "twitterbot",
+    "slackbot",
+    "discordbot",
+    "telegrambot",
+    "pinterestbot",
+    "redditbot",
+    "crawler",
+    "spider",
+    "bot/",
+    "bot ",
+    "slurp",
+    "ahrefsbot",
+    "semrushbot",
+    "mj12bot",
+    "dotbot",
+    "bytespider",
+    "curl/",
+    "wget/",
+    "python-requests",
+    "okhttp",
+    "go-http-client",
+)
+
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_utm_value(raw_value, default="", max_len=160):
@@ -48,6 +83,18 @@ def _sanitize_utm_value(raw_value, default="", max_len=160):
     if not value:
         value = default
     return value[:max_len]
+
+
+def _is_bot_like_request(request):
+    method = (request.method or "").upper()
+    if method in {"HEAD", "OPTIONS"}:
+        return True
+
+    user_agent = (request.META.get("HTTP_USER_AGENT") or "").strip().lower()
+    if not user_agent:
+        return True
+
+    return any(signature in user_agent for signature in BOT_UA_SUBSTRINGS)
 
 
 def _extract_referrer_host(request):
@@ -105,11 +152,27 @@ def flirtfix_redirect(request):
     }
     click_id = uuid.uuid4()
     target_url = _build_play_store_redirect_url(utm_data, click_id)
+    method = (request.method or "").upper()
+    user_agent = (request.META.get("HTTP_USER_AGENT") or "").strip()
+    user_agent_preview = user_agent[:120]
 
-    should_persist_click = any(
+    has_campaign_context = any(
         utm_data[key] != "unknown" for key in ("utm_source", "utm_medium", "utm_campaign")
     )
-    if should_persist_click:
+    is_bot_like = _is_bot_like_request(request)
+    if not has_campaign_context:
+        logger.info(
+            "Skipping marketing click persist reason=unknown_utm_triplet method=%s ua=%s",
+            method,
+            user_agent_preview,
+        )
+    elif is_bot_like:
+        logger.info(
+            "Skipping marketing click persist reason=bot_like_request method=%s ua=%s",
+            method,
+            user_agent_preview,
+        )
+    else:
         raw_query = {key: request.GET.getlist(key) for key in request.GET.keys()}
         MarketingClickEvent.objects.create(
             route_key=FLIRTFIX_ROUTE_KEY,
@@ -121,7 +184,7 @@ def flirtfix_redirect(request):
             utm_term=utm_data["utm_term"],
             referrer_host=_extract_referrer_host(request),
             ip_hash=_hash_ip_address(get_client_ip(request)),
-            user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+            user_agent=user_agent[:255],
             target_url=target_url,
             raw_query=raw_query,
         )

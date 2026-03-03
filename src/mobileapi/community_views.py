@@ -19,9 +19,13 @@ from rest_framework.response import Response
 
 from community.models import (
     CommentLike,
+    ContentReport,
     CommunityComment,
     CommunityPost,
+    PollVote,
+    PostPoll,
     PostVote,
+    UserBlock,
 )
 from conversation.models import ChatCredit
 
@@ -61,14 +65,15 @@ def _is_pro(user):
 def _author_payload(user):
     """Serialise the post/comment author into a dict."""
     if user is None:
-        return {'username': '[deleted]', 'is_pro': False}
+        return {'id': None, 'username': '[deleted]', 'is_pro': False}
     return {
+        'id': user.pk,
         'username': user.username,
         'is_pro': _is_pro(user),
     }
 
 
-def _post_payload(post, user_vote=None, now=None):
+def _post_payload(post, user_vote=None, now=None, request_user=None):
     """Serialise a CommunityPost.
 
     `post` must have been annotated with `upvotes`, `downvotes`,
@@ -83,6 +88,37 @@ def _post_payload(post, user_vote=None, now=None):
     body_text = post.body or ''
     hours_old = max(0, (now - post.created_at).total_seconds() / 3600)
 
+    # If anonymous and the requester is not the author, hide identity
+    is_anon = getattr(post, 'is_anonymous', False)
+    is_own_post = (
+        request_user is not None
+        and request_user.is_authenticated
+        and post.author_id == request_user.pk
+    )
+    if is_anon and not is_own_post:
+        author = {'id': None, 'username': 'Anonymous', 'is_pro': False}
+    else:
+        author = _author_payload(post.author)
+
+    # Poll data
+    poll_data = None
+    try:
+        poll = post.poll
+        send_it = poll.votes.filter(choice='send_it').count()
+        dont_send_it = poll.votes.filter(choice='dont_send_it').count()
+        user_poll_vote = None
+        if request_user and request_user.is_authenticated:
+            pv = poll.votes.filter(user=request_user).first()
+            if pv:
+                user_poll_vote = pv.choice
+        poll_data = {
+            'send_it_count': send_it,
+            'dont_send_it_count': dont_send_it,
+            'user_vote': user_poll_vote,
+        }
+    except PostPoll.DoesNotExist:
+        pass
+
     return {
         'id': post.id,
         'title': post.title or '',
@@ -90,16 +126,18 @@ def _post_payload(post, user_vote=None, now=None):
             body_text[:200] + '...' if len(body_text) > 200 else body_text
         ),
         'category': post.category,
-        'author': _author_payload(post.author),
+        'author': author,
         'vote_score': vote_score,
         'comment_count': getattr(post, 'comment_count', 0) or 0,
         'image_url': post.image_url or None,
         'is_featured': post.is_featured,
+        'is_anonymous': is_anon,
         'is_trending': (
             hours_old <= TRENDING_HOURS and vote_score >= TRENDING_SCORE_THRESHOLD
         ),
         'is_new': hours_old <= NEW_HOURS,
         'user_vote': user_vote,
+        'poll': poll_data,
         'created_at': post.created_at.isoformat(),
     }
 
@@ -177,6 +215,13 @@ def _list_posts(request):
     qs = CommunityPost.objects.filter(is_deleted=False)
     if category:
         qs = qs.filter(category=category)
+    # Exclude posts from blocked users
+    if request.user.is_authenticated:
+        blocked_ids = set(
+            UserBlock.objects.filter(blocker=request.user).values_list('blocked_user_id', flat=True)
+        )
+        if blocked_ids:
+            qs = qs.exclude(author_id__in=blocked_ids)
     qs = _annotated_posts_qs(qs)
 
     now = datetime.now(tz=timezone.utc)
@@ -197,7 +242,7 @@ def _list_posts(request):
         }
 
     return Response({
-        'posts': [_post_payload(p, user_votes.get(p.id), now) for p in page_posts],
+        'posts': [_post_payload(p, user_votes.get(p.id), now, request_user=request.user) for p in page_posts],
         'page': page,
         'has_more': len(sorted_posts) > start + PAGE_SIZE,
         'total': len(sorted_posts),
@@ -237,17 +282,25 @@ def _create_post(request):
             logger.exception('Cloudinary upload failed')
             return Response({'error': 'Image upload failed. Please try again.'}, status=500)
 
+    is_anonymous = bool(request.data.get('is_anonymous', False))
+
     post = CommunityPost.objects.create(
         author=request.user,
         title=title,
         body=body,
         category=category,
         image_url=image_url,
+        is_anonymous=is_anonymous,
     )
+
+    # Create poll if requested
+    has_poll = request.data.get('has_poll', False)
+    if has_poll and str(has_poll).lower() in ('true', '1', 'yes'):
+        PostPoll.objects.create(post=post)
 
     # Return annotated post
     annotated = _annotated_posts_qs(CommunityPost.objects.filter(pk=post.pk)).first()
-    return Response(_post_payload(annotated), status=201)
+    return Response(_post_payload(annotated, request_user=request.user), status=201)
 
 
 @api_view(['GET', 'DELETE'])
@@ -279,13 +332,19 @@ def community_post_detail(request, post_id):
             pass
 
     now = datetime.now(tz=timezone.utc)
-    payload = _post_payload(post, user_vote, now)
+    payload = _post_payload(post, user_vote, now, request_user=request.user)
     payload['body'] = post.body or ''  # include full body in detail
 
-    # Comments
+    # Comments (exclude blocked users)
+    comments_qs = CommunityComment.objects.filter(post_id=post_id, is_deleted=False)
+    if request.user.is_authenticated:
+        blocked_ids = set(
+            UserBlock.objects.filter(blocker=request.user).values_list('blocked_user_id', flat=True)
+        )
+        if blocked_ids:
+            comments_qs = comments_qs.exclude(author_id__in=blocked_ids)
     comments = list(
-        CommunityComment.objects.filter(post_id=post_id, is_deleted=False)
-        .select_related('author')
+        comments_qs.select_related('author')
         .annotate(like_count=Count('likes'))
     )
     liked_ids = set()
@@ -403,5 +462,160 @@ def community_comment_like(request, comment_id):
     return Response({
         'liked': liked,
         'like_count': comment.likes.count(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Report / Block endpoints
+# ---------------------------------------------------------------------------
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@ratelimit(key='user_or_ip', rate=_rate('COMMUNITY_RATELIMIT_COMMENT_CREATE'), block=True)
+def report_post(request, post_id):
+    """Report a community post."""
+    try:
+        post = CommunityPost.objects.get(pk=post_id, is_deleted=False)
+    except CommunityPost.DoesNotExist:
+        return Response({'error': 'Post not found.'}, status=404)
+
+    # Cannot report your own post
+    if post.author_id == request.user.pk:
+        return Response({'error': 'You cannot report your own content.'}, status=400)
+
+    reason = (request.data.get('reason') or '').strip()
+    valid_reasons = [c[0] for c in ContentReport.REASON_CHOICES]
+    if reason not in valid_reasons:
+        return Response({'error': f'reason must be one of: {", ".join(valid_reasons)}'}, status=400)
+
+    detail = (request.data.get('detail') or '').strip()
+
+    try:
+        ContentReport.objects.create(
+            reporter=request.user,
+            content_type='post',
+            object_id=post_id,
+            reason=reason,
+            detail=detail,
+        )
+    except IntegrityError:
+        return Response({'error': 'You have already reported this post.'}, status=409)
+
+    return Response({'status': 'reported'}, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@ratelimit(key='user_or_ip', rate=_rate('COMMUNITY_RATELIMIT_COMMENT_CREATE'), block=True)
+def report_comment(request, comment_id):
+    """Report a community comment."""
+    try:
+        comment = CommunityComment.objects.get(pk=comment_id, is_deleted=False)
+    except CommunityComment.DoesNotExist:
+        return Response({'error': 'Comment not found.'}, status=404)
+
+    # Cannot report your own comment
+    if comment.author_id == request.user.pk:
+        return Response({'error': 'You cannot report your own content.'}, status=400)
+
+    reason = (request.data.get('reason') or '').strip()
+    valid_reasons = [c[0] for c in ContentReport.REASON_CHOICES]
+    if reason not in valid_reasons:
+        return Response({'error': f'reason must be one of: {", ".join(valid_reasons)}'}, status=400)
+
+    detail = (request.data.get('detail') or '').strip()
+
+    try:
+        ContentReport.objects.create(
+            reporter=request.user,
+            content_type='comment',
+            object_id=comment_id,
+            reason=reason,
+            detail=detail,
+        )
+    except IntegrityError:
+        return Response({'error': 'You have already reported this comment.'}, status=409)
+
+    return Response({'status': 'reported'}, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_block_user(request, user_id):
+    """Block or unblock a user. Returns the new blocked status."""
+    from django.contrib.auth.models import User as AuthUser
+
+    # Cannot block yourself
+    if user_id == request.user.pk:
+        return Response({'error': 'You cannot block yourself.'}, status=400)
+
+    try:
+        target_user = AuthUser.objects.get(pk=user_id)
+    except AuthUser.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=404)
+
+    try:
+        UserBlock.objects.create(blocker=request.user, blocked_user=target_user)
+        blocked = True
+    except IntegrityError:
+        # Already blocked → unblock
+        UserBlock.objects.filter(blocker=request.user, blocked_user=target_user).delete()
+        blocked = False
+
+    return Response({'blocked': blocked})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def blocked_users_list(request):
+    """Return the list of user IDs blocked by the current user."""
+    blocked_ids = list(
+        UserBlock.objects.filter(blocker=request.user).values_list('blocked_user_id', flat=True)
+    )
+    return Response({'blocked_user_ids': blocked_ids})
+
+
+# ---------------------------------------------------------------------------
+# Poll endpoints
+# ---------------------------------------------------------------------------
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def community_poll_vote(request, post_id):
+    """Vote on a post's poll. Toggle: voting the same choice again removes it."""
+    choice = (request.data.get('choice') or '').strip()
+    if choice not in ('send_it', 'dont_send_it'):
+        return Response({'error': 'choice must be "send_it" or "dont_send_it".'}, status=400)
+
+    try:
+        poll = PostPoll.objects.select_related('post').get(post__pk=post_id, post__is_deleted=False)
+    except PostPoll.DoesNotExist:
+        return Response({'error': 'Poll not found.'}, status=404)
+
+    existing = PollVote.objects.filter(poll=poll, user=request.user).first()
+
+    if existing is None:
+        try:
+            PollVote.objects.create(poll=poll, user=request.user, choice=choice)
+            user_vote = choice
+        except IntegrityError:
+            existing = PollVote.objects.filter(poll=poll, user=request.user).first()
+
+    if existing is not None:
+        if existing.choice == choice:
+            existing.delete()
+            user_vote = None
+        else:
+            existing.choice = choice
+            existing.save(update_fields=['choice'])
+            user_vote = choice
+
+    send_it = poll.votes.filter(choice='send_it').count()
+    dont_send_it = poll.votes.filter(choice='dont_send_it').count()
+
+    return Response({
+        'send_it_count': send_it,
+        'dont_send_it_count': dont_send_it,
+        'user_vote': user_vote,
     })
 

@@ -3,7 +3,7 @@ from django.db.models import Count, Q
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import CommunityComment, CommunityPost, CommentLike, PostVote
+from .models import CommunityComment, CommunityPost, CommentLike, ContentReport, PollVote, PostPoll, PostVote, UserBlock
 
 
 def _user_admin_link(user):
@@ -213,3 +213,78 @@ class CommentLikeAdmin(admin.ModelAdmin):
         body_preview = obj.comment.body[:50]
         return format_html('<a href="{}">{}</a>', url, body_preview)
     comment_link.short_description = 'Comment'
+
+
+@admin.register(ContentReport)
+class ContentReportAdmin(admin.ModelAdmin):
+    list_display = ('reporter_link', 'content_type', 'object_id', 'reason', 'detail_preview', 'created_at')
+    list_filter = ('content_type', 'reason', 'created_at')
+    search_fields = ('reporter__username', 'detail')
+    readonly_fields = ('created_at',)
+    autocomplete_fields = ('reporter',)
+    list_select_related = ('reporter',)
+    list_per_page = 50
+
+    def reporter_link(self, obj):
+        return _user_admin_link(obj.reporter)
+    reporter_link.short_description = 'Reporter'
+    reporter_link.admin_order_field = 'reporter__username'
+
+    def detail_preview(self, obj):
+        return obj.detail[:80] + '...' if len(obj.detail) > 80 else obj.detail
+    detail_preview.short_description = 'Detail'
+
+
+@admin.register(UserBlock)
+class UserBlockAdmin(admin.ModelAdmin):
+    list_display = ('blocker_link', 'blocked_user_link', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('blocker__username', 'blocked_user__username')
+    readonly_fields = ('created_at',)
+    autocomplete_fields = ('blocker', 'blocked_user')
+    list_select_related = ('blocker', 'blocked_user')
+    list_per_page = 50
+
+    def blocker_link(self, obj):
+        return _user_admin_link(obj.blocker)
+    blocker_link.short_description = 'Blocker'
+    blocker_link.admin_order_field = 'blocker__username'
+
+    def blocked_user_link(self, obj):
+        return _user_admin_link(obj.blocked_user)
+    blocked_user_link.short_description = 'Blocked User'
+    blocked_user_link.admin_order_field = 'blocked_user__username'
+
+
+class PollVoteInline(admin.TabularInline):
+    model = PollVote
+    extra = 0
+    fields = ('user', 'choice', 'created_at')
+    readonly_fields = ('created_at',)
+    autocomplete_fields = ('user',)
+    ordering = ('-created_at',)
+
+
+@admin.register(PostPoll)
+class PostPollAdmin(admin.ModelAdmin):
+    list_display = ('post_link', 'send_it_count', 'dont_send_it_count', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('post__title',)
+    readonly_fields = ('created_at',)
+    autocomplete_fields = ('post',)
+    list_select_related = ('post',)
+    inlines = [PollVoteInline]
+    list_per_page = 50
+
+    def post_link(self, obj):
+        url = reverse('admin:community_communitypost_change', args=[obj.post_id])
+        return format_html('<a href="{}">{}</a>', url, obj.post.title[:50])
+    post_link.short_description = 'Post'
+
+    def send_it_count(self, obj):
+        return obj.votes.filter(choice='send_it').count()
+    send_it_count.short_description = 'Send It'
+
+    def dont_send_it_count(self, obj):
+        return obj.votes.filter(choice='dont_send_it').count()
+    dont_send_it_count.short_description = "Don't Send It"

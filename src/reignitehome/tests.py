@@ -78,3 +78,58 @@ class FlirtfixRedirectTests(TestCase):
     def test_flirtfix_extra_path_is_not_matched(self):
         response = self.client.get("/flirtfix/extra")
         self.assertEqual(response.status_code, 404)
+
+    def test_flirtfix_redirect_skips_googlebot_user_agent(self):
+        response = self.client.get(
+            "/flirtfix",
+            {
+                "utm_source": "instagram",
+                "utm_medium": "bio",
+                "utm_campaign": "launch_campaign",
+            },
+            HTTP_USER_AGENT=(
+                "Mozilla/5.0 (compatible; Googlebot/2.1; "
+                "+http://www.google.com/bot.html)"
+            ),
+        )
+        self._assert_valid_play_redirect(response)
+        self.assertEqual(MarketingClickEvent.objects.count(), 0)
+
+    def test_flirtfix_redirect_skips_social_preview_crawler(self):
+        response = self.client.get(
+            "/flirtfix",
+            {
+                "utm_source": "instagram",
+                "utm_medium": "bio",
+                "utm_campaign": "launch_campaign",
+            },
+            HTTP_USER_AGENT="facebookexternalhit/1.1",
+        )
+        self._assert_valid_play_redirect(response)
+        self.assertEqual(MarketingClickEvent.objects.count(), 0)
+
+    def test_flirtfix_redirect_skips_when_user_agent_missing(self):
+        response = self.client.get(
+            "/flirtfix",
+            {
+                "utm_source": "instagram",
+                "utm_medium": "bio",
+                "utm_campaign": "launch_campaign",
+            },
+            HTTP_USER_AGENT="",
+        )
+        self._assert_valid_play_redirect(response)
+        self.assertEqual(MarketingClickEvent.objects.count(), 0)
+
+    def test_flirtfix_head_request_is_not_counted(self):
+        response = self.client.head(
+            "/flirtfix",
+            {
+                "utm_source": "instagram",
+                "utm_medium": "bio",
+                "utm_campaign": "launch_campaign",
+            },
+            HTTP_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        )
+        self._assert_valid_play_redirect(response)
+        self.assertEqual(MarketingClickEvent.objects.count(), 0)
