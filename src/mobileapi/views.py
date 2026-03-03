@@ -53,7 +53,6 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 _VAULT_MODE = "vault"
-_VAULT_ARCHIVE_LIMIT = 20
 _VAULT_DAILY_DROP_COUNT = 3
 
 def _log_ai_action(action_type: str, model: str, is_subscribed: bool, is_signed_up: bool, username: str = None):
@@ -970,7 +969,7 @@ def _select_recommended_openers(count):
     return random.sample(qs, count)
 
 
-def _select_vault_archive_openers(limit=_VAULT_ARCHIVE_LIMIT):
+def _select_vault_archive_openers(limit=None):
     qs = list(
         RecommendedOpener.objects.filter(is_active=True).order_by("sort_order", "id")
     )
@@ -3001,7 +3000,7 @@ def recommended_openers(request):
             )
 
         cfg = _get_config()
-        archive = _select_vault_archive_openers(limit=_VAULT_ARCHIVE_LIMIT)
+        archive = _select_vault_archive_openers(limit=None)
         if not archive:
             return Response(
                 {"success": False, "error": "no_openers", "message": "No openers available"},
@@ -3014,19 +3013,21 @@ def recommended_openers(request):
             day_key=daily_drop_date,
             count=_VAULT_DAILY_DROP_COUNT,
         )
+        daily_drop_ids = {opener.id for opener in daily_drop}
+        guest_unlocked_ids = {daily_drop[0].id} if daily_drop else set()
 
         if request.user.is_authenticated:
             chat_credit = ChatCredit.objects.get(user=request.user)
             is_elite = _is_subscription_active(chat_credit)
             tier = "elite" if is_elite else "free"
-            selected_openers = archive if is_elite else daily_drop
+            unlocked_ids = {opener.id for opener in archive} if is_elite else daily_drop_ids
             opener_payload = [
                 _build_vault_opener_payload(
                     opener,
-                    is_locked=False,
+                    is_locked=opener.id not in unlocked_ids,
                     blur_word_count=cfg.blur_preview_word_count,
                 )
-                for opener in selected_openers
+                for opener in archive
             ]
             generation_event = _persist_mobile_generation_event(
                 request=request,
@@ -3062,16 +3063,15 @@ def recommended_openers(request):
                 }
             )
 
-        # Guest path (no credit usage): reveal first daily opener only.
-        opener_payload = []
-        for index, opener in enumerate(daily_drop):
-            opener_payload.append(
-                _build_vault_opener_payload(
-                    opener,
-                    is_locked=index > 0,
-                    blur_word_count=cfg.blur_preview_word_count,
-                )
+        # Guest path (no credit usage): reveal one daily opener, blur the rest.
+        opener_payload = [
+            _build_vault_opener_payload(
+                opener,
+                is_locked=opener.id not in guest_unlocked_ids,
+                blur_word_count=cfg.blur_preview_word_count,
             )
+            for opener in archive
+        ]
         generation_event = _persist_mobile_generation_event(
             request=request,
             chat_credit=None,

@@ -1093,7 +1093,7 @@ class MobileAnalyticsEventTests(TestCase):
         self.assertEqual(event.total_tokens, 0)
         self.assertEqual(response.data.get("generation_event_id"), event.pk)
 
-    def test_recommended_openers_vault_guest_returns_one_open_and_two_locked(self):
+    def test_recommended_openers_vault_guest_returns_full_archive_with_one_opened(self):
         RecommendedOpener.objects.all().delete()
         for idx in range(1, 6):
             RecommendedOpener.objects.create(
@@ -1113,20 +1113,22 @@ class MobileAnalyticsEventTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         openers = response.data.get("openers") or []
-        self.assertEqual(len(openers), 3)
-        self.assertEqual(openers[0].get("is_locked"), False)
-        self.assertEqual(openers[1].get("is_locked"), True)
-        self.assertEqual(openers[2].get("is_locked"), True)
-        self.assertTrue((openers[1].get("blur_preview") or "").strip())
-        self.assertTrue((openers[2].get("blur_preview") or "").strip())
-        self.assertIsNone(openers[1].get("message"))
-        self.assertIsNone(openers[2].get("message"))
+        self.assertEqual(len(openers), 5)
+        unlocked = [item for item in openers if item.get("is_locked") is False]
+        locked = [item for item in openers if item.get("is_locked") is True]
+        self.assertEqual(len(unlocked), 1)
+        self.assertEqual(len(locked), 4)
+        self.assertTrue((unlocked[0].get("message") or "").strip())
+        self.assertIsNone(unlocked[0].get("blur_preview"))
+        for item in locked:
+            self.assertIsNone(item.get("message"))
+            self.assertTrue((item.get("blur_preview") or "").strip())
 
         vault_meta = response.data.get("vault_meta") or {}
         self.assertEqual(vault_meta.get("tier"), "guest")
         self.assertEqual(vault_meta.get("cta"), "auth_then_paywall")
         self.assertEqual(vault_meta.get("archive_total"), 5)
-        self.assertEqual(vault_meta.get("display_count"), 3)
+        self.assertEqual(vault_meta.get("display_count"), 5)
 
     def test_recommended_openers_vault_free_is_stable_within_same_day(self):
         RecommendedOpener.objects.all().delete()
@@ -1165,17 +1167,20 @@ class MobileAnalyticsEventTests(TestCase):
         self.assertEqual(response2.status_code, 200)
         openers1 = response1.data.get("openers") or []
         openers2 = response2.data.get("openers") or []
-        self.assertEqual(len(openers1), 3)
-        self.assertEqual(len(openers2), 3)
+        self.assertEqual(len(openers1), 10)
+        self.assertEqual(len(openers2), 10)
         self.assertEqual(
             [item.get("id") for item in openers1],
             [item.get("id") for item in openers2],
         )
-        self.assertTrue(all(item.get("is_locked") is False for item in openers1))
+        unlocked1 = [item.get("id") for item in openers1 if item.get("is_locked") is False]
+        unlocked2 = [item.get("id") for item in openers2 if item.get("is_locked") is False]
+        self.assertEqual(len(unlocked1), 3)
+        self.assertEqual(unlocked1, unlocked2)
         self.assertEqual((response1.data.get("vault_meta") or {}).get("tier"), "free")
         self.assertEqual((response1.data.get("vault_meta") or {}).get("cta"), "paywall")
 
-    def test_recommended_openers_vault_elite_returns_top_twenty_archive(self):
+    def test_recommended_openers_vault_elite_returns_full_archive(self):
         RecommendedOpener.objects.all().delete()
         user = User.objects.create_user(
             username="vaulteliteuser",
@@ -1207,11 +1212,11 @@ class MobileAnalyticsEventTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         openers = response.data.get("openers") or []
-        self.assertEqual(len(openers), 20)
+        self.assertEqual(len(openers), 25)
         expected_ids = list(
             RecommendedOpener.objects.filter(is_active=True)
             .order_by("sort_order", "id")
-            .values_list("id", flat=True)[:20]
+            .values_list("id", flat=True)
         )
         self.assertEqual([item.get("id") for item in openers], expected_ids)
         self.assertTrue(all(item.get("is_locked") is False for item in openers))
@@ -1219,8 +1224,8 @@ class MobileAnalyticsEventTests(TestCase):
         vault_meta = response.data.get("vault_meta") or {}
         self.assertEqual(vault_meta.get("tier"), "elite")
         self.assertEqual(vault_meta.get("cta"), "none")
-        self.assertEqual(vault_meta.get("archive_total"), 20)
-        self.assertEqual(vault_meta.get("display_count"), 20)
+        self.assertEqual(vault_meta.get("archive_total"), 25)
+        self.assertEqual(vault_meta.get("display_count"), 25)
 
     def test_vault_daily_drop_helper_is_stable_and_day_sensitive(self):
         candidates = list(range(1, 101))
