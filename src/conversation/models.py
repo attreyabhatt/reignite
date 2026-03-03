@@ -51,6 +51,12 @@ class RecommendedOpener(models.Model):
     image = models.ImageField(upload_to='recommended_openers/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
+    vault_unblurred_priority = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="Optional admin priority for unlocked vault openers (1 = highest).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

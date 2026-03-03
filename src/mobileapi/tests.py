@@ -1118,6 +1118,8 @@ class MobileAnalyticsEventTests(TestCase):
         locked = [item for item in openers if item.get("is_locked") is True]
         self.assertEqual(len(unlocked), 1)
         self.assertEqual(len(locked), 4)
+        self.assertEqual(openers[0].get("is_locked"), False)
+        self.assertEqual(openers[0].get("id"), unlocked[0].get("id"))
         self.assertTrue((unlocked[0].get("message") or "").strip())
         self.assertIsNone(unlocked[0].get("blur_preview"))
         for item in locked:
@@ -1177,8 +1179,88 @@ class MobileAnalyticsEventTests(TestCase):
         unlocked2 = [item.get("id") for item in openers2 if item.get("is_locked") is False]
         self.assertEqual(len(unlocked1), 3)
         self.assertEqual(unlocked1, unlocked2)
+        self.assertTrue(all(item.get("is_locked") is False for item in openers1[:3]))
+        self.assertTrue(all(item.get("is_locked") is True for item in openers1[3:]))
         self.assertEqual((response1.data.get("vault_meta") or {}).get("tier"), "free")
         self.assertEqual((response1.data.get("vault_meta") or {}).get("cta"), "paywall")
+
+    def test_recommended_openers_vault_free_admin_priority_controls_unlocked_order(self):
+        RecommendedOpener.objects.all().delete()
+        user = User.objects.create_user(
+            username="vaultfreepriorityuser",
+            email="vaultfreepriority@example.com",
+            password="StrongPass123!",
+        )
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        openers = []
+        for idx in range(1, 7):
+            opener = RecommendedOpener.objects.create(
+                text=f"Priority opener {idx}",
+                why_it_works=f"Priority why {idx}",
+                is_active=True,
+                sort_order=idx,
+            )
+            openers.append(opener)
+
+        openers[1].vault_unblurred_priority = 1
+        openers[4].vault_unblurred_priority = 2
+        openers[5].vault_unblurred_priority = 3
+        RecommendedOpener.objects.bulk_update(
+            [openers[1], openers[4], openers[5]],
+            ["vault_unblurred_priority"],
+        )
+
+        response = self.client.post(
+            reverse("recommended_openers"),
+            {"mode": "vault"},
+            format="json",
+            REMOTE_ADDR="203.0.113.152",
+            HTTP_X_DEVICE_FINGERPRINT="vault-free-priority-device",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.data.get("openers") or []
+        self.assertEqual(len(payload), 6)
+        expected_top_ids = [openers[1].id, openers[4].id, openers[5].id]
+        self.assertEqual([item.get("id") for item in payload[:3]], expected_top_ids)
+        self.assertTrue(all(item.get("is_locked") is False for item in payload[:3]))
+        self.assertTrue(all(item.get("is_locked") is True for item in payload[3:]))
+
+    def test_recommended_openers_vault_guest_uses_first_admin_priority_opener(self):
+        RecommendedOpener.objects.all().delete()
+        openers = []
+        for idx in range(1, 6):
+            opener = RecommendedOpener.objects.create(
+                text=f"Guest priority opener {idx}",
+                why_it_works=f"Guest priority why {idx}",
+                is_active=True,
+                sort_order=idx,
+            )
+            openers.append(opener)
+
+        openers[2].vault_unblurred_priority = 1
+        openers[4].vault_unblurred_priority = 2
+        RecommendedOpener.objects.bulk_update(
+            [openers[2], openers[4]],
+            ["vault_unblurred_priority"],
+        )
+
+        response = self.client.post(
+            reverse("recommended_openers"),
+            {"mode": "vault"},
+            format="json",
+            REMOTE_ADDR="203.0.113.153",
+            HTTP_X_DEVICE_FINGERPRINT="vault-guest-priority-device",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.data.get("openers") or []
+        self.assertEqual(len(payload), 5)
+        self.assertEqual(payload[0].get("id"), openers[2].id)
+        self.assertEqual(payload[0].get("is_locked"), False)
+        self.assertTrue(all(item.get("is_locked") is True for item in payload[1:]))
 
     def test_recommended_openers_vault_elite_returns_full_archive(self):
         RecommendedOpener.objects.all().delete()

@@ -85,7 +85,14 @@ class MobileDeviceDailyUsageAdmin(admin.ModelAdmin):
 
 @admin.register(MobileRecommendedOpener)
 class MobileRecommendedOpenerAdmin(admin.ModelAdmin):
-    list_display = ("text", "is_active", "sort_order", "updated_at")
+    list_display = (
+        "text",
+        "is_active",
+        "sort_order",
+        "vault_unblurred_priority",
+        "updated_at",
+    )
+    list_editable = ("is_active", "sort_order", "vault_unblurred_priority")
     list_filter = ("is_active",)
     search_fields = ("text", "why_it_works")
     ordering = ("sort_order", "id")

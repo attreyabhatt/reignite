@@ -993,6 +993,63 @@ def _select_vault_daily_drop(openers, day_key, count=_VAULT_DAILY_DROP_COUNT):
     return [openers[i] for i in picked_indices]
 
 
+def _select_vault_admin_unlocked(openers, count=_VAULT_DAILY_DROP_COUNT):
+    prioritized = [
+        opener
+        for opener in openers
+        if opener.vault_unblurred_priority is not None
+    ]
+    prioritized.sort(
+        key=lambda opener: (
+            opener.vault_unblurred_priority,
+            opener.sort_order,
+            opener.id,
+        )
+    )
+    if count is None or count <= 0:
+        return prioritized
+    return prioritized[:count]
+
+
+def _select_vault_unlocked_openers(archive, daily_drop, count=_VAULT_DAILY_DROP_COUNT):
+    if not archive or count is None or count <= 0:
+        return []
+
+    selected = []
+    seen_ids = set()
+
+    def _append(opener):
+        if opener.id in seen_ids:
+            return
+        seen_ids.add(opener.id)
+        selected.append(opener)
+
+    for opener in _select_vault_admin_unlocked(archive, count=count):
+        if len(selected) >= count:
+            break
+        _append(opener)
+
+    for opener in daily_drop:
+        if len(selected) >= count:
+            break
+        _append(opener)
+
+    for opener in archive:
+        if len(selected) >= count:
+            break
+        _append(opener)
+
+    return selected
+
+
+def _order_vault_openers_for_display(archive, unlocked_openers):
+    if not unlocked_openers:
+        return list(archive)
+    unlocked_ids = {opener.id for opener in unlocked_openers}
+    locked_openers = [opener for opener in archive if opener.id not in unlocked_ids]
+    return list(unlocked_openers) + locked_openers
+
+
 def _build_vault_blur_preview(text, word_count):
     if not text:
         return ""
@@ -3013,21 +3070,35 @@ def recommended_openers(request):
             day_key=daily_drop_date,
             count=_VAULT_DAILY_DROP_COUNT,
         )
-        daily_drop_ids = {opener.id for opener in daily_drop}
-        guest_unlocked_ids = {daily_drop[0].id} if daily_drop else set()
+        free_unlocked_openers = _select_vault_unlocked_openers(
+            archive,
+            daily_drop,
+            count=_VAULT_DAILY_DROP_COUNT,
+        )
+        free_unlocked_ids = {opener.id for opener in free_unlocked_openers}
+        guest_unlocked_openers = free_unlocked_openers[:1]
+        guest_unlocked_ids = {opener.id for opener in guest_unlocked_openers}
 
         if request.user.is_authenticated:
             chat_credit = ChatCredit.objects.get(user=request.user)
             is_elite = _is_subscription_active(chat_credit)
             tier = "elite" if is_elite else "free"
-            unlocked_ids = {opener.id for opener in archive} if is_elite else daily_drop_ids
+            if is_elite:
+                unlocked_ids = {opener.id for opener in archive}
+                display_openers = list(archive)
+            else:
+                unlocked_ids = free_unlocked_ids
+                display_openers = _order_vault_openers_for_display(
+                    archive,
+                    free_unlocked_openers,
+                )
             opener_payload = [
                 _build_vault_opener_payload(
                     opener,
                     is_locked=opener.id not in unlocked_ids,
                     blur_word_count=cfg.blur_preview_word_count,
                 )
-                for opener in archive
+                for opener in display_openers
             ]
             generation_event = _persist_mobile_generation_event(
                 request=request,
@@ -3063,14 +3134,18 @@ def recommended_openers(request):
                 }
             )
 
-        # Guest path (no credit usage): reveal one daily opener, blur the rest.
+        # Guest path (no credit usage): reveal one opener, blur the rest.
+        display_openers = _order_vault_openers_for_display(
+            archive,
+            guest_unlocked_openers,
+        )
         opener_payload = [
             _build_vault_opener_payload(
                 opener,
                 is_locked=opener.id not in guest_unlocked_ids,
                 blur_word_count=cfg.blur_preview_word_count,
             )
-            for opener in archive
+            for opener in display_openers
         ]
         generation_event = _persist_mobile_generation_event(
             request=request,
