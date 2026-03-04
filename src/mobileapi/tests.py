@@ -1123,9 +1123,19 @@ class MobileAnalyticsEventTests(TestCase):
         self.assertEqual(openers[0].get("id"), unlocked[0].get("id"))
         self.assertTrue((unlocked[0].get("message") or "").strip())
         self.assertIsNone(unlocked[0].get("blur_preview"))
+        expected_locked_text_by_id = {
+            opener.id: opener.text
+            for opener in RecommendedOpener.objects.filter(
+                id__in=[item.get("id") for item in locked]
+            )
+        }
         for item in locked:
             self.assertIsNone(item.get("message"))
             self.assertTrue((item.get("blur_preview") or "").strip())
+            self.assertEqual(
+                (item.get("blur_preview") or "").strip(),
+                expected_locked_text_by_id.get(item.get("id"), "").strip(),
+            )
 
         vault_meta = response.data.get("vault_meta") or {}
         self.assertEqual(vault_meta.get("tier"), "guest")

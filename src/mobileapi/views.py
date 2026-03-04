@@ -883,6 +883,20 @@ def _extract_blur_preview(reply_json_str, word_count):
         return []
 
 
+def _extract_full_message_preview(reply_json_str):
+    """Extract full suggestion messages (untruncated) for locked opener blur previews."""
+    try:
+        suggestions = json.loads(reply_json_str)
+        previews = []
+        for item in suggestions:
+            if isinstance(item, dict) and "message" in item:
+                message = str(item["message"]).strip()
+                previews.append(message)
+        return previews
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
 def _subscription_payload(chat_credit, request=None):
     """Return subscription info payload for mobile clients."""
     cfg = _get_config()
@@ -1050,18 +1064,7 @@ def _order_vault_openers_for_display(archive, unlocked_openers):
     return list(unlocked_openers) + locked_openers
 
 
-def _build_vault_blur_preview(text, word_count):
-    if not text:
-        return ""
-    words = text.split()
-    visible_words = max(1, int(word_count or 0))
-    preview = " ".join(words[:visible_words])
-    if len(words) > visible_words:
-        preview += "..."
-    return preview
-
-
-def _build_vault_opener_payload(opener, is_locked, blur_word_count):
+def _build_vault_opener_payload(opener, is_locked):
     if is_locked:
         return {
             "id": opener.id,
@@ -1069,7 +1072,7 @@ def _build_vault_opener_payload(opener, is_locked, blur_word_count):
             "why_it_works": opener.why_it_works,
             "image_url": opener.image.url if opener.image else None,
             "is_locked": True,
-            "blur_preview": _build_vault_blur_preview(opener.text, blur_word_count),
+            "blur_preview": (opener.text or "").strip(),
         }
 
     return {
@@ -2757,7 +2760,7 @@ def generate_openers_from_profile_image(request):
                                 "reason": "daily_limit_reached",
                             },
                         )
-                        preview = _extract_blur_preview(reply, cfg.blur_preview_word_count)
+                        preview = _extract_full_message_preview(reply)
                         locked = _create_locked_reply(request.user, reply, preview, 'opener')
                         return Response({
                             "success": True,
@@ -3096,7 +3099,6 @@ def recommended_openers(request):
                 _build_vault_opener_payload(
                     opener,
                     is_locked=opener.id not in unlocked_ids,
-                    blur_word_count=cfg.blur_preview_word_count,
                 )
                 for opener in display_openers
             ]
@@ -3143,7 +3145,6 @@ def recommended_openers(request):
             _build_vault_opener_payload(
                 opener,
                 is_locked=opener.id not in guest_unlocked_ids,
-                blur_word_count=cfg.blur_preview_word_count,
             )
             for opener in display_openers
         ]
