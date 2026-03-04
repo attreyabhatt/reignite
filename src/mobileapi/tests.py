@@ -18,6 +18,7 @@ from django.utils import timezone
 from reignitehome.models import MarketingClickEvent, TrialIP as HomeTrialIP
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
+from community.models import CommunityPost, UserBlock
 
 from mobileapi import admin as mobile_admin
 from mobileapi import views
@@ -1400,6 +1401,443 @@ class MobileAnalyticsEventTests(TestCase):
             copy_event.user_type,
             MobileCopyEvent.UserType.AUTHENTICATED_NON_SUBSCRIBED,
         )
+
+
+@override_settings(
+    COMMUNITY_RATELIMIT_POST_CREATE="100/m",
+    COMMUNITY_RATELIMIT_COMMENT_CREATE="100/m",
+)
+class CommunityApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        self.author = User.objects.create_user(
+            username="communityauthor",
+            email="communityauthor@example.com",
+            password="StrongPass123!",
+        )
+        self.other_user = User.objects.create_user(
+            username="communityother",
+            email="communityother@example.com",
+            password="StrongPass123!",
+        )
+        self.reporter = User.objects.create_user(
+            username="communityreporter",
+            email="communityreporter@example.com",
+            password="StrongPass123!",
+        )
+        self.staff_user = User.objects.create_superuser(
+            username="communitystaff",
+            email="communitystaff@example.com",
+            password="StrongPass123!",
+        )
+
+        self.author_token = Token.objects.create(user=self.author)
+        self.other_token = Token.objects.create(user=self.other_user)
+        self.reporter_token = Token.objects.create(user=self.reporter)
+        self.staff_token = Token.objects.create(user=self.staff_user)
+
+    def _auth(self, token):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+    def _as_guest(self):
+        self.client.credentials()
+
+    def test_list_hides_future_scheduled_posts_for_non_staff(self):
+        now = timezone.now()
+        visible_post = CommunityPost.objects.create(
+            author=self.author,
+            title="Visible Post",
+            body="Visible body",
+            category="help_me_reply",
+            published_at=now - timedelta(hours=1),
+        )
+        future_post = CommunityPost.objects.create(
+            author=self.author,
+            title="Future Post",
+            body="Future body",
+            category="help_me_reply",
+            published_at=now + timedelta(hours=1),
+        )
+
+        self._as_guest()
+        guest_resp = self.client.get(reverse("community_post_list"))
+        self.assertEqual(guest_resp.status_code, 200)
+        guest_ids = [item["id"] for item in guest_resp.data["posts"]]
+        self.assertIn(visible_post.id, guest_ids)
+        self.assertNotIn(future_post.id, guest_ids)
+
+        self._auth(self.other_token)
+        user_resp = self.client.get(reverse("community_post_list"))
+        self.assertEqual(user_resp.status_code, 200)
+        user_ids = [item["id"] for item in user_resp.data["posts"]]
+        self.assertIn(visible_post.id, user_ids)
+        self.assertNotIn(future_post.id, user_ids)
+
+    def test_detail_hides_future_scheduled_posts_for_non_staff(self):
+        future_post = CommunityPost.objects.create(
+            author=self.author,
+            title="Future Detail Post",
+            body="Future detail body",
+            category="help_me_reply",
+            published_at=timezone.now() + timedelta(hours=1),
+        )
+
+        self._as_guest()
+        guest_resp = self.client.get(
+            reverse("community_post_detail", args=[future_post.id])
+        )
+        self.assertEqual(guest_resp.status_code, 404)
+
+        self._auth(self.other_token)
+        other_resp = self.client.get(
+            reverse("community_post_detail", args=[future_post.id])
+        )
+        self.assertEqual(other_resp.status_code, 404)
+
+        self._auth(self.author_token)
+        author_resp = self.client.get(
+            reverse("community_post_detail", args=[future_post.id])
+        )
+        self.assertEqual(author_resp.status_code, 404)
+
+    def test_staff_can_view_future_scheduled_post_detail(self):
+        future_post = CommunityPost.objects.create(
+            author=self.author,
+            title="Staff Visible Future Post",
+            body="Future body for staff",
+            category="help_me_reply",
+            published_at=timezone.now() + timedelta(hours=2),
+        )
+
+        self._auth(self.staff_token)
+        response = self.client.get(reverse("community_post_detail", args=[future_post.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], future_post.id)
+
+    def test_create_post_with_string_false_is_not_anonymous(self):
+        self._auth(self.author_token)
+        response = self.client.post(
+            reverse("community_post_list"),
+            {
+                "title": "Boolean Parse Post",
+                "body": "Check string false parsing.",
+                "category": "help_me_reply",
+                "is_anonymous": "false",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertFalse(response.data["is_anonymous"])
+        self.assertEqual(response.data["author"]["id"], self.author.id)
+
+        created = CommunityPost.objects.get(pk=response.data["id"])
+        self.assertFalse(created.is_anonymous)
+
+    def test_block_toggle_and_blocked_users_list(self):
+        blocked_post = CommunityPost.objects.create(
+            author=self.other_user,
+            title="Blocked User Post",
+            body="Should be hidden while blocked",
+            category="wins",
+            published_at=timezone.now() - timedelta(minutes=5),
+        )
+
+        self._auth(self.author_token)
+        block_resp = self.client.post(
+            reverse("community_block_user", args=[self.other_user.id]),
+            {},
+            format="json",
+        )
+        self.assertEqual(block_resp.status_code, 200)
+        self.assertEqual(block_resp.data["blocked"], True)
+        self.assertTrue(
+            UserBlock.objects.filter(
+                blocker=self.author, blocked_user=self.other_user
+            ).exists()
+        )
+
+        blocked_list_resp = self.client.get(reverse("community_blocked_users"))
+        self.assertEqual(blocked_list_resp.status_code, 200)
+        self.assertIn(self.other_user.id, blocked_list_resp.data["blocked_user_ids"])
+
+        filtered_feed = self.client.get(reverse("community_post_list"))
+        filtered_ids = [item["id"] for item in filtered_feed.data["posts"]]
+        self.assertNotIn(blocked_post.id, filtered_ids)
+
+        unblock_resp = self.client.post(
+            reverse("community_block_user", args=[self.other_user.id]),
+            {},
+            format="json",
+        )
+        self.assertEqual(unblock_resp.status_code, 200)
+        self.assertEqual(unblock_resp.data["blocked"], False)
+        self.assertFalse(
+            UserBlock.objects.filter(
+                blocker=self.author, blocked_user=self.other_user
+            ).exists()
+        )
+
+        unblocked_list_resp = self.client.get(reverse("community_blocked_users"))
+        self.assertEqual(unblocked_list_resp.status_code, 200)
+        self.assertNotIn(
+            self.other_user.id,
+            unblocked_list_resp.data["blocked_user_ids"],
+        )
+
+        unfiltered_feed = self.client.get(reverse("community_post_list"))
+        unfiltered_ids = [item["id"] for item in unfiltered_feed.data["posts"]]
+        self.assertIn(blocked_post.id, unfiltered_ids)
+
+    def test_permissions_for_community_endpoints(self):
+        post = CommunityPost.objects.create(
+            author=self.author,
+            title="Permission Post",
+            body="Permission body",
+            category="help_me_reply",
+        )
+        comment = post.comments.create(author=self.other_user, body="Permission comment")
+
+        self._as_guest()
+        create_post = self.client.post(
+            reverse("community_post_list"),
+            {
+                "title": "Guest Create",
+                "body": "Guest body",
+                "category": "wins",
+            },
+            format="json",
+        )
+        self.assertEqual(create_post.status_code, 401)
+
+        self.assertEqual(
+            self.client.post(
+                reverse("community_post_vote", args=[post.id]),
+                {"vote_type": "up"},
+                format="json",
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("community_post_comment", args=[post.id]),
+                {"body": "Guest comment"},
+                format="json",
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.delete(
+                reverse("community_comment_delete", args=[comment.id])
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("community_comment_like", args=[comment.id]),
+                {},
+                format="json",
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("community_report_post", args=[post.id]),
+                {"reason": "spam"},
+                format="json",
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("community_report_comment", args=[comment.id]),
+                {"reason": "spam"},
+                format="json",
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("community_block_user", args=[self.other_user.id]),
+                {},
+                format="json",
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.get(reverse("community_blocked_users")).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("community_poll_vote", args=[post.id]),
+                {"choice": "send_it"},
+                format="json",
+            ).status_code,
+            401,
+        )
+
+    def test_create_vote_comment_poll_report_and_delete_flow(self):
+        self._auth(self.author_token)
+        create_resp = self.client.post(
+            reverse("community_post_list"),
+            {
+                "title": "End-to-end Community Flow",
+                "body": "Main flow body",
+                "category": "rate_my_profile",
+                "has_poll": True,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, 201)
+        post_id = create_resp.data["id"]
+        self.assertIsNotNone(create_resp.data.get("poll"))
+
+        self._auth(self.other_token)
+        vote_up = self.client.post(
+            reverse("community_post_vote", args=[post_id]),
+            {"vote_type": "up"},
+            format="json",
+        )
+        self.assertEqual(vote_up.status_code, 200)
+        self.assertEqual(vote_up.data["user_vote"], "up")
+        self.assertEqual(vote_up.data["vote_score"], 1)
+
+        vote_clear = self.client.post(
+            reverse("community_post_vote", args=[post_id]),
+            {"vote_type": "up"},
+            format="json",
+        )
+        self.assertEqual(vote_clear.status_code, 200)
+        self.assertEqual(vote_clear.data["user_vote"], None)
+        self.assertEqual(vote_clear.data["vote_score"], 0)
+
+        vote_down = self.client.post(
+            reverse("community_post_vote", args=[post_id]),
+            {"vote_type": "down"},
+            format="json",
+        )
+        self.assertEqual(vote_down.status_code, 200)
+        self.assertEqual(vote_down.data["user_vote"], "down")
+        self.assertEqual(vote_down.data["vote_score"], -1)
+
+        poll_send_it = self.client.post(
+            reverse("community_poll_vote", args=[post_id]),
+            {"choice": "send_it"},
+            format="json",
+        )
+        self.assertEqual(poll_send_it.status_code, 200)
+        self.assertEqual(poll_send_it.data["send_it_count"], 1)
+        self.assertEqual(poll_send_it.data["user_vote"], "send_it")
+
+        poll_clear = self.client.post(
+            reverse("community_poll_vote", args=[post_id]),
+            {"choice": "send_it"},
+            format="json",
+        )
+        self.assertEqual(poll_clear.status_code, 200)
+        self.assertEqual(poll_clear.data["send_it_count"], 0)
+        self.assertEqual(poll_clear.data["user_vote"], None)
+
+        comment_resp = self.client.post(
+            reverse("community_post_comment", args=[post_id]),
+            {"body": "Useful feedback from another user."},
+            format="json",
+        )
+        self.assertEqual(comment_resp.status_code, 201)
+        comment_id = comment_resp.data["id"]
+
+        self._auth(self.author_token)
+        like_resp = self.client.post(
+            reverse("community_comment_like", args=[comment_id]),
+            {},
+            format="json",
+        )
+        self.assertEqual(like_resp.status_code, 200)
+        self.assertEqual(like_resp.data["liked"], True)
+        self.assertEqual(like_resp.data["like_count"], 1)
+
+        unlike_resp = self.client.post(
+            reverse("community_comment_like", args=[comment_id]),
+            {},
+            format="json",
+        )
+        self.assertEqual(unlike_resp.status_code, 200)
+        self.assertEqual(unlike_resp.data["liked"], False)
+        self.assertEqual(unlike_resp.data["like_count"], 0)
+
+        non_owner_delete = self.client.delete(
+            reverse("community_comment_delete", args=[comment_id])
+        )
+        self.assertEqual(non_owner_delete.status_code, 403)
+
+        self._auth(self.reporter_token)
+        report_post = self.client.post(
+            reverse("community_report_post", args=[post_id]),
+            {"reason": "spam", "detail": "Looks spammy"},
+            format="json",
+        )
+        self.assertEqual(report_post.status_code, 201)
+
+        report_post_duplicate = self.client.post(
+            reverse("community_report_post", args=[post_id]),
+            {"reason": "spam", "detail": "Duplicate report"},
+            format="json",
+        )
+        self.assertEqual(report_post_duplicate.status_code, 409)
+
+        report_comment = self.client.post(
+            reverse("community_report_comment", args=[comment_id]),
+            {"reason": "harassment", "detail": "Hostile language"},
+            format="json",
+        )
+        self.assertEqual(report_comment.status_code, 201)
+
+        report_comment_duplicate = self.client.post(
+            reverse("community_report_comment", args=[comment_id]),
+            {"reason": "harassment", "detail": "Duplicate comment report"},
+            format="json",
+        )
+        self.assertEqual(report_comment_duplicate.status_code, 409)
+
+        self._auth(self.author_token)
+        own_report_post = self.client.post(
+            reverse("community_report_post", args=[post_id]),
+            {"reason": "spam"},
+            format="json",
+        )
+        self.assertEqual(own_report_post.status_code, 400)
+
+        self._auth(self.other_token)
+        own_report_comment = self.client.post(
+            reverse("community_report_comment", args=[comment_id]),
+            {"reason": "spam"},
+            format="json",
+        )
+        self.assertEqual(own_report_comment.status_code, 400)
+
+        owner_delete_comment = self.client.delete(
+            reverse("community_comment_delete", args=[comment_id])
+        )
+        self.assertEqual(owner_delete_comment.status_code, 200)
+
+        delete_post_non_owner = self.client.delete(
+            reverse("community_post_detail", args=[post_id])
+        )
+        self.assertEqual(delete_post_non_owner.status_code, 403)
+
+        self._auth(self.author_token)
+        delete_post_owner = self.client.delete(
+            reverse("community_post_detail", args=[post_id])
+        )
+        self.assertEqual(delete_post_owner.status_code, 200)
+
+        self._as_guest()
+        deleted_post_detail = self.client.get(
+            reverse("community_post_detail", args=[post_id])
+        )
+        self.assertEqual(deleted_post_detail.status_code, 404)
 
 
 class MobileInstallAttributionEventTests(TestCase):

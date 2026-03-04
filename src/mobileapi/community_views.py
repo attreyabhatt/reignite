@@ -49,6 +49,14 @@ def _rate(setting_name):
     return _value
 
 
+def _parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in ('true', '1', 'yes', 'on')
+
+
 def _is_pro(user):
     """Return True if the user has an active subscription."""
     try:
@@ -223,7 +231,10 @@ def _list_posts(request):
     except (ValueError, TypeError):
         page = 1
 
+    now = datetime.now(tz=timezone.utc)
     qs = CommunityPost.objects.filter(is_deleted=False)
+    if not (request.user.is_authenticated and request.user.is_staff):
+        qs = qs.filter(published_at__lte=now)
     if category:
         qs = qs.filter(category=category)
     # Exclude posts from blocked users
@@ -235,7 +246,6 @@ def _list_posts(request):
             qs = qs.exclude(author_id__in=blocked_ids)
     qs = _annotated_posts_qs(qs)
 
-    now = datetime.now(tz=timezone.utc)
     posts = list(qs)
     sorted_posts = _sort_posts(posts, sort, now)
 
@@ -293,7 +303,7 @@ def _create_post(request):
             logger.exception('Cloudinary upload failed')
             return Response({'error': 'Image upload failed. Please try again.'}, status=500)
 
-    is_anonymous = bool(request.data.get('is_anonymous', False))
+    is_anonymous = _parse_bool(request.data.get('is_anonymous', False))
     author_display_name = ''
     published_at = None
 
@@ -334,8 +344,8 @@ def _create_post(request):
     post = CommunityPost.objects.create(**post_data)
 
     # Create poll if requested
-    has_poll = request.data.get('has_poll', False)
-    if has_poll and str(has_poll).lower() in ('true', '1', 'yes'):
+    has_poll = _parse_bool(request.data.get('has_poll', False))
+    if has_poll:
         PostPoll.objects.create(post=post)
 
     # Return annotated post
@@ -346,9 +356,13 @@ def _create_post(request):
 @api_view(['GET', 'DELETE'])
 @permission_classes([AllowAny])
 def community_post_detail(request, post_id):
-    post = _annotated_posts_qs(
-        CommunityPost.objects.filter(pk=post_id, is_deleted=False)
-    ).select_related('author').first()
+    qs = CommunityPost.objects.filter(pk=post_id, is_deleted=False)
+    if request.method == 'GET' and not (
+        request.user.is_authenticated and request.user.is_staff
+    ):
+        qs = qs.filter(published_at__lte=datetime.now(tz=timezone.utc))
+
+    post = _annotated_posts_qs(qs).select_related('author').first()
 
     if post is None:
         return Response({'error': 'Post not found.'}, status=404)
@@ -491,12 +505,15 @@ def community_comment_like(request, comment_id):
     except CommunityComment.DoesNotExist:
         return Response({'error': 'Comment not found.'}, status=404)
 
-    try:
-        CommentLike.objects.create(user=request.user, comment=comment)
+    like, created = CommentLike.objects.get_or_create(
+        user=request.user,
+        comment=comment,
+    )
+    if created:
         liked = True
-    except IntegrityError:
-        # Already liked → unlike
-        CommentLike.objects.filter(user=request.user, comment=comment).delete()
+    else:
+        # Already liked -> unlike
+        like.delete()
         liked = False
 
     return Response({
@@ -530,15 +547,16 @@ def report_post(request, post_id):
 
     detail = (request.data.get('detail') or '').strip()
 
-    try:
-        ContentReport.objects.create(
-            reporter=request.user,
-            content_type='post',
-            object_id=post_id,
-            reason=reason,
-            detail=detail,
-        )
-    except IntegrityError:
+    _, created = ContentReport.objects.get_or_create(
+        reporter=request.user,
+        content_type='post',
+        object_id=post_id,
+        defaults={
+            'reason': reason,
+            'detail': detail,
+        },
+    )
+    if not created:
         return Response({'error': 'You have already reported this post.'}, status=409)
 
     return Response({'status': 'reported'}, status=201)
@@ -565,15 +583,16 @@ def report_comment(request, comment_id):
 
     detail = (request.data.get('detail') or '').strip()
 
-    try:
-        ContentReport.objects.create(
-            reporter=request.user,
-            content_type='comment',
-            object_id=comment_id,
-            reason=reason,
-            detail=detail,
-        )
-    except IntegrityError:
+    _, created = ContentReport.objects.get_or_create(
+        reporter=request.user,
+        content_type='comment',
+        object_id=comment_id,
+        defaults={
+            'reason': reason,
+            'detail': detail,
+        },
+    )
+    if not created:
         return Response({'error': 'You have already reported this comment.'}, status=409)
 
     return Response({'status': 'reported'}, status=201)
@@ -594,12 +613,15 @@ def toggle_block_user(request, user_id):
     except AuthUser.DoesNotExist:
         return Response({'error': 'User not found.'}, status=404)
 
-    try:
-        UserBlock.objects.create(blocker=request.user, blocked_user=target_user)
+    block, created = UserBlock.objects.get_or_create(
+        blocker=request.user,
+        blocked_user=target_user,
+    )
+    if created:
         blocked = True
-    except IntegrityError:
-        # Already blocked → unblock
-        UserBlock.objects.filter(blocker=request.user, blocked_user=target_user).delete()
+    else:
+        # Already blocked -> unblock
+        block.delete()
         blocked = False
 
     return Response({'blocked': blocked})
@@ -658,3 +680,4 @@ def community_poll_vote(request, post_id):
         'dont_send_it_count': dont_send_it,
         'user_vote': user_vote,
     })
+
