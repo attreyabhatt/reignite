@@ -32,9 +32,9 @@ from conversation.models import ChatCredit
 logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 20
-# New post = created within this many hours
+# New post = published within this many hours
 NEW_HOURS = 6
-# Trending = created within 24 h and score >= threshold
+# Trending = published within 24 h and score >= threshold
 TRENDING_HOURS = 24
 TRENDING_SCORE_THRESHOLD = 5
 
@@ -73,6 +73,10 @@ def _author_payload(user):
     }
 
 
+def _post_published_at(post):
+    return getattr(post, 'published_at', post.created_at)
+
+
 def _post_payload(post, user_vote=None, now=None, request_user=None):
     """Serialise a CommunityPost.
 
@@ -86,7 +90,8 @@ def _post_payload(post, user_vote=None, now=None, request_user=None):
     downvotes = getattr(post, 'downvotes', 0) or 0
     vote_score = upvotes - downvotes
     body_text = post.body or ''
-    hours_old = max(0, (now - post.created_at).total_seconds() / 3600)
+    published_at = _post_published_at(post)
+    hours_old = max(0, (now - published_at).total_seconds() / 3600)
 
     # If anonymous and the requester is not the author, hide identity
     is_anon = getattr(post, 'is_anonymous', False)
@@ -99,6 +104,9 @@ def _post_payload(post, user_vote=None, now=None, request_user=None):
         author = {'id': None, 'username': 'Anonymous', 'is_pro': False}
     else:
         author = _author_payload(post.author)
+        custom_author_name = (getattr(post, 'author_display_name', '') or '').strip()
+        if custom_author_name:
+            author['username'] = custom_author_name
 
     # Poll data
     poll_data = None
@@ -138,7 +146,9 @@ def _post_payload(post, user_vote=None, now=None, request_user=None):
         'is_new': hours_old <= NEW_HOURS,
         'user_vote': user_vote,
         'poll': poll_data,
-        'created_at': post.created_at.isoformat(),
+        # Keep created_at for backward compatibility with clients.
+        'created_at': published_at.isoformat(),
+        'published_at': published_at.isoformat(),
     }
 
 
@@ -174,11 +184,12 @@ def _sort_posts(posts, sort, now):
     Featured posts always float to the top within each sort bucket.
     """
     def hot_score(p):
-        hours = max(0, (now - p.created_at).total_seconds() / 3600)
+        published_at = _post_published_at(p)
+        hours = max(0, (now - published_at).total_seconds() / 3600)
         return (p.upvotes - p.downvotes) / (hours + 2) ** 1.5
 
     if sort == 'new':
-        key = lambda p: p.created_at.timestamp()
+        key = lambda p: _post_published_at(p).timestamp()
     elif sort == 'top':
         key = lambda p: p.upvotes - p.downvotes
     else:  # hot (default)
@@ -283,15 +294,44 @@ def _create_post(request):
             return Response({'error': 'Image upload failed. Please try again.'}, status=500)
 
     is_anonymous = bool(request.data.get('is_anonymous', False))
+    author_display_name = ''
+    published_at = None
 
-    post = CommunityPost.objects.create(
+    # Staff can seed/schedule posts with custom display names and publish times.
+    if request.user.is_staff:
+        author_display_name = (request.data.get('author_display_name') or '').strip()
+        if len(author_display_name) > 150:
+            return Response(
+                {'error': 'author_display_name must be 150 characters or fewer.'},
+                status=400,
+            )
+
+        raw_published_at = request.data.get('published_at')
+        if raw_published_at not in (None, ''):
+            raw_published_at = str(raw_published_at).strip()
+            try:
+                published_at = datetime.fromisoformat(raw_published_at.replace('Z', '+00:00'))
+            except ValueError:
+                return Response(
+                    {'error': 'published_at must be a valid ISO-8601 datetime.'},
+                    status=400,
+                )
+            if published_at.tzinfo is None:
+                published_at = published_at.replace(tzinfo=timezone.utc)
+
+    post_data = dict(
         author=request.user,
+        author_display_name=author_display_name,
         title=title,
         body=body,
         category=category,
         image_url=image_url,
         is_anonymous=is_anonymous,
     )
+    if published_at is not None:
+        post_data['published_at'] = published_at
+
+    post = CommunityPost.objects.create(**post_data)
 
     # Create poll if requested
     has_poll = request.data.get('has_poll', False)
@@ -618,4 +658,3 @@ def community_poll_vote(request, post_id):
         'dont_send_it_count': dont_send_it,
         'user_vote': user_vote,
     })
-

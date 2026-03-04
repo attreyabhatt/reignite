@@ -45,17 +45,33 @@ class CommentLikeInline(admin.TabularInline):
 class CommunityPostAdmin(admin.ModelAdmin):
     list_display = (
         'title',
+        'effective_author_name',
         'author_link',
         'category',
         'vote_score_display',
         'comment_count_display',
         'is_featured',
         'is_deleted',
-        'created_at',
+        'published_at',
     )
-    list_filter = ('category', 'is_featured', 'is_deleted', 'created_at')
-    search_fields = ('title', 'body', 'author__username')
+    list_filter = ('category', 'is_featured', 'is_deleted', 'published_at')
+    search_fields = ('title', 'body', 'author__username', 'author_display_name')
     readonly_fields = ('created_at', 'updated_at', 'author_admin_link')
+    fields = (
+        'author',
+        'author_admin_link',
+        'author_display_name',
+        'title',
+        'body',
+        'image_url',
+        'category',
+        'is_anonymous',
+        'is_featured',
+        'is_deleted',
+        'published_at',
+        'created_at',
+        'updated_at',
+    )
     autocomplete_fields = ('author',)
     actions = [
         'mark_featured',
@@ -68,9 +84,18 @@ class CommunityPostAdmin(admin.ModelAdmin):
     list_select_related = ('author',)
     list_per_page = 50
 
+    def effective_author_name(self, obj):
+        if obj.author_display_name:
+            return obj.author_display_name
+        if obj.author:
+            return obj.author.username
+        return '[deleted]'
+    effective_author_name.short_description = 'Author Name'
+    effective_author_name.admin_order_field = 'author_display_name'
+
     def author_link(self, obj):
         return _user_admin_link(obj.author)
-    author_link.short_description = 'Author'
+    author_link.short_description = 'Linked User'
     author_link.admin_order_field = 'author__username'
 
     def author_admin_link(self, obj):

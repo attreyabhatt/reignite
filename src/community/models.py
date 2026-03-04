@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-import datetime
 
 
 class CommunityPost(models.Model):
@@ -17,6 +16,7 @@ class CommunityPost(models.Model):
         null=True,
         related_name='community_posts',
     )
+    author_display_name = models.CharField(max_length=150, blank=True, default='')
     title = models.CharField(max_length=200)
     body = models.TextField()
     image_url = models.URLField(blank=True, default='')
@@ -24,13 +24,14 @@ class CommunityPost(models.Model):
     is_anonymous = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
+    published_at = models.DateTimeField(default=timezone.now, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-published_at', '-created_at']
         indexes = [
-            models.Index(fields=['category', 'is_deleted', '-created_at']),
+            models.Index(fields=['category', 'is_deleted', '-published_at']),
             models.Index(fields=['is_featured', 'is_deleted']),
         ]
 
