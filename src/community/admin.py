@@ -217,13 +217,14 @@ class CommentLikeAdmin(admin.ModelAdmin):
 
 @admin.register(ContentReport)
 class ContentReportAdmin(admin.ModelAdmin):
-    list_display = ('reporter_link', 'content_type', 'object_id', 'reason', 'detail_preview', 'created_at')
+    list_display = ('reporter_link', 'content_type', 'reported_content_link', 'reason', 'detail_preview', 'content_status', 'created_at')
     list_filter = ('content_type', 'reason', 'created_at')
     search_fields = ('reporter__username', 'detail')
-    readonly_fields = ('created_at',)
+    readonly_fields = ('created_at', 'reported_content_preview')
     autocomplete_fields = ('reporter',)
     list_select_related = ('reporter',)
     list_per_page = 50
+    actions = ['soft_delete_reported_content', 'dismiss_reports']
 
     def reporter_link(self, obj):
         return _user_admin_link(obj.reporter)
@@ -233,6 +234,78 @@ class ContentReportAdmin(admin.ModelAdmin):
     def detail_preview(self, obj):
         return obj.detail[:80] + '...' if len(obj.detail) > 80 else obj.detail
     detail_preview.short_description = 'Detail'
+
+    def _get_reported_object(self, obj):
+        """Return the reported post or comment, or None."""
+        try:
+            if obj.content_type == 'post':
+                return CommunityPost.objects.get(pk=obj.object_id)
+            elif obj.content_type == 'comment':
+                return CommunityComment.objects.get(pk=obj.object_id)
+        except (CommunityPost.DoesNotExist, CommunityComment.DoesNotExist):
+            pass
+        return None
+
+    def reported_content_link(self, obj):
+        """Clickable link to the reported post or comment in admin."""
+        target = self._get_reported_object(obj)
+        if target is None:
+            return format_html('<em>deleted</em>')
+        if obj.content_type == 'post':
+            url = reverse('admin:community_communitypost_change', args=[target.pk])
+            label = target.title[:50]
+        else:
+            url = reverse('admin:community_communitycomment_change', args=[target.pk])
+            label = target.body[:50]
+        return format_html('<a href="{}">{}</a>', url, label)
+    reported_content_link.short_description = 'Reported Content'
+
+    def content_status(self, obj):
+        """Show whether the reported content is still live or already removed."""
+        target = self._get_reported_object(obj)
+        if target is None:
+            return format_html('<span style="color:#999;">Not found</span>')
+        if target.is_deleted:
+            return format_html('<span style="color:#999;">Removed</span>')
+        return format_html('<span style="color:#c00;">Live</span>')
+    content_status.short_description = 'Status'
+
+    def reported_content_preview(self, obj):
+        """Full preview of the reported content shown on the detail page."""
+        target = self._get_reported_object(obj)
+        if target is None:
+            return 'Content not found (may have been hard-deleted).'
+        if obj.content_type == 'post':
+            status = '[REMOVED] ' if target.is_deleted else ''
+            return f'{status}Title: {target.title}\n\nBody: {target.body[:500]}'
+        else:
+            status = '[REMOVED] ' if target.is_deleted else ''
+            return f'{status}Comment on post #{target.post_id}: {target.body[:500]}'
+    reported_content_preview.short_description = 'Content Preview'
+
+    @admin.action(description='Remove reported content (soft delete)')
+    def soft_delete_reported_content(self, request, queryset):
+        deleted_posts = 0
+        deleted_comments = 0
+        for report in queryset:
+            target = self._get_reported_object(report)
+            if target is not None and not target.is_deleted:
+                if report.content_type == 'post':
+                    CommunityPost.objects.filter(pk=target.pk).update(is_deleted=True)
+                    deleted_posts += 1
+                elif report.content_type == 'comment':
+                    CommunityComment.objects.filter(pk=target.pk).update(is_deleted=True)
+                    deleted_comments += 1
+        self.message_user(
+            request,
+            f'Removed {deleted_posts} post(s) and {deleted_comments} comment(s).',
+        )
+
+    @admin.action(description='Dismiss selected reports (delete report records)')
+    def dismiss_reports(self, request, queryset):
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f'Dismissed {count} report(s).')
 
 
 @admin.register(UserBlock)

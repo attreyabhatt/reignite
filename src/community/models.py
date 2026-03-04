@@ -6,10 +6,9 @@ import datetime
 
 class CommunityPost(models.Model):
     CATEGORY_CHOICES = [
-        ('success_story', 'Success Story'),
-        ('opening_line', 'Opening Line'),
-        ('dating_advice', 'Dating Advice'),
-        ('app_feedback', 'App Feedback'),
+        ('help_me_reply', 'Help Me Reply'),
+        ('rate_my_profile', 'Rate My Profile'),
+        ('wins', 'Wins'),
     ]
 
     author = models.ForeignKey(
