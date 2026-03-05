@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import cloudinary.uploader
 from django.conf import settings
 from django.db import IntegrityError
-from django.db.models import Count, Q
+from django.db.models import Count, ExpressionWrapper, IntegerField, Q
 from django_ratelimit.decorators import ratelimit
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -175,9 +175,15 @@ def _comment_payload(comment, user_liked=False):
 
 
 def _annotated_posts_qs(base_qs):
+    upvotes_expr = Count('votes', filter=Q(votes__vote_type='up'), distinct=True)
+    downvotes_expr = Count('votes', filter=Q(votes__vote_type='down'), distinct=True)
     return base_qs.select_related('author').annotate(
-        upvotes=Count('votes', filter=Q(votes__vote_type='up'), distinct=True),
-        downvotes=Count('votes', filter=Q(votes__vote_type='down'), distinct=True),
+        upvotes=upvotes_expr,
+        downvotes=downvotes_expr,
+        vote_score=ExpressionWrapper(
+            upvotes_expr - downvotes_expr,
+            output_field=IntegerField(),
+        ),
         comment_count=Count(
             'comments',
             filter=Q(comments__is_deleted=False),
@@ -186,26 +192,14 @@ def _annotated_posts_qs(base_qs):
     )
 
 
-def _sort_posts(posts, sort, now):
-    """Sort a list of annotated post objects.
-
-    Featured posts always float to the top within each sort bucket.
-    """
-    def hot_score(p):
-        published_at = _post_published_at(p)
-        hours = max(0, (now - published_at).total_seconds() / 3600)
-        return (p.upvotes - p.downvotes) / (hours + 2) ** 1.5
-
+def _ordered_posts_qs(qs, sort):
+    # Featured posts always float to the top within each sort bucket.
     if sort == 'new':
-        key = lambda p: _post_published_at(p).timestamp()
-    elif sort == 'top':
-        key = lambda p: p.upvotes - p.downvotes
-    else:  # hot (default)
-        key = hot_score
-
-    featured = sorted([p for p in posts if p.is_featured], key=key, reverse=True)
-    normal = sorted([p for p in posts if not p.is_featured], key=key, reverse=True)
-    return featured + normal
+        return qs.order_by('-is_featured', '-published_at', '-vote_score', '-id')
+    if sort == 'top':
+        return qs.order_by('-is_featured', '-vote_score', '-published_at', '-id')
+    # hot (default): recency first, then score.
+    return qs.order_by('-is_featured', '-published_at', '-vote_score', '-id')
 
 
 # ---------------------------------------------------------------------------
@@ -244,14 +238,13 @@ def _list_posts(request):
         )
         if blocked_ids:
             qs = qs.exclude(author_id__in=blocked_ids)
+    total_posts = qs.count()
     qs = _annotated_posts_qs(qs)
-
-    posts = list(qs)
-    sorted_posts = _sort_posts(posts, sort, now)
+    ordered_qs = _ordered_posts_qs(qs, sort)
 
     # Pagination
     start = (page - 1) * PAGE_SIZE
-    page_posts = sorted_posts[start: start + PAGE_SIZE]
+    page_posts = list(ordered_qs[start: start + PAGE_SIZE])
 
     # Resolve user votes in one query
     user_votes = {}
@@ -265,8 +258,8 @@ def _list_posts(request):
     return Response({
         'posts': [_post_payload(p, user_votes.get(p.id), now, request_user=request.user) for p in page_posts],
         'page': page,
-        'has_more': len(sorted_posts) > start + PAGE_SIZE,
-        'total': len(sorted_posts),
+        'has_more': total_posts > start + PAGE_SIZE,
+        'total': total_posts,
     })
 
 

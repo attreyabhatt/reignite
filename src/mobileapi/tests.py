@@ -18,7 +18,7 @@ from django.utils import timezone
 from reignitehome.models import MarketingClickEvent, TrialIP as HomeTrialIP
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
-from community.models import CommunityPost, UserBlock
+from community.models import CommunityPost, PostVote, UserBlock
 
 from mobileapi import admin as mobile_admin
 from mobileapi import views
@@ -1544,6 +1544,85 @@ class CommunityApiTests(TestCase):
 
         created = CommunityPost.objects.get(pk=response.data["id"])
         self.assertFalse(created.is_anonymous)
+
+    def test_list_paginates_posts(self):
+        now = timezone.now()
+        for i in range(23):
+            CommunityPost.objects.create(
+                author=self.author,
+                title=f"Paginated post {i}",
+                body="Pagination body",
+                category="help_me_reply",
+                published_at=now - timedelta(minutes=i),
+            )
+
+        self._as_guest()
+        page_1 = self.client.get(reverse("community_post_list"), {"sort": "new", "page": 1})
+        page_2 = self.client.get(reverse("community_post_list"), {"sort": "new", "page": 2})
+
+        self.assertEqual(page_1.status_code, 200)
+        self.assertEqual(page_2.status_code, 200)
+        self.assertEqual(len(page_1.data["posts"]), 20)
+        self.assertEqual(len(page_2.data["posts"]), 3)
+        self.assertTrue(page_1.data["has_more"])
+        self.assertFalse(page_2.data["has_more"])
+
+        page_1_ids = {item["id"] for item in page_1.data["posts"]}
+        page_2_ids = {item["id"] for item in page_2.data["posts"]}
+        self.assertEqual(len(page_1_ids.intersection(page_2_ids)), 0)
+
+    def test_list_sort_top_uses_vote_score(self):
+        now = timezone.now()
+        high_score = CommunityPost.objects.create(
+            author=self.author,
+            title="High score",
+            body="High score body",
+            category="wins",
+            published_at=now - timedelta(days=1),
+        )
+        low_score = CommunityPost.objects.create(
+            author=self.author,
+            title="Low score",
+            body="Low score body",
+            category="wins",
+            published_at=now,
+        )
+
+        PostVote.objects.create(user=self.other_user, post=high_score, vote_type="up")
+        PostVote.objects.create(user=self.reporter, post=high_score, vote_type="up")
+        PostVote.objects.create(user=self.other_user, post=low_score, vote_type="down")
+
+        self._as_guest()
+        response = self.client.get(reverse("community_post_list"), {"sort": "top", "page": 1})
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.data["posts"]]
+        self.assertLess(ids.index(high_score.id), ids.index(low_score.id))
+
+    def test_list_sort_hot_prefers_recent_posts(self):
+        now = timezone.now()
+        older_high_score = CommunityPost.objects.create(
+            author=self.author,
+            title="Older high score",
+            body="Older high score body",
+            category="wins",
+            published_at=now - timedelta(days=2),
+        )
+        recent_low_score = CommunityPost.objects.create(
+            author=self.author,
+            title="Recent low score",
+            body="Recent low score body",
+            category="wins",
+            published_at=now - timedelta(minutes=5),
+        )
+
+        PostVote.objects.create(user=self.other_user, post=older_high_score, vote_type="up")
+        PostVote.objects.create(user=self.reporter, post=older_high_score, vote_type="up")
+
+        self._as_guest()
+        response = self.client.get(reverse("community_post_list"), {"sort": "hot", "page": 1})
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.data["posts"]]
+        self.assertLess(ids.index(recent_low_score.id), ids.index(older_high_score.id))
 
     def test_block_toggle_and_blocked_users_list(self):
         blocked_post = CommunityPost.objects.create(

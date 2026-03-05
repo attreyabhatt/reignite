@@ -95,6 +95,24 @@ class FlirtfixRedirectTests(TestCase):
         self._assert_valid_play_redirect(response)
         self.assertEqual(MarketingClickEvent.objects.count(), 0)
 
+    def test_flirtfix_redirect_skips_google_pagerenderer_user_agent(self):
+        response = self.client.get(
+            "/flirtfix",
+            {
+                "utm_source": "instagram",
+                "utm_medium": "bio",
+                "utm_campaign": "launch_campaign",
+            },
+            HTTP_USER_AGENT=(
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36 "
+                "Google-PageRenderer Google "
+                "(+https://developers.google.com/+/web/snippet/)"
+            ),
+        )
+        self._assert_valid_play_redirect(response)
+        self.assertEqual(MarketingClickEvent.objects.count(), 0)
+
     def test_flirtfix_redirect_skips_social_preview_crawler(self):
         response = self.client.get(
             "/flirtfix",

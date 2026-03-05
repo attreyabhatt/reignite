@@ -44,6 +44,7 @@ PLAY_STORE_APP_ID = "com.tryagaintext.flirtfix"
 FLIRTFIX_ROUTE_KEY = "flirtfix"
 BOT_UA_SUBSTRINGS = (
     "googlebot",
+    "google-pagerenderer",
     "bingbot",
     "duckduckbot",
     "yandexbot",
