@@ -9,9 +9,9 @@ from community.models import UserBlock
 logger = logging.getLogger(__name__)
 
 _ONESIGNAL_NOTIFICATIONS_URL = "https://api.onesignal.com/notifications"
-_COMMENT_NOTIFICATION_TITLE = "New Comment on Your Post \u2728"
+_COMMENT_NOTIFICATION_TITLE = "Ooh, good answer... \U0001F440"
 _COMMENT_NOTIFICATION_BODY = (
-    "Someone commented on your community post. Open Flirtfix to view it."
+    "The community is cooking. Tap to see the latest reply to your post!"
 )
 
 

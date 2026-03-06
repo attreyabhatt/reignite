@@ -2023,6 +2023,16 @@ class CommunityApiTests(TestCase):
             [str(self.author.id)],
         )
         self.assertEqual(
+            kwargs["json"]["headings"],
+            {"en": "Ooh, good answer... \U0001F440"},
+        )
+        self.assertEqual(
+            kwargs["json"]["contents"],
+            {
+                "en": "The community is cooking. Tap to see the latest reply to your post!",
+            },
+        )
+        self.assertEqual(
             kwargs["json"]["data"],
             {
                 "action": "community_comment",
