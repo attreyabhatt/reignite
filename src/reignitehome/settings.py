@@ -104,6 +104,15 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
 }
 
+# OneSignal (transactional push notifications)
+ONESIGNAL_APP_ID = config("ONESIGNAL_APP_ID", default="")
+ONESIGNAL_REST_API_KEY = config("ONESIGNAL_REST_API_KEY", default="")
+ONESIGNAL_COMMENT_NOTIFICATIONS_ENABLED = config(
+    "ONESIGNAL_COMMENT_NOTIFICATIONS_ENABLED",
+    cast=bool,
+    default=True,
+)
+
 # settings.py
 # Mobile API public endpoint rate limits (Phase 1).
 MOBILE_RATELIMIT_REGISTER_IP = config("MOBILE_RATELIMIT_REGISTER_IP", default="5/10m")

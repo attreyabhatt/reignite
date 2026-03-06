@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 import cloudinary.uploader
 from django.conf import settings
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Count, ExpressionWrapper, IntegerField, Q
 from django_ratelimit.decorators import ratelimit
 from rest_framework.decorators import api_view, permission_classes
@@ -28,6 +28,7 @@ from community.models import (
     UserBlock,
 )
 from conversation.models import ChatCredit
+from .push_notifications import send_post_comment_notification
 
 logger = logging.getLogger(__name__)
 
@@ -470,6 +471,14 @@ def community_post_comment(request, post_id):
         post=post,
         author=request.user,
         body=body,
+    )
+    transaction.on_commit(
+        lambda: send_post_comment_notification(
+            post_author_id=post.author_id,
+            comment_author_id=comment.author_id,
+            post_id=post.id,
+            comment_id=comment.id,
+        )
     )
     return Response(_comment_payload(comment), status=201)
 

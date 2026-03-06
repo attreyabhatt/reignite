@@ -1,5 +1,6 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from datetime import timedelta
+import requests
 
 from django.contrib import admin
 from conversation.models import (
@@ -27,6 +28,7 @@ from mobileapi.models import (
     MobileGenerationEvent,
     MobileInstallAttributionEvent,
 )
+from mobileapi.push_notifications import send_post_comment_notification
 
 
 class RedactionHelperTests(TestCase):
@@ -1927,6 +1929,134 @@ class CommunityApiTests(TestCase):
             reverse("community_post_detail", args=[post_id])
         )
         self.assertEqual(deleted_post_detail.status_code, 404)
+
+    def test_comment_create_triggers_notification_with_expected_payload_inputs(self):
+        post = CommunityPost.objects.create(
+            author=self.author,
+            title="Notify me",
+            body="Body",
+            category="wins",
+        )
+        self._auth(self.other_token)
+
+        with patch("mobileapi.community_views.send_post_comment_notification") as send_mock:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse("community_post_comment", args=[post.id]),
+                    {"body": "New comment from another user."},
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, 201)
+        send_mock.assert_called_once()
+        kwargs = send_mock.call_args.kwargs
+        self.assertEqual(kwargs["post_author_id"], self.author.id)
+        self.assertEqual(kwargs["comment_author_id"], self.other_user.id)
+        self.assertEqual(kwargs["post_id"], post.id)
+        self.assertEqual(kwargs["comment_id"], response.data["id"])
+
+    @override_settings(
+        ONESIGNAL_APP_ID="test-app-id",
+        ONESIGNAL_REST_API_KEY="test-rest-key",
+        ONESIGNAL_COMMENT_NOTIFICATIONS_ENABLED=True,
+    )
+    def test_sender_skips_self_comment(self):
+        with patch("mobileapi.push_notifications.requests.post") as post_mock:
+            sent = send_post_comment_notification(
+                post_author_id=self.author.id,
+                comment_author_id=self.author.id,
+                post_id=123,
+                comment_id=456,
+            )
+
+        self.assertFalse(sent)
+        post_mock.assert_not_called()
+
+    @override_settings(
+        ONESIGNAL_APP_ID="test-app-id",
+        ONESIGNAL_REST_API_KEY="test-rest-key",
+        ONESIGNAL_COMMENT_NOTIFICATIONS_ENABLED=True,
+    )
+    def test_sender_skips_when_users_are_blocked(self):
+        UserBlock.objects.create(blocker=self.author, blocked_user=self.other_user)
+
+        with patch("mobileapi.push_notifications.requests.post") as post_mock:
+            sent = send_post_comment_notification(
+                post_author_id=self.author.id,
+                comment_author_id=self.other_user.id,
+                post_id=100,
+                comment_id=200,
+            )
+
+        self.assertFalse(sent)
+        post_mock.assert_not_called()
+
+    @override_settings(
+        ONESIGNAL_APP_ID="test-app-id",
+        ONESIGNAL_REST_API_KEY="test-rest-key",
+        ONESIGNAL_COMMENT_NOTIFICATIONS_ENABLED=True,
+    )
+    def test_sender_payload_uses_external_id_and_action_data(self):
+        response_mock = Mock()
+        response_mock.status_code = 200
+        response_mock.text = ""
+
+        with patch(
+            "mobileapi.push_notifications.requests.post",
+            return_value=response_mock,
+        ) as post_mock:
+            sent = send_post_comment_notification(
+                post_author_id=self.author.id,
+                comment_author_id=self.other_user.id,
+                post_id=77,
+                comment_id=88,
+            )
+
+        self.assertTrue(sent)
+        post_mock.assert_called_once()
+        kwargs = post_mock.call_args.kwargs
+        self.assertEqual(kwargs["headers"]["Authorization"], "Key test-rest-key")
+        self.assertEqual(kwargs["json"]["app_id"], "test-app-id")
+        self.assertEqual(kwargs["json"]["target_channel"], "push")
+        self.assertEqual(
+            kwargs["json"]["include_aliases"]["external_id"],
+            [str(self.author.id)],
+        )
+        self.assertEqual(
+            kwargs["json"]["data"],
+            {
+                "action": "community_comment",
+                "post_id": 77,
+                "comment_id": 88,
+            },
+        )
+
+    @override_settings(
+        ONESIGNAL_APP_ID="test-app-id",
+        ONESIGNAL_REST_API_KEY="test-rest-key",
+        ONESIGNAL_COMMENT_NOTIFICATIONS_ENABLED=True,
+    )
+    def test_comment_create_succeeds_when_onesignal_request_fails(self):
+        post = CommunityPost.objects.create(
+            author=self.author,
+            title="Resilient",
+            body="Body",
+            category="wins",
+        )
+        self._auth(self.other_token)
+
+        with patch(
+            "mobileapi.push_notifications.requests.post",
+            side_effect=requests.RequestException("network down"),
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse("community_post_comment", args=[post.id]),
+                    {"body": "Still should succeed."},
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, 201)
 
 
 class MobileInstallAttributionEventTests(TestCase):
