@@ -1,100 +1,77 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container py-3">
-  <div class="row justify-content-center">
-    <div class="col-md-7 col-lg-6">
-      <h2 class="mb-4">Contact Us</h2>
+<div class="max-w-xl mx-auto px-4 sm:px-6 py-12">
+    <h2 class="text-2xl font-bold font-heading mb-6">Contact Us</h2>
 
-      {% if submitted %}
-        <div class="alert alert-success text-center" role="alert">
-          <h4 class="alert-heading">Thank you!</h4>
-          <p>Your message has been sent. We’ll get back to you via email soon.</p>
+    {% if submitted %}
+        <div class="rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-6 text-center">
+            <h4 class="font-heading font-semibold text-lg text-green-800 dark:text-green-300 mb-2">Thank you!</h4>
+            <p class="text-sm text-green-700 dark:text-green-400">Your message has been sent. We'll get back to you via email soon.</p>
         </div>
-      {% else %}
+    {% else %}
 
-        {# --- Error summary (optional) --- #}
         {% if errors %}
-          <div class="alert alert-danger" role="alert">
-            <strong>Please fix the following:</strong>
-            <ul class="mb-0">
-              {% for field, msgs in errors.items %}
-                {% for msg in msgs %}
-                  <li>{{ msg }}</li>
+        <div class="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 mb-6">
+            <p class="font-semibold text-sm text-red-800 dark:text-red-300 mb-2">Please fix the following:</p>
+            <ul class="text-sm text-red-700 dark:text-red-400 list-disc pl-5">
+                {% for field, msgs in errors.items %}
+                    {% for msg in msgs %}
+                    <li>{{ msg }}</li>
+                    {% endfor %}
                 {% endfor %}
-              {% endfor %}
             </ul>
-          </div>
+        </div>
         {% endif %}
 
-        <form method="post" class="card p-4 shadow-sm" novalidate>
-          {% csrf_token %}
+        <form method="post" class="bg-white dark:bg-dbrand-surface-container rounded-2xl p-6 border border-brand-outline dark:border-dbrand-outline shadow-sm" novalidate>
+            {% csrf_token %}
 
-          <div class="mb-3">
-            <label for="reason" class="form-label">Reason</label>
-            <select
-              class="form-select{% if errors.reason %} is-invalid{% endif %}"
-              id="reason"
-              name="reason"
-              required
-            >
-              <option value="">Select reason</option>
-              <option value="bug"      {% if form.reason == "bug" %}selected{% endif %}>Bug Report</option>
-              <option value="payment"  {% if form.reason == "payment" %}selected{% endif %}>Payments</option>
-              <option value="feedback" {% if form.reason == "feedback" %}selected{% endif %}>Feedback</option>
-              <option value="other"    {% if form.reason == "other" %}selected{% endif %}>Other</option>
-            </select>
-            {% if errors.reason %}<div class="invalid-feedback">{{ errors.reason.0 }}</div>{% endif %}
-          </div>
+            <div class="mb-4">
+                <label for="reason" class="block text-sm font-semibold mb-1.5">Reason</label>
+                <select class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary {% if errors.reason %}ring-2 ring-red-500{% endif %}"
+                    id="reason" name="reason" required>
+                    <option value="">Select reason</option>
+                    <option value="bug" {% if form.reason == "bug" %}selected{% endif %}>Bug Report</option>
+                    <option value="payment" {% if form.reason == "payment" %}selected{% endif %}>Payments</option>
+                    <option value="feedback" {% if form.reason == "feedback" %}selected{% endif %}>Feedback</option>
+                    <option value="other" {% if form.reason == "other" %}selected{% endif %}>Other</option>
+                </select>
+                {% if errors.reason %}<p class="text-xs text-red-500 mt-1">{{ errors.reason.0 }}</p>{% endif %}
+            </div>
 
-          <div class="mb-3">
-            <label for="title" class="form-label">Title</label>
-            <input
-              type="text"
-              class="form-control{% if errors.title %} is-invalid{% endif %}"
-              id="title"
-              name="title"
-              maxlength="100"
-              required
-              value="{{ form.title|default:'' }}"
-            >
-            {% if errors.title %}<div class="invalid-feedback">{{ errors.title.0 }}</div>{% endif %}
-          </div>
+            <div class="mb-4">
+                <label for="title" class="block text-sm font-semibold mb-1.5">Title</label>
+                <input type="text"
+                    class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary {% if errors.title %}ring-2 ring-red-500{% endif %}"
+                    id="title" name="title" maxlength="100" required value="{{ form.title|default:'' }}">
+                {% if errors.title %}<p class="text-xs text-red-500 mt-1">{{ errors.title.0 }}</p>{% endif %}
+            </div>
 
-          <div class="mb-3">
-            <label for="subject" class="form-label">Subject</label>
-            <textarea
-              class="form-control{% if errors.subject %} is-invalid{% endif %}"
-              id="subject"
-              name="subject"
-              rows="4"
-              required
-            >{{ form.subject|default:'' }}</textarea>
-            {% if errors.subject %}<div class="invalid-feedback">{{ errors.subject.0 }}</div>{% endif %}
-          </div>
+            <div class="mb-4">
+                <label for="subject" class="block text-sm font-semibold mb-1.5">Subject</label>
+                <textarea class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary resize-y {% if errors.subject %}ring-2 ring-red-500{% endif %}"
+                    id="subject" name="subject" rows="4" required>{{ form.subject|default:'' }}</textarea>
+                {% if errors.subject %}<p class="text-xs text-red-500 mt-1">{{ errors.subject.0 }}</p>{% endif %}
+            </div>
 
-          <div class="mb-3">
-            <label for="email" class="form-label">Email address</label>
-            <input
-              type="email"
-              class="form-control{% if errors.email %} is-invalid{% endif %}"
-              id="email"
-              name="email"
-              required
-              value="{{ form.email|default:'' }}"
-            >
-            {% if errors.email %}<div class="invalid-feedback">{{ errors.email.0 }}</div>{% endif %}
-          </div>
+            <div class="mb-4">
+                <label for="email" class="block text-sm font-semibold mb-1.5">Email address</label>
+                <input type="email"
+                    class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary {% if errors.email %}ring-2 ring-red-500{% endif %}"
+                    id="email" name="email" required value="{{ form.email|default:'' }}">
+                {% if errors.email %}<p class="text-xs text-red-500 mt-1">{{ errors.email.0 }}</p>{% endif %}
+            </div>
 
-          {# --- Honeypot: leave empty; bots will fill it --- #}
-          <div style="position: absolute; left: -10000px;" aria-hidden="true">
-            <label for="website">Website</label>
-            <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
-          </div>
+            <!-- Honeypot -->
+            <div style="position: absolute; left: -10000px;" aria-hidden="true">
+                <label for="website">Website</label>
+                <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+            </div>
 
-          <button type="submit" class="btn btn-dark w-100">Send Message</button>
+            <button type="submit" class="w-full px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white shadow-lg hover:opacity-90 transition-opacity">
+                Send Message
+            </button>
         </form>
-      {% endif %}
-    </div>
-  </div>
+    {% endif %}
 </div>
 {% endblock %}

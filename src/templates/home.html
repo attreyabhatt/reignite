@@ -1,454 +1,113 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}tryagaintext — Your AI Wingman for Any Stage of the Chat{% endblock %}
+{% block title %}tryagaintext - Your AI Wingman for Any Stage of the Chat{% endblock %}
 
 {% block extra_head %}
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-    :root {
-        --bg-start: #f7f8fb;
-        --bg-end: #eef1f7;
-        --glass-bg: rgba(255, 255, 255, .65);
-        --glass-border: rgba(255, 255, 255, .7);
-        --card-border: rgba(17, 24, 39, .06);
-        --text: #0b1220;
-        --muted: #6b7280;
-        --accent: #0a84ff;
-        /* calm Apple blue */
-        --shadow: 0 10px 30px rgba(17, 24, 39, .08);
-        --radius-xl: 20px;
-        --radius-lg: 16px;
-    }
-
-    body {
-        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        color: var(--text);
-        background: linear-gradient(180deg, var(--bg-start), var(--bg-end)) fixed;
-    }
-
-    /* badges + card polish for the examples */
-    .badge-glass{
-    display:inline-block;
-    padding:.35rem .7rem;
-    border-radius:9999px;
-    background:rgba(255,255,255,.6);
-    border:1px solid rgba(17,24,39,.08);
-    backdrop-filter:saturate(180%) blur(14px);
-    -webkit-backdrop-filter:saturate(180%) blur(14px);
-    font-weight:600;
-    color:#111827;
-    }
-
-    .showcase-card{
-    border:1px solid rgba(17,24,39,.06);
-    border-radius:16px;
-    box-shadow: 0 10px 30px rgba(17,24,39,.08);
-    }
-
-
-    /* Frosted layer */
-    .glass {
-        background: var(--glass-bg);
-        backdrop-filter: saturate(180%) blur(18px);
-        -webkit-backdrop-filter: saturate(180%) blur(18px);
-        border: 1px solid var(--glass-border);
-        border-radius: var(--radius-xl);
-        box-shadow: var(--shadow);
-    }
-
-    .glass--soft {
-        background: rgba(255, 255, 255, .55);
-        border: 1px solid rgba(255, 255, 255, .6);
-    }
-
-    .section-pad {
-        padding: clamp(2.5rem, 4vw, 4rem) 0;
-    }
-
-    .display-hero {
-        letter-spacing: -.02em;
-    }
-
-    /* Buttons */
-    .btn-dark {
-        --bs-btn-focus-shadow-rgb: 10, 132, 255;
-        border-radius: 9999px;
-        padding: .75rem 1.4rem;
-    }
-
-    .hero-cta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .85rem;
-        align-items: center;
-    }
-
-    .hero-primary-btn {
-        box-shadow: 0 8px 22px rgba(11, 18, 32, .2);
-    }
-
-    .hero-store-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .65rem;
-        padding: .62rem .95rem .62rem .85rem;
-        border-radius: 14px;
-        border: 1px solid rgba(15, 23, 42, .9);
-        background: linear-gradient(180deg, #161f33, #0f172a);
-        color: #fff;
-        text-decoration: none;
-        box-shadow: 0 8px 24px rgba(15, 23, 42, .22);
-        transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
-    }
-
-    .hero-store-btn:hover,
-    .hero-store-btn:focus-visible {
-        color: #fff;
-        transform: translateY(-1px);
-        box-shadow: 0 12px 28px rgba(15, 23, 42, .28);
-        filter: brightness(1.04);
-    }
-
-    .hero-store-btn:focus-visible {
-        outline: 3px solid rgba(10, 132, 255, .35);
-        outline-offset: 2px;
-    }
-
-    .hero-store-icon {
-        font-size: 1.25rem;
-        line-height: 1;
-        color: #7dd3fc;
-    }
-
-    .hero-store-copy {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.1;
-    }
-
-    .hero-store-kicker {
-        font-size: .63rem;
-        font-weight: 700;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-        opacity: .78;
-    }
-
-    .hero-store-title {
-        font-size: .95rem;
-        font-weight: 700;
-        white-space: nowrap;
-    }
-
-    .hero-seo-copy {
-        max-width: 34rem;
-    }
-
-    .credit-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: .5rem;
-        padding: .4rem .8rem;
-        border-radius: 9999px;
-        background: #111827;
-        color: #fff;
-        font-size: .9rem;
-    }
-
-    /* Cards + items */
-    .rounded-xl {
-        border-radius: var(--radius-xl);
-    }
-
-    .rounded-lg {
-        border-radius: var(--radius-lg);
-    }
-
-    .soft-card {
-        background: #fff;
-        border: 1px solid var(--card-border);
-        border-radius: var(--radius-xl);
-        box-shadow: var(--shadow);
-    }
-
-    /* Suggestion cards */
-    .suggestion {
-        position: relative;
-    }
-
-    .suggestion .copy-btn {
-        position: absolute;
-        right: .5rem;
-        top: .4rem;
-    }
-
-    .copied-tooltip {
-        display: none;
-        position: absolute;
-        top: 120%;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #111827;
-        color: #fff;
-        font-size: 12px;
-        padding: 2px 8px;
-        border-radius: 8px;
-    }
-
-    /* Minimal list chips */
-    .chip {
-        display: inline-flex;
-        align-items: center;
-        gap: .5rem;
-        padding: .55rem .9rem;
-        border: 1px solid var(--card-border);
-        border-radius: 9999px;
-        background: #fff;
-        margin: .25rem;
-        font-weight: 600;
-        color: #111827;
-    }
-
-    /* Dark trust section */
-    .trust {
-        background: radial-gradient(1200px 600px at 20% -10%, #1b2437 0%, #0b1220 40%, #0b1220 100%);
-        color: #e5e7eb;
-    }
-
-    .trust .item {
-        background: rgba(255, 255, 255, .06);
-        border: 1px solid rgba(255, 255, 255, .1);
-        border-radius: var(--radius-lg);
-        padding: 1rem;
-    }
-
-    /* Form tweaks */
-    .form-select,
-    .form-control {
-        border-radius: 9999px;
-    }
-
-    textarea.form-control {
-        border-radius: var(--radius-lg) !important;
-    }
-
-    .form-text {
-        color: var(--muted);
-    }
-
-    /* Motion (prefers-reduced-motion respected) */
-    .hover-lift {
-        transition: transform .2s ease, box-shadow .2s ease;
-    }
-
-    .hover-lift:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 14px 40px rgba(17, 24, 39, .12);
-    }
-
-    .backdrop-canvas {
-        position: fixed; inset: 0; z-index: -1;
+    body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
         pointer-events: none;
         background:
-        radial-gradient(1200px 600px at 15% -10%, rgba(10,15,30,.08), transparent 60%),
-        linear-gradient(180deg, #f7f8fb 0%, #eef1f7 100%);
+            radial-gradient(1200px 600px at 15% -10%, rgba(153, 27, 56, .06), transparent 60%),
+            linear-gradient(180deg, #F9F8F6 0%, #F1EEE9 100%);
     }
 
-    @media (min-width: 992px){
-    .backdrop-canvas{
-        background-image:
-        radial-gradient(1200px 600px at 15% -10%, rgba(10,15,30,.09), transparent 60%),
-        linear-gradient(180deg, #f7f8fb 0%, #eef1f7 100%),
-        url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0%200%200%200%20.02%20.03%200%200%200%200%200%200%200%200%200'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
-        background-blend-mode: normal, normal, overlay;
+    .dark body::before,
+    :is(.dark) body::before {
+        background:
+            radial-gradient(1200px 600px at 15% -10%, rgba(255, 45, 109, .08), transparent 60%),
+            linear-gradient(180deg, #0E0F12 0%, #12141A 100%);
     }
-    }
-
-
-    /* Harden glass so it keeps reading over subtle backdrops */
-    .glass{
-        position: relative;
-        isolation: isolate;                         /* ensure proper compositing */
-        background: rgba(255,255,255,.55);          /* must have alpha */
-        backdrop-filter: saturate(180%) blur(18px);
-        -webkit-backdrop-filter: saturate(180%) blur(18px);
-        border: 1px solid rgba(255,255,255,.65);
-        border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(17,24,39,.08);
-    }
-
-    @media (min-width: 992px){
-    .glass{
-        background: rgba(255,255,255,.48);
-        backdrop-filter: saturate(180%) blur(22px);
-        -webkit-backdrop-filter: saturate(180%) blur(22px);
-        border-color: rgba(255,255,255,.60);
-    }
-    }
-
-    /* Subtle film so “glassiness” still shows even over very flat areas */
-    .glass::before{
-    content:"";
-    position:absolute; inset:0; border-radius: inherit; pointer-events:none;
-    background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .hover-lift {
-            transition: none;
-        }
-
-        .hover-lift:hover {
-            transform: none;
-            box-shadow: var(--shadow);
-        }
-
-        .hero-store-btn {
-            transition: none;
-        }
-
-        .hero-store-btn:hover,
-        .hero-store-btn:focus-visible {
-            transform: none;
-        }
-    }
-
-    @media (max-width: 575.98px) {
-        .hero-cta {
-            align-items: stretch;
-        }
-
-        .hero-cta .btn,
-        .hero-store-btn {
-            width: 100%;
-            justify-content: center;
-        }
-
-        .hero-store-copy {
-            align-items: center;
-        }
-    }
-
-    /* Ensure page has a compositing context and something to blur */
-    html, body { height: 100%; }
-    body { position: relative; }
-
-    /* Fixed, full-viewport backdrop behind all content */
-    body::before{
-    content:"";
-    position: fixed;
-    inset: 0;
-    z-index: -1;              /* sits behind everything */
-    pointer-events: none;
-
-    /* soft gradient base (visible on large screens too) */
-    background:
-        radial-gradient(1200px 600px at 15% -10%, rgba(10,15,30,.08), transparent 60%),
-        linear-gradient(180deg, #f7f8fb 0%, #eef1f7 100%),
-        /* micrograin – parser-safe, no data URI */
-        repeating-linear-gradient(0deg, rgba(0,0,0,.015) 0 1px, transparent 1px 2px),
-        repeating-linear-gradient(90deg, rgba(0,0,0,.015) 0 1px, transparent 1px 2px);
-    background-blend-mode: normal, normal, overlay, overlay;
-    }
-
 </style>
 {% endblock extra_head %}
 
 {% block content %}
-<!-- Backdrop canvas: ensures glass looks glassy on large screens -->
-<div class="backdrop-canvas" aria-hidden="true"></div>
-
-<!-- HERO -->
-<section class="section-pad">
-    <div class="container">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-6">
-                
-                <h1 class="display-5 fw-bold display-hero mb-3">Your AI wingman for <span style="color: #ff4e3d;">any
-                        stage</span> of the chat</h1>
-                <p class="lead text-muted mb-4">From first message to asking her out — paste the convo or upload a
-                    screenshot and get <strong>3 send-ready replies</strong> that match the vibe.</p>
-                <div class="hero-cta">
-                    <a href="#try" class="btn btn-dark btn-lg hero-primary-btn">Try it free</a>
-                    <a href="/flirtfix?utm_source=website&utm_medium=home_cta&utm_campaign=flirtfix_web_home" class="hero-store-btn"
-                        title="Download FlirtFix for Android on Google Play"
-                        aria-label="Download FlirtFix Android app from Google Play Store">
-                        <i class="bi bi-google-play hero-store-icon" aria-hidden="true"></i>
-                        <span class="hero-store-copy">
-                            <span class="hero-store-kicker">Get the Android app</span>
-                            <span class="hero-store-title">Download on Google Play</span>
+<section class="py-16 sm:py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div>
+                <h1 class="text-4xl sm:text-5xl font-bold font-heading tracking-tight leading-tight mb-4">
+                    Your AI wingman for
+                    <span class="bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary bg-clip-text text-transparent">any stage</span>
+                    of the chat
+                </h1>
+                <p class="text-lg text-brand-muted dark:text-dbrand-muted mb-6 max-w-lg">
+                    From first message to asking her out - paste the convo or upload a screenshot and get <strong class="text-brand-text dark:text-dbrand-text">3 send-ready replies</strong> that match the vibe.
+                </p>
+                <div class="flex flex-wrap gap-3 items-center">
+                    <a href="#try" class="px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white shadow-lg hover:opacity-90 transition-opacity no-underline">
+                        Try it free
+                    </a>
+                    <a href="/flirtfix?utm_source=website&utm_medium=home_cta&utm_campaign=flirtfix_web_home"
+                        class="inline-flex items-center gap-3 px-4 py-2.5 rounded-xl border border-brand-text/90 dark:border-dbrand-outline bg-gradient-to-b from-brand-text to-[#0f172a] dark:from-dbrand-surface-container dark:to-dbrand-bg text-white no-underline hover:-translate-y-0.5 hover:shadow-xl transition-all"
+                        title="Download FlirtFix for Android on Google Play">
+                        <i class="fa-brands fa-google-play text-xl text-sky-300"></i>
+                        <span class="flex flex-col leading-tight">
+                            <span class="text-[0.63rem] font-bold uppercase tracking-wider opacity-80">Get the Android app</span>
+                            <span class="text-sm font-bold whitespace-nowrap">Download on Google Play</span>
                         </span>
                     </a>
                 </div>
-                <p class="small text-muted mt-3 mb-0 hero-seo-copy">
+                <p class="text-xs text-brand-muted dark:text-dbrand-muted mt-3 max-w-sm">
                     Install the FlirtFix Android app from Google Play for faster replies on mobile.
                 </p>
             </div>
-            <div class="col-lg-6">
-                <!-- Glass preview grid -->
-                <div class="glass p-3">
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <div class="soft-card p-3 hover-lift h-100">
-                                <div class="small text-muted text-uppercase mb-2">Just matched</div>
-                                <div>You seem normal… but that’s usually how the best Netflix true crime documentaries start 😏</div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="soft-card p-3 hover-lift h-100">
-                                <div class="small text-muted text-uppercase mb-2">Dry reply</div>
-                                <div>I see you’re testing my patience. That’s cute. Now, tell me: what’s something you’re actually passionate about?
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="soft-card p-3 hover-lift h-100">
-                                <div class="small text-muted text-uppercase mb-2">Left on read</div>
-                                <div>Dear Diary, cute girl vanished. Should I send a search party?</div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="soft-card p-3 hover-lift h-100">
-                                <div class="small text-muted text-uppercase mb-2">Ask her out</div>
-                                <div>We’ve earned a vibe upgrade. Drinks Thu 7-ish at [place]?</div>
-                            </div>
-                        </div>
+
+            <div class="glass rounded-2xl p-4 bg-white/55 dark:bg-dbrand-surface/50 border border-white/65 dark:border-dbrand-outline shadow-lg">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-white dark:bg-dbrand-surface-container rounded-2xl p-4 border border-brand-outline/30 dark:border-dbrand-outline shadow-sm hover-lift">
+                        <div class="text-xs text-brand-muted dark:text-dbrand-muted uppercase font-semibold tracking-wide mb-2">Just matched</div>
+                        <div class="text-sm text-brand-text dark:text-dbrand-text">You seem normal... but that's usually how the best Netflix true crime documentaries start.</div>
+                    </div>
+                    <div class="bg-white dark:bg-dbrand-surface-container rounded-2xl p-4 border border-brand-outline/30 dark:border-dbrand-outline shadow-sm hover-lift">
+                        <div class="text-xs text-brand-muted dark:text-dbrand-muted uppercase font-semibold tracking-wide mb-2">Dry reply</div>
+                        <div class="text-sm text-brand-text dark:text-dbrand-text">I see you're testing my patience. That's cute. Now, tell me: what's something you're actually passionate about?</div>
+                    </div>
+                    <div class="bg-white dark:bg-dbrand-surface-container rounded-2xl p-4 border border-brand-outline/30 dark:border-dbrand-outline shadow-sm hover-lift">
+                        <div class="text-xs text-brand-muted dark:text-dbrand-muted uppercase font-semibold tracking-wide mb-2">Left on read</div>
+                        <div class="text-sm text-brand-text dark:text-dbrand-text">Dear Diary, cute girl vanished. Should I send a search party?</div>
+                    </div>
+                    <div class="bg-white dark:bg-dbrand-surface-container rounded-2xl p-4 border border-brand-outline/30 dark:border-dbrand-outline shadow-sm hover-lift">
+                        <div class="text-xs text-brand-muted dark:text-dbrand-muted uppercase font-semibold tracking-wide mb-2">Ask her out</div>
+                        <div class="text-sm text-brand-text dark:text-dbrand-text">We've earned a vibe upgrade. Drinks Thu 7-ish at [place]?</div>
                     </div>
                 </div>
-                <!-- /glass preview grid -->
             </div>
         </div>
     </div>
 </section>
 
-<!-- TRY IT: Main glass workspace -->
-<!-- TRY IT: Main glass workspace (matches home.html) -->
-<section id="try" class="section-pad">
-    <div class="container">
-        <div class="glass p-4">
-            <div class="row g-4">
-                <!-- Form -->
-                <div class="col-12 col-lg-8">
-                    <form id="chatForm">
+<section id="try" class="py-12 sm:py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="glass rounded-2xl p-5 sm:p-6 bg-white/55 dark:bg-dbrand-surface/50 border border-white/65 dark:border-dbrand-outline shadow-lg">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <form
+                        id="chatForm"
+                        data-web-reply-form
+                        hx-post="{% url 'ajax_reply' %}"
+                        hx-target="#responsePanel"
+                        hx-swap="innerHTML"
+                    >
                         {% csrf_token %}
+                        <input type="hidden" id="conversation-id" name="conversation_id" value="">
 
-                        <!-- Situation -->
-                        <div class="mb-3">
-                            <label for="situation" class="form-label fw-semibold">
-                                <i class="fa fa-bullseye me-1 text-primary"></i> What's the situation?
+                        <div class="mb-4">
+                            <label for="situation" class="block text-sm font-semibold mb-1.5">
+                                <i class="fa fa-bullseye mr-1 text-brand-primary dark:text-dbrand-primary"></i> What's the situation?
                             </label>
-                            <select class="form-select" id="situation" name="situation" required>
-                                <option value="stuck_after_reply" selected>She replied, but I don’t know what to say
-                                </option>
-
-                                <optgroup label="🟢 Early-Conversation">
+                            <select class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary" id="situation" name="situation" required>
+                                <option value="stuck_after_reply" selected>She replied, but I don't know what to say</option>
+                                <optgroup label="?? Early-Conversation">
                                     <option value="just_matched">We just matched</option>
                                     <option value="spark_interest">I want to spark her interest</option>
                                 </optgroup>
-
-                                <optgroup label="🟡 Mid-Conversation">
-                                    <option value="stuck_after_reply">She replied, but I don’t know what to say</option>
+                                <optgroup label="?? Mid-Conversation">
+                                    <option value="stuck_after_reply">She replied, but I don't know what to say</option>
                                     <option value="dry_reply">She gave a dry or one-word reply</option>
                                     <option value="she_asked_question">She asked me a question</option>
                                     <option value="feels_like_interview">Conversation feels like an interview</option>
@@ -456,99 +115,72 @@
                                     <option value="spark_deeper_conversation">I want to be sincere / vulnerable</option>
                                     <option value="pivot_conversation">Change the topic</option>
                                 </optgroup>
-
-                                <optgroup label="🔁 Recovery or Reigniting">
+                                <optgroup label="?? Recovery or Reigniting">
                                     <option value="left_on_read">She left me on read</option>
-                                    <option value="reviving_old_chat">I haven’t talked to her in a while</option>
+                                    <option value="reviving_old_chat">I haven't talked to her in a while</option>
                                     <option value="recovering_after_cringe">I think I said something off</option>
                                 </optgroup>
-
-                                <optgroup label="🟣 Late-Conversation">
+                                <optgroup label="?? Late-Conversation">
                                     <option value="ask_her_out">Ask her out</option>
                                     <option value="switching_platforms">Trying to move to another platform</option>
                                 </optgroup>
                             </select>
                         </div>
 
-                        <!-- Her info (optional) -->
-                        <div class="mb-3" id="her-info-div" style="display: none;">
-                            <label for="her_info" class="form-label fw-semibold">
-                                <i class="fa-solid fa-user-secret me-1 text-secondary"></i> Her Information (optional)
+                        <div class="mb-4 hidden" id="her-info-div">
+                            <label for="her_info" class="block text-sm font-semibold mb-1.5">
+                                <i class="fa-solid fa-user-secret mr-1 text-brand-secondary dark:text-dbrand-secondary"></i> Her Information (optional)
                             </label>
-                            <textarea name="her_info" id="her_info" class="form-control" rows="3"
-                                placeholder="Add anything that might help — her bio, hobbies, vibe, or her hairstyle."></textarea>
-                            <div class="form-text">Adding details can improve your results.</div>
+                            <textarea name="her_info" id="her_info" rows="3"
+                                class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary resize-y"
+                                placeholder="Add anything that might help - her bio, hobbies, vibe, or her hairstyle."></textarea>
+                            <p class="text-xs text-brand-muted dark:text-dbrand-muted mt-1">Adding details can improve your results.</p>
                         </div>
 
-                        <!-- Screenshot upload (glass, soft) -->
-                        <div class="mb-3 glass glass--soft p-3" id="screenshot-upload">
-                            <label for="formFile" class="form-label fw-semibold">
-                                <i class="me-1 text-success"></i> Upload Screenshot
-                                <span class="small text-muted">(optional — we’ll extract the messages)</span>
+                        <div class="mb-4 glass rounded-xl p-4 bg-white/40 dark:bg-dbrand-surface/40 border border-white/50 dark:border-dbrand-outline" id="screenshot-upload">
+                            <label for="formFile" class="block text-sm font-semibold mb-1.5">
+                                Upload Screenshot
+                                <span class="text-xs text-brand-muted dark:text-dbrand-muted font-normal">(optional - we'll extract the messages)</span>
                             </label>
-                            <input class="form-control mb-2" type="file" id="formFile">
-                            <div class="form-text">Drag & drop a chat screenshot, or paste your convo below.</div>
-                            <div id="ocr-status" class="mt-2 d-none">
-                                <span class="spinner-border spinner-border-sm align-middle text-primary"
-                                    role="status"></span>
-                                <span class="ms-2 text-muted">Analyzing screenshot...</span>
+                            <input class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-blush file:text-brand-primary dark:file:bg-dbrand-surface-container dark:file:text-dbrand-primary hover:file:opacity-80 border border-brand-outline dark:border-dbrand-outline rounded-xl bg-white dark:bg-dbrand-surface-container px-3 py-2" type="file" id="formFile">
+                            <p class="text-xs text-brand-muted dark:text-dbrand-muted mt-1.5">Drag & drop a chat screenshot, or paste your convo below.</p>
+                            <div id="ocr-status" class="mt-2 hidden">
+                                <span class="inline-block w-4 h-4 border-2 border-brand-primary dark:border-dbrand-primary border-t-transparent rounded-full animate-spin align-middle"></span>
+                                <span class="ml-2 text-sm text-brand-muted dark:text-dbrand-muted">Analyzing screenshot...</span>
                             </div>
                         </div>
 
-                        <!-- Conversation -->
-                        <div class="mb-3" id="conversation-paste-area">
-                            <label for="last-reply" class="form-label fw-semibold">
-                                <i class="me-1 text-warning"></i> Conversation
+                        <div class="mb-4" id="conversation-paste-area">
+                            <label for="last-reply" class="block text-sm font-semibold mb-1.5">
+                                Conversation
                             </label>
-                            <textarea name="last-reply" id="last-reply" class="form-control" rows="5"
+                            <textarea name="last_text" id="last-reply" rows="5"
+                                class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary resize-y"
                                 placeholder="you: hey, free thursday?&#10;her: (seen, no reply)"></textarea>
-                            <div class="form-text text-end"><span id="charCount">0</span> characters</div>
+                            <p class="text-xs text-brand-muted dark:text-dbrand-muted mt-1 text-right"><span id="charCount">0</span> characters</p>
                         </div>
 
-                        <!-- Submit + credits chip (same position as home.html) -->
-                        <div class="d-flex align-items-center justify-content-between">
-                            <button type="submit" class="btn btn-dark" id="generate-btn">
-                                <i class="fa fa-fire me-2"></i>Generate Replies
+                        <div class="flex items-center justify-between">
+                            <button
+                                type="submit"
+                                id="generate-btn"
+                                data-generate-btn
+                                class="px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white shadow-lg hover:opacity-90 transition-opacity"
+                            >
+                                <i class="fa fa-fire mr-2"></i>Generate Replies
                             </button>
-                            <div class="credit-chip mb-3">
-                                <i class="fa fa-bolt"></i>
+                            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-text dark:bg-dbrand-surface-container text-white text-sm">
+                                <i class="fa fa-bolt text-brand-secondary dark:text-dbrand-secondary"></i>
                                 Free credits: <strong id="chatCredits">{{ chat_credits }}</strong>
                             </div>
                         </div>
                     </form>
                 </div>
 
-                <!-- Suggestions (match classes exactly) -->
-                <div class="col-12 col-lg-4" id="suggestions">
-                    <div class="small fw-semibold mb-2">Suggested Replies</div>
-
-                    <!-- First: rectangle -->
-                    <div id="suggestedReply" class="soft-card p-3 rounded-0 suggestion mb-3">
-                        <button type="button" class="btn btn-sm btn-link copy-btn"
-                            onclick="copyToClipboard('suggestedReplyMsg', this)" title="Copy">
-                            <i class="fa fa-copy"></i><span class="copied-tooltip">Copied!</span>
-                        </button>
-                        <div id="suggestedReplyMsg">No response has been generated yet</div>
-                        <div class="small text-muted mt-1" id="suggestedReplyScore"></div>
-                    </div>
-
-                    <!-- Second/Third: rounded-xl and hidden initially -->
-                    <div id="suggestedReply2" class="soft-card p-3 rounded-xl suggestion mb-3 d-none">
-                        <button type="button" class="btn btn-sm btn-link copy-btn"
-                            onclick="copyToClipboard('suggestedReplyMsg2', this)" title="Copy">
-                            <i class="fa fa-copy"></i><span class="copied-tooltip">Copied!</span>
-                        </button>
-                        <div id="suggestedReplyMsg2">No response has been generated yet</div>
-                        <div class="small text-muted mt-1" id="suggestedReplyScore2"></div>
-                    </div>
-
-                    <div id="suggestedReply3" class="soft-card p-3 rounded-xl suggestion mb-3 d-none">
-                        <button type="button" class="btn btn-sm btn-link copy-btn"
-                            onclick="copyToClipboard('suggestedReplyMsg3', this)" title="Copy">
-                            <i class="fa fa-copy"></i><span class="copied-tooltip">Copied!</span>
-                        </button>
-                        <div id="suggestedReplyMsg3">No response has been generated yet</div>
-                        <div class="small text-muted mt-1" id="suggestedReplyScore3"></div>
+                <div id="suggestions">
+                    <div class="text-xs font-semibold text-brand-muted dark:text-dbrand-muted uppercase tracking-wide mb-3">Suggested Replies</div>
+                    <div id="responsePanel">
+                        {% include "conversation/partials/response_empty.html" %}
                     </div>
                 </div>
             </div>
@@ -556,357 +188,68 @@
     </div>
 </section>
 
+<template id="response-empty-template">
+    {% include "conversation/partials/response_empty.html" %}
+</template>
 
-<!-- HOW IT WORKS -->
-<section class="section-pad">
-    <div class="container">
-        <h2 class="fw-bold text-center mb-4 ">How it works</h2>
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="soft-card p-4 h-100 hover-lift">
-                    <div class="display-6">🎯</div>
-                    <h5 class="mt-2 fw-semibold mb-1">Pick your situation</h5>
-                    <p class="text-muted mb-0">Just matched, dry reply, asking her out, and more.</p>
-                </div>
+<section class="py-12 sm:py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-3xl font-bold font-heading text-center mb-8">How it works</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white dark:bg-dbrand-surface-container rounded-2xl p-6 border border-brand-outline/30 dark:border-dbrand-outline shadow-sm hover-lift">
+                <div class="text-4xl mb-3"><i class="fa fa-bullseye text-brand-primary dark:text-dbrand-primary"></i></div>
+                <h5 class="font-heading font-semibold text-lg mb-1">Pick your situation</h5>
+                <p class="text-sm text-brand-muted dark:text-dbrand-muted">Just matched, dry reply, asking her out, and more.</p>
             </div>
-            <div class="col-md-4">
-                <div class="soft-card p-4 h-100 hover-lift">
-                    <div class="display-6">🧠</div>
-                    <h5 class="mt-2 fw-semibold mb-1">Paste or upload</h5>
-                    <p class="text-muted mb-0">Paste the chat or upload a screenshot — we’ll extract it for you.</p>
-                </div>
+            <div class="bg-white dark:bg-dbrand-surface-container rounded-2xl p-6 border border-brand-outline/30 dark:border-dbrand-outline shadow-sm hover-lift">
+                <div class="text-4xl mb-3"><i class="fa fa-image text-brand-secondary dark:text-dbrand-secondary"></i></div>
+                <h5 class="font-heading font-semibold text-lg mb-1">Paste or upload</h5>
+                <p class="text-sm text-brand-muted dark:text-dbrand-muted">Paste the chat or upload a screenshot - we'll extract it for you.</p>
             </div>
-            <div class="col-md-4">
-                <div class="soft-card p-4 h-100 hover-lift">
-                    <div class="display-6">⚡</div>
-                    <h5 class="mt-2 fw-semibold mb-1">Get 3 replies</h5>
-                    <p class="text-muted mb-0">Copy with one tap and keep the conversation moving.</p>
-                </div>
+            <div class="bg-white dark:bg-dbrand-surface-container rounded-2xl p-6 border border-brand-outline/30 dark:border-dbrand-outline shadow-sm hover-lift">
+                <div class="text-4xl mb-3"><i class="fa fa-bolt text-brand-tertiary dark:text-dbrand-tertiary"></i></div>
+                <h5 class="font-heading font-semibold text-lg mb-1">Get 3 replies</h5>
+                <p class="text-sm text-brand-muted dark:text-dbrand-muted">Copy with one tap and keep the conversation moving.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- TRUST -->
-<section class="section-pad trust mt-5">
-    <div class="container">
-        <div class="row g-4 align-items-center py-5">
-            <div class="col-lg-6">
-                <h2 class="fw-bold mb-3">Your chats stay yours</h2>
-                <p class="text-white-50 mb-4">We only use the text you provide to generate responses. You control what
-                    you paste and what you keep.</p>
-                <ul class="text-white-50 list-unstyled mb-0">
-                    <li class="mb-2">• Screenshots processed for text only</li>
-                    <li class="mb-2">• One-tap delete</li>
-                    <li>• No messages shared with other users</li>
+<section class="py-16 bg-gradient-to-br from-brand-text via-[#0b1220] to-brand-text dark:from-dbrand-bg dark:via-dbrand-surface dark:to-dbrand-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div>
+                <h2 class="text-3xl font-bold font-heading text-white mb-4">Your chats stay yours</h2>
+                <p class="text-gray-400 mb-6">We only use the text you provide to generate responses. You control what you paste and what you keep.</p>
+                <ul class="text-gray-400 space-y-2">
+                    <li class="flex items-center gap-2"><i class="fa fa-check text-brand-secondary dark:text-dbrand-secondary text-xs"></i> Screenshots processed for text only</li>
+                    <li class="flex items-center gap-2"><i class="fa fa-check text-brand-secondary dark:text-dbrand-secondary text-xs"></i> One-tap delete</li>
+                    <li class="flex items-center gap-2"><i class="fa fa-check text-brand-secondary dark:text-dbrand-secondary text-xs"></i> No messages shared with other users</li>
                 </ul>
             </div>
-            <div class="col-lg-6">
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="item h-100">Fast suggestions</div>
-                    </div>
-                    <div class="col-6">
-                        <div class="item h-100">Platform-agnostic</div>
-                    </div>
-                    <div class="col-6">
-                        <div class="item h-100">Copy anywhere</div>
-                    </div>
-                    <div class="col-6">
-                        <div class="item h-100">Mobile-friendly</div>
-                    </div>
-                </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-xl p-4 bg-white/[0.06] border border-white/10 text-gray-300 text-sm font-medium">Fast suggestions</div>
+                <div class="rounded-xl p-4 bg-white/[0.06] border border-white/10 text-gray-300 text-sm font-medium">Platform-agnostic</div>
+                <div class="rounded-xl p-4 bg-white/[0.06] border border-white/10 text-gray-300 text-sm font-medium">Copy anywhere</div>
+                <div class="rounded-xl p-4 bg-white/[0.06] border border-white/10 text-gray-300 text-sm font-medium">Mobile-friendly</div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- CTA -->
-<section class="section-pad" style="margin-bottom:-3rem;">
-    <div class="container text-center">
-        <div class="glass p-5">
-            <h3 class="fw-bold mb-2">Need more than 5 free credits?</h3>
-            <p class="text-muted mb-3">Create a free account and get +10 bonus credits.</p>
-            <a href="{% url 'account_signup' %}?next=/conversations/" class="btn btn-dark">Create account</a>
+<section class="py-12 sm:py-16">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="glass rounded-2xl p-8 sm:p-10 bg-white/55 dark:bg-dbrand-surface/50 border border-white/65 dark:border-dbrand-outline shadow-lg text-center">
+            <h3 class="text-2xl font-bold font-heading mb-2">Need more than 5 free credits?</h3>
+            <p class="text-brand-muted dark:text-dbrand-muted mb-5">Create a free account and get +10 bonus credits.</p>
+            <a href="{% url 'account_signup' %}?next=/conversations/" class="px-8 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white shadow-lg hover:opacity-90 transition-opacity no-underline">
+                Create account
+            </a>
         </div>
     </div>
 </section>
-
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
-    const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
-    document.addEventListener('DOMContentLoaded', function () {
-        const form = document.getElementById('chatForm');
-        const generateBtn = document.getElementById('generate-btn') || form.querySelector('button[type="submit"]');
-
-        // fields
-        const situationSel = document.getElementById('situation');
-        const herInfo = document.getElementById('her_info');
-        const lastReply = document.getElementById('last-reply');
-
-        // containers
-        const screenshotUpload = document.getElementById('screenshot-upload');
-        const conversationArea = document.getElementById('conversation-paste-area');
-        const ocrStatus = document.getElementById('ocr-status');
-
-        // counters
-        const charCount = document.getElementById('charCount');
-        const creditsEl = document.getElementById('chatCredits');
-        const creditsInlineEl = document.getElementById('chatCreditsInline');
-
-        // suggestion cards
-        const card1 = document.getElementById('suggestedReply');
-        const card2 = document.getElementById('suggestedReply2');
-        const card3 = document.getElementById('suggestedReply3');
-        const msg1 = document.getElementById('suggestedReplyMsg');
-        const msg2 = document.getElementById('suggestedReplyMsg2');
-        const msg3 = document.getElementById('suggestedReplyMsg3');
-        const score1 = document.getElementById('suggestedReplyScore');
-        const score2 = document.getElementById('suggestedReplyScore2');
-        const score3 = document.getElementById('suggestedReplyScore3');
-
-        function updateCounter() {
-            if (charCount) charCount.textContent = (lastReply?.value || '').length;
-        }
-        updateCounter();
-        lastReply?.addEventListener('input', updateCounter);
-
-        // Hide convo/screenshot if "just_matched"
-        function toggleConvoVisibility() {
-            const v = situationSel.value;
-            const show = v !== 'just_matched';
-            screenshotUpload.classList.toggle('d-none', !show);
-            conversationArea.classList.toggle('d-none', !show);
-        }
-        situationSel.addEventListener('change', toggleConvoVisibility);
-        toggleConvoVisibility();
-
-        // Submit handler
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            document.getElementById('suggestions').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-
-            // Disable button + spinner
-            const oldBtnHTML = generateBtn.innerHTML;
-            generateBtn.disabled = true;
-            generateBtn.setAttribute('aria-busy', 'true');
-            generateBtn.innerHTML = `<span class="spinner-border spinner-border-sm align-middle" role="status"></span>
-                               <span class="ms-2">Generating…</span>`;
-
-            // show only first card as "loading"
-            card1.classList.remove('d-none');
-            card2.classList.add('d-none');
-            card3.classList.add('d-none');
-            msg1.innerHTML = `
-        <span class="spinner-border spinner-border-sm align-middle text-primary" role="status"></span>
-        <span class="ms-2 text-muted">Generating your replies…</span>
-      `;
-            score1.textContent = '';
-
-            const payload = {
-                last_text: lastReply?.value || '',
-                situation: situationSel?.value || '',
-                her_info: herInfo?.value || ''
-            };
-
-            fetch("{% url 'ajax_reply' %}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify(payload)
-            })
-                .then(async (response) => {
-                    const data = await response.json().catch(() => null);
-
-                    if (data && data.redirect_url) {
-                        window.location.href = data.redirect_url; // signup or pricing
-                        throw 'redirected';
-                    }
-
-                    if (!response.ok || (data && data.error)) {
-                        const msg = (data && data.error) ? data.error : `Error ${response.status}`;
-                        throw new Error(msg);
-                    }
-                    return data;
-                })
-                .then((data) => {
-                    // Parse "custom" safely — consistent with your main app
-                    let custom = data.custom;
-                    if (typeof custom !== 'string') throw new Error('Unexpected response format from server.');
-                    custom = custom.replace(/^json\s*/i, '').trim();
-                    if (!custom.startsWith('[')) {
-                        const m = custom.match(/\[.*\]/s);
-                        if (m) custom = m[0];
-                    }
-
-                    let suggestions;
-                    try { suggestions = JSON.parse(custom); }
-                    catch (e) { throw new Error('Could not parse AI response. ' + e.message); }
-
-                    const s1 = suggestions?.[0] || {};
-                    const s2 = suggestions?.[1] || {};
-                    const s3 = suggestions?.[2] || {};
-
-                    msg1.textContent = s1.message || '—';
-                    score1.textContent = (typeof s1.confidence_score === 'number')
-                        ? `Confidence: ${Math.round(s1.confidence_score * 100)}%` : '';
-
-                    msg2.textContent = s2.message || '—';
-                    score2.textContent = (typeof s2.confidence_score === 'number')
-                        ? `Confidence: ${Math.round(s2.confidence_score * 100)}%` : '';
-                    card2.classList.remove('d-none');
-
-                    msg3.textContent = s3.message || '—';
-                    score3.textContent = (typeof s3.confidence_score === 'number')
-                        ? `Confidence: ${Math.round(s3.confidence_score * 100)}%` : '';
-                    card3.classList.remove('d-none');
-
-                    if (typeof data.credits_left !== 'undefined') {
-                        if (creditsEl) creditsEl.textContent = data.credits_left;
-                        if (creditsInlineEl) creditsInlineEl.textContent = data.credits_left;
-                    }
-                })
-                .catch((err) => {
-                    if (err === 'redirected') return;
-                    alert(err?.message || 'Error generating reply.');
-                    msg1.textContent = 'No response has been generated yet';
-                    score1.textContent = '';
-                    card2.classList.add('d-none');
-                    card3.classList.add('d-none');
-                })
-                .finally(() => {
-                    generateBtn.disabled = false;
-                    generateBtn.removeAttribute('aria-busy');
-                    generateBtn.innerHTML = oldBtnHTML;
-                });
-        });
-
-        // OCR upload
-        document.getElementById('formFile')?.addEventListener('change', function (e) {
-            const inputEl = e.target;
-            const file = inputEl.files?.[0];
-            if (!file) return;
-
-            ocrStatus.classList.remove('d-none');
-            const formData = new FormData();
-            formData.append('screenshot', file);
-
-            fetch("/conversations/ocr-screenshot/", {
-                method: 'POST',
-                headers: { 'X-CSRFToken': csrfToken },
-                body: formData
-            })
-                .then(async (response) => {
-                    const data = await response.json().catch(() => null);
-                    if (!response.ok || (data && data.error)) {
-                        if (data && data.redirect_url) {
-                            window.location.href = data.redirect_url;
-                            throw 'redirected';
-                        }
-                        const msg = (data && data.error) ? data.error : `OCR failed (status ${response.status})`;
-                        throw new Error(msg);
-                    }
-                    return data;
-                })
-                .then((data) => {
-                    ocrStatus.classList.add('d-none');
-                    if (data.ocr_text) {
-                        if (lastReply.value.trim()) {
-                            lastReply.value = lastReply.value.trim() + "\n\n" + data.ocr_text;
-                        } else {
-                            lastReply.value = data.ocr_text;
-                        }
-                        updateCounter();
-                    } else {
-                        throw new Error("Failed to extract text from image.");
-                    }
-                })
-                .catch((err) => {
-                    if (err === 'redirected') return;
-                    ocrStatus.classList.add('d-none');
-                    alert(err?.message || "Failed to OCR the screenshot.");
-                })
-                .finally(() => {
-                    inputEl.value = '';
-                });
-        });
-    });
-
-</script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const situationSelect = document.getElementById('situation');
-        const herInfoDiv = document.getElementById('her-info-div');
-
-        // Function to toggle visibility
-        function toggleHerInfo() {
-            const val = situationSelect.value;
-            if (val === 'just_matched') {
-                document.getElementById('screenshot-upload').style.display = 'none';
-                document.getElementById('conversation-paste-area').style.display = 'none';
-                herInfoDiv.style.display = 'block';
-            } else {
-                document.getElementById('screenshot-upload').style.display = 'block';
-                document.getElementById('conversation-paste-area').style.display = 'block';
-                herInfoDiv.style.display = 'none';
-            }
-        }
-
-        // Initial check
-        toggleHerInfo();
-
-        // Listen for changes
-        situationSelect.addEventListener('change', toggleHerInfo);
-    });
-</script>
-
-<script>
-    // Copy helper (global) — now also logs the copy event for homepage
-    function copyToClipboard(elementId, btn) {
-        const text = document.getElementById(elementId).innerText;
-
-        // 1) Copy to clipboard (existing behavior)
-        navigator.clipboard.writeText(text).then(function () {
-            const tooltip = btn.querySelector('.copied-tooltip');
-            if (tooltip) {
-                tooltip.style.display = 'inline-block';
-                setTimeout(() => { tooltip.style.display = 'none'; }, 1000);
-            }
-        });
-
-        // 2) Log to backend (same endpoint/model you already added)
-        try {
-            const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
-            const situationSel = document.getElementById('situation');
-            const herInfo = document.getElementById('her_info');
-            const lastReply = document.getElementById('last-reply');
-
-            const payload = {
-                situation: situationSel?.value || '',
-                her_info: herInfo?.value || '',
-                conversation_text: lastReply?.value || '',
-                copied_message: text,
-                // If you surface a conversation id on the homepage, include it:
-                // conversation_id: document.body.dataset.conversationId || null
-            };
-
-            fetch("/conversations/copy/", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrfToken
-                },
-                body: JSON.stringify(payload)
-            }).catch(() => { /* ignore silent logging errors */ });
-
-        } catch (e) {
-            /* ignore logging failures */
-        }
-    }
-    window.copyToClipboard = copyToClipboard;
-</script>
-
+<script src="{% static 'js/web_reply_ui.js' %}"></script>
 {% endblock %}

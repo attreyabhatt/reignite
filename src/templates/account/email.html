@@ -4,95 +4,83 @@
 {% block head_title %}{% trans "Email Addresses" %}{% endblock %}
 
 {% block accountcontent %}
-<div class="text-center mb-4">
-    <i class="fas fa-envelope fa-3x text-primary mb-3"></i>
-    <p class="text-muted">You can add or remove email addresses and set your primary email.</p>
+<div class="text-center mb-6">
+    <i class="fas fa-envelope text-3xl text-brand-primary dark:text-dbrand-primary mb-3"></i>
+    <p class="text-sm text-brand-muted dark:text-dbrand-muted">You can add or remove email addresses and set your primary email.</p>
 </div>
 
 {% if user.emailaddress_set.all %}
-<div class="mb-4">
-    <h6>Current Email Addresses:</h6>
+<div class="mb-6">
+    <h6 class="text-sm font-semibold mb-3">Current Email Addresses:</h6>
     <form method="post" action="{% url 'account_email' %}">
         {% csrf_token %}
-        <div class="list-group">
+        <div class="space-y-2">
             {% for emailaddress in user.emailaddress_set.all %}
-                <div class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="email" value="{{ emailaddress.email }}" 
-                                   {% if emailaddress.primary %}checked{% endif %}>
-                            <label class="form-check-label">
-                                {{ emailaddress.email }}
-                                {% if emailaddress.primary %}
-                                    <span class="badge bg-primary ms-2">Primary</span>
-                                {% endif %}
-                                {% if not emailaddress.verified %}
-                                    <span class="badge bg-warning ms-2">Unverified</span>
-                                {% endif %}
-                            </label>
-                        </div>
-                    </div>
-                    <div>
+            <div class="flex items-center justify-between p-3 rounded-xl border border-brand-outline/30 dark:border-dbrand-outline/30">
+                <div class="flex items-center gap-2">
+                    <input type="radio" name="email" value="{{ emailaddress.email }}"
+                        {% if emailaddress.primary %}checked{% endif %}
+                        class="text-brand-primary dark:text-dbrand-primary focus:ring-brand-secondary">
+                    <span class="text-sm">
+                        {{ emailaddress.email }}
+                        {% if emailaddress.primary %}
+                        <span class="ml-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-primary/10 dark:bg-dbrand-primary/10 text-brand-primary dark:text-dbrand-primary">Primary</span>
+                        {% endif %}
                         {% if not emailaddress.verified %}
-                            <button type="submit" name="action_send" value="{{ emailaddress.email }}" 
-                                    class="btn btn-sm btn-outline-info">
-                                <i class="fas fa-paper-plane"></i> Send Verification
-                            </button>
+                        <span class="ml-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">Unverified</span>
                         {% endif %}
-                        {% if not emailaddress.primary %}
-                            <button type="submit" name="action_remove" value="{{ emailaddress.email }}" 
-                                    class="btn btn-sm btn-outline-danger">
-                                <i class="fas fa-trash"></i> Remove
-                            </button>
-                        {% endif %}
-                    </div>
+                    </span>
                 </div>
+                <div class="flex gap-1">
+                    {% if not emailaddress.verified %}
+                    <button type="submit" name="action_send" value="{{ emailaddress.email }}"
+                        class="px-2.5 py-1 rounded-lg text-xs font-medium border border-brand-outline dark:border-dbrand-outline hover:bg-brand-blush dark:hover:bg-dbrand-surface-high transition-colors">
+                        <i class="fas fa-paper-plane"></i> Verify
+                    </button>
+                    {% endif %}
+                    {% if not emailaddress.primary %}
+                    <button type="submit" name="action_remove" value="{{ emailaddress.email }}"
+                        class="px-2.5 py-1 rounded-lg text-xs font-medium text-red-500 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
             {% endfor %}
         </div>
-        
-        <div class="mt-3">
-            <button type="submit" name="action_primary" class="btn btn-dark w-100">
-                <i class="fas fa-star"></i> Make Primary
-            </button>
-        </div>
+
+        <button type="submit" name="action_primary" class="w-full mt-3 px-4 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white hover:opacity-90 transition-opacity">
+            <i class="fas fa-star mr-1"></i> Make Primary
+        </button>
     </form>
 </div>
 {% endif %}
 
-<div class="card">
-    <div class="card-header">
-        <h6 class="mb-0">Add New Email Address</h6>
-    </div>
-    <div class="card-body">
-        <form method="post" action="{% url 'account_email' %}">
-            {% csrf_token %}
-            <div class="mb-3">
-                <label for="{{ form.email.id_for_label }}" class="form-label">
-                    <i class="fas fa-envelope"></i> {{ form.email.label }}
-                </label>
-                <input type="email" 
-                       class="form-control {% if form.email.errors %}is-invalid{% endif %}"
-                       id="{{ form.email.id_for_label }}"
-                       name="{{ form.email.name }}"
-                       value="{{ form.email.value|default:'' }}"
-                       placeholder="Enter new email address">
-                {% if form.email.errors %}
-                    <div class="invalid-feedback">
-                        {{ form.email.errors }}
-                    </div>
-                {% endif %}
-            </div>
-            
-            <button type="submit" name="action_add" class="btn btn-dark w-100">
-                <i class="fas fa-plus"></i> Add Email
-            </button>
-        </form>
-    </div>
+<div class="rounded-xl border border-brand-outline dark:border-dbrand-outline p-4">
+    <h6 class="text-sm font-semibold mb-3">Add New Email Address</h6>
+    <form method="post" action="{% url 'account_email' %}">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="{{ form.email.id_for_label }}" class="block text-xs font-medium text-brand-muted dark:text-dbrand-muted mb-1.5">
+                <i class="fas fa-envelope mr-1"></i> {{ form.email.label }}
+            </label>
+            <input type="email"
+                class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-brand-bg dark:bg-dbrand-surface px-4 py-3 text-sm text-brand-text dark:text-dbrand-text focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary {% if form.email.errors %}ring-2 ring-red-500{% endif %}"
+                id="{{ form.email.id_for_label }}" name="{{ form.email.name }}"
+                value="{{ form.email.value|default:'' }}" placeholder="Enter new email address">
+            {% if form.email.errors %}
+            <p class="text-xs text-red-500 mt-1">{{ form.email.errors }}</p>
+            {% endif %}
+        </div>
+        <button type="submit" name="action_add" class="w-full px-4 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white hover:opacity-90 transition-opacity">
+            <i class="fas fa-plus mr-1"></i> Add Email
+        </button>
+    </form>
 </div>
 
-<div class="text-center mt-4">
-    <a href="{% url 'home' %}" class="text-decoration-none">
-        <i class="fas fa-arrow-left"></i> Back to Home
+<div class="text-center mt-5">
+    <a href="{% url 'home' %}" class="text-sm text-brand-muted dark:text-dbrand-muted hover:text-brand-text dark:hover:text-dbrand-text no-underline">
+        <i class="fas fa-arrow-left mr-1"></i> Back to Home
     </a>
 </div>
 {% endblock %}

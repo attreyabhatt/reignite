@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 
 <head>
     {% load static %}
@@ -8,12 +8,68 @@
     <title>{% block head_title %} {% endblock head_title %}</title>
 
     <link rel="icon" href="{% static 'images/favicon.ico' %}" type="image/x-icon">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
-    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
-    <!-- Outfit -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS (Play CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        // Light theme
+                        brand: {
+                            bg: '#F9F8F6',
+                            surface: '#FFFFFF',
+                            primary: '#991B38',
+                            secondary: '#C4A462',
+                            tertiary: '#C22E53',
+                            text: '#1C1C1E',
+                            muted: '#8E8E93',
+                            outline: '#E6E1D9',
+                            blush: '#FAF0F2',
+                            'outline-variant': '#EDE7E1',
+                            'surface-dim': '#F1EEE9',
+                            'surface-container': '#F7F4F0',
+                        },
+                        // Dark theme
+                        dbrand: {
+                            bg: '#0E0F12',
+                            surface: '#12141A',
+                            primary: '#FF2D6D',
+                            secondary: '#D4AF37',
+                            tertiary: '#B95A7B',
+                            text: '#F4F2EE',
+                            muted: '#8F9BB3',
+                            outline: '#3A3F4A',
+                            'outline-variant': '#2E323B',
+                            'surface-container': '#1B1E25',
+                            'surface-high': '#21242C',
+                            'surface-low': '#16181F',
+                        },
+                    },
+                    fontFamily: {
+                        heading: ['"Playfair Display"', 'serif'],
+                        body: ['Manrope', 'system-ui', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        'xl': '16px',
+                        '2xl': '20px',
+                    },
+                },
+            },
+        }
+    </script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+
+    <!-- Fonts: Playfair Display + Manrope -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome (icons) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Google Analytics -->
@@ -22,35 +78,76 @@
         window.dataLayer = window.dataLayer || [];
         function gtag() { dataLayer.push(arguments); }
         gtag('js', new Date());
-
         gtag('config', 'G-5KFLPTVDQ7');
     </script>
+
     <style>
-        .navbar-brand svg path[fill^="var(--tat-accent)"] { transition: transform .2s ease; transform-origin: 75% 35%; }
-        @media (prefers-reduced-motion: reduce) {
-        .navbar-brand svg path[fill^="var(--tat-accent)"] { transition: none; }
+        body { font-family: 'Manrope', system-ui, sans-serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Playfair Display', serif; }
+
+        /* Glass effect - reusable */
+        .glass {
+            position: relative;
+            isolation: isolate;
+            backdrop-filter: saturate(180%) blur(18px);
+            -webkit-backdrop-filter: saturate(180%) blur(18px);
         }
-        .navbar-brand:hover svg path[fill^="var(--tat-accent)"] { transform: scale(1.06); }
+        .glass::before {
+            content: "";
+            position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+            background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
+        }
 
+        /* Smooth hover lift */
+        .hover-lift { transition: transform .2s ease, box-shadow .2s ease; }
+        .hover-lift:hover { transform: translateY(-2px); }
+
+        /* Copied tooltip */
+        .copied-tooltip {
+            display: none; position: absolute; top: 120%; left: 50%;
+            transform: translateX(-50%); font-size: 12px;
+            padding: 2px 8px; border-radius: 8px; z-index: 10;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hover-lift { transition: none; }
+            .hover-lift:hover { transform: none; }
+        }
     </style>
+
     {% block extra_head %}
-
-
     {% endblock extra_head %}
+
+    <!-- Dark mode init (before paint) -->
+    <script>
+        (function() {
+            const stored = localStorage.getItem('theme');
+            if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
 </head>
 
-<body class="d-flex flex-column min-vh-100">
+<body class="flex flex-col min-h-screen bg-brand-bg text-brand-text dark:bg-dbrand-bg dark:text-dbrand-text font-body">
     {% include "navbar.html" %}
-    <main class="flex-grow-1 pt-4">
+    <main class="flex-grow pt-4">
         {% block content %}
         {% endblock %}
-        <!-- CTA FOOTER -->
         <footer>
             {% include "footer.html" %}
         </footer>
     </main>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
+        // Dark mode toggle function
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const isDark = html.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+
+        // Copy suggestion analytics
         document.addEventListener('click', function (e) {
             if (e.target.classList.contains('copy-btn')) {
                 const suggestionId = e.target.dataset.suggestionId || 'unknown';

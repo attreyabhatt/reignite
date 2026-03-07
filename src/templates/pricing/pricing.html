@@ -1,78 +1,76 @@
 {% extends "base.html" %}
 
-{% block head_title %}
-Pricing | Chat Credits
-{% endblock head_title %}
+{% block head_title %}Pricing | Chat Credits{% endblock head_title %}
 
 {% block content %}
-<div class="container py-5">
-    <h2 class="text-center mb-4 fw-bold">Get More Chat Credits</h2>
-    <p class="text-center mb-5 text-muted">Unlock more AI wingman responses anytime.</p>
-    <div class="row justify-content-center g-4">
-        <!-- Starter: 10 Credits -->
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 h-100 bg-light">
-                <div class="card-body text-center">
-                    <h5 class="card-title fw-bold mb-2">10 Credits</h5>
-                    <div class="display-6 mb-3">$1.99</div>
-                    <ul class="list-unstyled mb-4">
-                        <li>One-time purchase</li>
-                        <li>Instant delivery</li>
-                        <li>Great for testing</li>
-                    </ul>
-                    {% if user.is_authenticated %}
-                    <a href="{% url 'pricing:purchase' 10 %}" class="btn btn-outline-dark w-100">Buy 10 Credits</a>
-                    {% else %}
-                    <a href="#" class="btn btn-outline-dark w-100">Buy 10 Credits</a>
-                    {% endif %}
-                </div>
-            </div>
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <h2 class="text-3xl sm:text-4xl font-bold font-heading text-center mb-3">Get More Chat Credits</h2>
+    <p class="text-center text-brand-muted dark:text-dbrand-muted mb-10">Unlock more AI wingman responses anytime.</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- 10 Credits -->
+        <div class="rounded-2xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container p-6 text-center hover-lift">
+            <h5 class="font-heading font-bold text-lg mb-2">10 Credits</h5>
+            <div class="text-4xl font-bold font-heading mb-4 text-brand-text dark:text-dbrand-text">$1.99</div>
+            <ul class="space-y-2 text-sm text-brand-muted dark:text-dbrand-muted mb-6 list-none p-0">
+                <li>One-time purchase</li>
+                <li>Instant delivery</li>
+                <li>Great for testing</li>
+            </ul>
+            {% if user.is_authenticated %}
+            <a href="{% url 'pricing:purchase' 10 %}" class="block w-full px-4 py-3 rounded-full border border-brand-outline dark:border-dbrand-outline text-sm font-semibold text-brand-text dark:text-dbrand-text hover:bg-brand-blush dark:hover:bg-dbrand-surface-high transition-colors no-underline text-center">
+                Buy 10 Credits
+            </a>
+            {% else %}
+            <a href="#" class="block w-full px-4 py-3 rounded-full border border-brand-outline dark:border-dbrand-outline text-sm font-semibold text-brand-text dark:text-dbrand-text hover:bg-brand-blush dark:hover:bg-dbrand-surface-high transition-colors no-underline text-center">
+                Buy 10 Credits
+            </a>
+            {% endif %}
         </div>
 
-        <!-- Standard: 50 Credits -->
-        <div class="col-md-4">
-            <div class="card shadow border-dark border-2 h-100 bg-dark">
-                <div class="card-body text-center">
-                    <h5 class="card-title fw-bold mb-2 text-light">50 Credits</h5>
-                    <div class="display-6 mb-3 text-light">$6.99</div>
-                    <ul class="list-unstyled mb-4 text-light">
-                        <li>One-time purchase</li>
-                        <li>Best for active users</li>
-                        <li>Save 30%</li>
-                    </ul>
-                    {% if user.is_authenticated %}
-                    <a href="{% url 'pricing:purchase' 50 %}" class="btn btn-light w-100">Buy 50 Credits</a>
-                    {% else %}
-                    <a href="#" class="btn btn-light w-100">Buy 50 Credits</a>
-                    {% endif %}
-                </div>
-            </div>
+        <!-- 50 Credits (featured) -->
+        <div class="rounded-2xl border-2 border-brand-primary dark:border-dbrand-primary bg-gradient-to-b from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary p-6 text-center text-white shadow-xl scale-[1.02] hover-lift">
+            <h5 class="font-heading font-bold text-lg mb-2">50 Credits</h5>
+            <div class="text-4xl font-bold font-heading mb-4">$6.99</div>
+            <ul class="space-y-2 text-sm text-white/80 mb-6 list-none p-0">
+                <li>One-time purchase</li>
+                <li>Best for active users</li>
+                <li>Save 30%</li>
+            </ul>
+            {% if user.is_authenticated %}
+            <a href="{% url 'pricing:purchase' 50 %}" class="block w-full px-4 py-3 rounded-full bg-white text-brand-primary dark:text-dbrand-primary text-sm font-semibold hover:bg-white/90 transition-colors no-underline text-center">
+                Buy 50 Credits
+            </a>
+            {% else %}
+            <a href="#" class="block w-full px-4 py-3 rounded-full bg-white text-brand-primary dark:text-dbrand-primary text-sm font-semibold hover:bg-white/90 transition-colors no-underline text-center">
+                Buy 50 Credits
+            </a>
+            {% endif %}
         </div>
 
-        <!-- Wingman Pro: 200 Credits -->
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 h-100 bg-light">
-                <div class="card-body text-center">
-                    <h5 class="card-title fw-bold mb-2">200 Credits</h5>
-                    <div class="display-6 mb-3">$19.99</div>
-                    <ul class="list-unstyled mb-4">
-                        <li>One-time purchase</li>
-                        <li>Most value for money</li>
-                        <li>Save 50%</li>
-                    </ul>
-                    {% if user.is_authenticated %}
-                    <a href="{% url 'pricing:purchase' 200 %}" class="btn btn-outline-dark w-100">Buy 200 Credits</a>
-                    {% else %}
-                    <a href="#" class="btn btn-outline-dark w-100">Buy 200 Credits</a>
-                    {% endif %}
-                </div>
-            </div>
+        <!-- 200 Credits -->
+        <div class="rounded-2xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container p-6 text-center hover-lift">
+            <h5 class="font-heading font-bold text-lg mb-2">200 Credits</h5>
+            <div class="text-4xl font-bold font-heading mb-4 text-brand-text dark:text-dbrand-text">$19.99</div>
+            <ul class="space-y-2 text-sm text-brand-muted dark:text-dbrand-muted mb-6 list-none p-0">
+                <li>One-time purchase</li>
+                <li>Most value for money</li>
+                <li>Save 50%</li>
+            </ul>
+            {% if user.is_authenticated %}
+            <a href="{% url 'pricing:purchase' 200 %}" class="block w-full px-4 py-3 rounded-full border border-brand-outline dark:border-dbrand-outline text-sm font-semibold text-brand-text dark:text-dbrand-text hover:bg-brand-blush dark:hover:bg-dbrand-surface-high transition-colors no-underline text-center">
+                Buy 200 Credits
+            </a>
+            {% else %}
+            <a href="#" class="block w-full px-4 py-3 rounded-full border border-brand-outline dark:border-dbrand-outline text-sm font-semibold text-brand-text dark:text-dbrand-text hover:bg-brand-blush dark:hover:bg-dbrand-surface-high transition-colors no-underline text-center">
+                Buy 200 Credits
+            </a>
+            {% endif %}
         </div>
-
-
     </div>
-    <div class="text-center mt-5 text-muted">
-        <small>No subscription required. Secure payment coming soon.</small>
-    </div>
+
+    <p class="text-center text-sm text-brand-muted dark:text-dbrand-muted mt-10">
+        No subscription required. Secure payment coming soon.
+    </p>
 </div>
 {% endblock %}

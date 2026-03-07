@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from .models import Conversation, ChatCredit, CopyEvent
 
@@ -24,11 +24,134 @@ MAX_LAST_TEXT = 8000          # protect model + DB
 MAX_HER_INFO = 4000
 MAX_SITUATION_LEN = 150
 
+
+def _is_htmx_request(request):
+    return request.headers.get("HX-Request", "").lower() == "true"
+
+
+def _render_htmx_error(request, message):
+    return render(request, "conversation/partials/response_error.html", {"error_message": message})
+
+
 def _json_error(msg, status=400, redirect_url=None):
     payload = {"error": msg}
     if redirect_url:
         payload["redirect_url"] = redirect_url
     return JsonResponse(payload, status=status)
+
+
+def _read_reply_input(request):
+    content_type = (request.content_type or "").split(";")[0].strip().lower()
+    if content_type == "application/json":
+        try:
+            data = json.loads(request.body or "{}")
+        except json.JSONDecodeError as exc:
+            raise ValueError("Invalid JSON body.") from exc
+        return {
+            "last_text": (data.get("last_text") or "").strip(),
+            "situation": (data.get("situation") or "").strip(),
+            "her_info": (data.get("her_info") or "").strip(),
+        }
+
+    return {
+        "last_text": (request.POST.get("last_text") or request.POST.get("last-reply") or "").strip(),
+        "situation": (request.POST.get("situation") or "").strip(),
+        "her_info": (request.POST.get("her_info") or "").strip(),
+    }
+
+
+def _extract_json_array(raw_response):
+    if isinstance(raw_response, list):
+        return raw_response
+
+    if isinstance(raw_response, dict):
+        for key in ("suggestions", "responses", "data"):
+            value = raw_response.get(key)
+            if isinstance(value, list):
+                return value
+        raise ValueError("Model output did not contain a suggestions array.")
+
+    if not isinstance(raw_response, str):
+        raise ValueError("Model output is not valid JSON text.")
+
+    text = raw_response.strip()
+    fenced_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, flags=re.IGNORECASE)
+    if fenced_match:
+        text = fenced_match.group(1).strip()
+
+    text = re.sub(r"^\s*json\s*", "", text, flags=re.IGNORECASE).strip()
+
+    if text.startswith("["):
+        candidate = text
+    else:
+        match = re.search(r"\[[\s\S]*\]", text)
+        if not match:
+            raise ValueError("No JSON array found in model output.")
+        candidate = match.group(0)
+
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Could not parse model output JSON: {exc.msg}") from exc
+
+    if not isinstance(parsed, list):
+        raise ValueError("Model output JSON is not an array.")
+
+    return parsed
+
+
+def parse_suggestions(raw_response):
+    parsed = _extract_json_array(raw_response)
+    suggestions = []
+
+    for item in parsed:
+        message = ""
+        confidence_value = None
+
+        if isinstance(item, dict):
+            message = str(item.get("message") or "").strip()
+            confidence_raw = item.get("confidence_score")
+            if confidence_raw is not None:
+                try:
+                    confidence_value = float(confidence_raw)
+                except (TypeError, ValueError):
+                    confidence_value = None
+        elif isinstance(item, str):
+            message = item.strip()
+
+        if not message:
+            continue
+
+        confidence_label = ""
+        if confidence_value is not None:
+            confidence_label = f"Confidence: {round(confidence_value * 100)}%"
+
+        suggestions.append({
+            "message": message,
+            "confidence_score": confidence_value,
+            "confidence_label": confidence_label,
+        })
+
+        if len(suggestions) >= 3:
+            break
+
+    if not suggestions:
+        raise ValueError("No valid suggestions were found in the model output.")
+
+    return suggestions
+
+
+def _render_htmx_redirect(url):
+    response = HttpResponse("")
+    response["HX-Redirect"] = url
+    return response
+
+
+def _json_or_htmx_error(request, is_htmx, message, status=400):
+    if is_htmx:
+        return _render_htmx_error(request, message)
+    return _json_error(message, status=status)
+
 
 def generate_title(last_text: str) -> str:
     """Generate a short title based on the latest 'her:' line or last line."""
@@ -39,6 +162,7 @@ def generate_title(last_text: str) -> str:
         snippet = last_text.strip().split('\n')[-1][:40] if last_text.strip() else "Conversation"
     snippet = re.sub(r'\s+', ' ', snippet).strip().capitalize()
     return f"{snippet}..."
+
 
 # --------- Views ---------
 def conversation_home(request):
@@ -54,98 +178,151 @@ def conversation_home(request):
     return render(request, 'conversation/index.html', context)
 
 
-# conversation/views.py
-
 @require_POST
 @ratelimit(key='ip', rate='50/d', block=True)
 def ajax_reply(request):
-    # Parse JSON safely early
+    is_htmx = _is_htmx_request(request)
+
     try:
-        data = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        return _json_error("Invalid JSON body.")
+        data = _read_reply_input(request)
+    except ValueError as exc:
+        return _json_or_htmx_error(request, is_htmx, str(exc), status=400)
 
     last_text = (data.get('last_text') or "").strip()
     situation = (data.get('situation') or "").strip()
     her_info = (data.get('her_info') or "").strip()
 
-    # ---- Validation (same as before) ----
     if not last_text and situation != "just_matched":
-        return _json_error("Conversation text is required.")
+        return _json_or_htmx_error(request, is_htmx, "Conversation text is required.", status=400)
     if len(last_text) > MAX_LAST_TEXT:
-        return _json_error(f"Conversation is too long (>{MAX_LAST_TEXT} chars). Please shorten it.")
+        return _json_or_htmx_error(
+            request,
+            is_htmx,
+            f"Conversation is too long (>{MAX_LAST_TEXT} chars). Please shorten it.",
+            status=400,
+        )
     if not situation or len(situation) > MAX_SITUATION_LEN or situation not in ALLOWED_SITUATIONS:
-        return _json_error("Invalid 'situation' value.")
+        return _json_or_htmx_error(request, is_htmx, "Invalid 'situation' value.", status=400)
     if len(her_info) > MAX_HER_INFO:
-        return _json_error(f"'Her information' is too long (>{MAX_HER_INFO} chars).")
+        return _json_or_htmx_error(
+            request,
+            is_htmx,
+            f"'Her information' is too long (>{MAX_HER_INFO} chars).",
+            status=400,
+        )
 
-    # ---- Authenticated flow (unchanged) ----
+    created = False
+    convo = None
+    credits_left = None
+
     if request.user.is_authenticated:
         chat_credit = request.user.chat_credit
         if chat_credit.balance < 1:
-            # existing behavior: pricing redirect
-            return JsonResponse({'redirect_url': reverse('pricing:pricing')})
+            pricing_url = reverse('pricing:pricing')
+            if is_htmx:
+                return _render_htmx_redirect(pricing_url)
+            return JsonResponse({'redirect_url': pricing_url})
 
-        # Upsert conversation
         convo = Conversation.objects.filter(user=request.user, content=last_text).first()
-        created = False
         if convo:
             convo.content = last_text
             convo.situation = situation
             convo.her_info = her_info
             convo.save()
         else:
-            generated_title = generate_title(last_text)
             convo = Conversation.objects.create(
                 user=request.user,
                 content=last_text,
                 situation=situation,
                 her_info=her_info,
-                girl_title=generated_title
+                girl_title=generate_title(last_text),
             )
             created = True
 
-        # AI call (webapp uses marc_prompt for just_matched)
         try:
             custom_response, success = generate_custom_response(last_text, situation, her_info, is_webapp=True)
         except Exception:
-            return _json_error("AI engine error. Please try again.", status=500)
-        if not success:
-            return _json_error("AI failed to generate a proper response. Try again. No credit deducted.", status=500)
+            return _json_or_htmx_error(request, is_htmx, "AI engine error. Please try again.", status=500)
 
-        # Deduct 1 credit
+        if not success:
+            return _json_or_htmx_error(
+                request,
+                is_htmx,
+                "AI failed to generate a proper response. Try again. No credit deducted.",
+                status=500,
+            )
+
+        try:
+            suggestions = parse_suggestions(custom_response)
+        except ValueError as exc:
+            return _json_or_htmx_error(request, is_htmx, f"Could not parse generated response: {exc}", status=500)
+
         chat_credit.balance = max(0, chat_credit.balance - 1)
         chat_credit.save()
+        credits_left = chat_credit.balance
 
-        resp = {
+        payload = {
             "custom": custom_response,
-            "credits_left": chat_credit.balance,
+            "suggestions": suggestions,
+            "credits_left": credits_left,
         }
         if created:
-            resp["new_conversation"] = {"id": convo.id, "girl_title": convo.girl_title}
-        return JsonResponse(resp)
+            payload["new_conversation"] = {"id": convo.id, "girl_title": convo.girl_title}
 
-    # ---- Guest (homepage) flow: 5 free session credits ----
+        if not is_htmx:
+            return JsonResponse(payload)
+
+        html_response = render(request, "conversation/partials/response_suggestions.html", {"suggestions": suggestions})
+        triggers = {
+            "creditsUpdated": {"credits_left": credits_left},
+        }
+        if created:
+            triggers["conversationCreated"] = {"id": convo.id, "girl_title": convo.girl_title}
+        html_response["HX-Trigger"] = json.dumps(triggers)
+        return html_response
+
     credits = int(request.session.get('chat_credits', 5))
     if credits < 1:
-        # out of free credits → ask to signup, then land them on /conversations/
         signup_url = reverse('account_signup') + "?next=/conversations/&message=out_of_credits"
+        if is_htmx:
+            return _render_htmx_redirect(signup_url)
         return JsonResponse({'redirect_url': signup_url}, status=403)
 
-    # AI call (no DB save for guests, webapp uses marc_prompt for just_matched)
     try:
         custom_response, success = generate_custom_response(last_text, situation, her_info, is_webapp=True)
     except Exception:
-        return _json_error("AI engine error. Please try again.", status=500)
-    if not success:
-        return _json_error("AI failed to generate a proper response. Try again. No credit deducted.", status=500)
+        return _json_or_htmx_error(request, is_htmx, "AI engine error. Please try again.", status=500)
 
-    # Deduct 1 session credit on success
+    if not success:
+        return _json_or_htmx_error(
+            request,
+            is_htmx,
+            "AI failed to generate a proper response. Try again. No credit deducted.",
+            status=500,
+        )
+
+    try:
+        suggestions = parse_suggestions(custom_response)
+    except ValueError as exc:
+        return _json_or_htmx_error(request, is_htmx, f"Could not parse generated response: {exc}", status=500)
+
     request.session['chat_credits'] = max(0, credits - 1)
-    return JsonResponse({
+    credits_left = request.session['chat_credits']
+
+    payload = {
         "custom": custom_response,
-        "credits_left": request.session['chat_credits'],
+        "suggestions": suggestions,
+        "credits_left": credits_left,
+    }
+
+    if not is_htmx:
+        return JsonResponse(payload)
+
+    html_response = render(request, "conversation/partials/response_suggestions.html", {"suggestions": suggestions})
+    html_response["HX-Trigger"] = json.dumps({
+        "creditsUpdated": {"credits_left": credits_left},
     })
+    return html_response
 
 
 def conversation_detail(request, pk):
@@ -237,6 +414,7 @@ def delete_conversation(request):
     convo.delete()
     return JsonResponse({'success': True})
 
+
 @require_POST
 @ratelimit(key='ip', rate='200/d', block=True)   # optional but nice for guests
 def log_copy(request):
@@ -284,3 +462,4 @@ def log_copy(request):
     )
 
     return JsonResponse({'ok': True})
+
