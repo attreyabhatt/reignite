@@ -149,7 +149,13 @@ def create_user_chat_credit(sender, instance, created, **kwargs):
         )
         
 class MobileAppConfig(models.Model):
-    """Singleton config — editable from Django admin. Only one row should exist."""
+    """Singleton config - editable from Django admin. Only one row should exist."""
+
+    COMMUNITY_SORT_CHOICES = [
+        ('new', 'New'),
+        ('hot', 'Hot'),
+        ('top', 'Top'),
+    ]
 
     # --- Free user limits ---
     free_daily_credit_limit = models.PositiveIntegerField(
@@ -161,6 +167,14 @@ class MobileAppConfig(models.Model):
 
     subscriber_weekly_limit = models.PositiveIntegerField(
         default=400, help_text="Legacy weekly fair-use cap for subscribers"
+    )
+
+    # --- Community feed defaults ---
+    community_default_sort = models.CharField(
+        max_length=10,
+        choices=COMMUNITY_SORT_CHOICES,
+        default='new',
+        help_text='Default community feed sort when clients do not pass a sort query param',
     )
 
     # --- Guest (unauthenticated) model selection ---

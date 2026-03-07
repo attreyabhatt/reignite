@@ -15,8 +15,10 @@ def _user_admin_link(user):
 
 class CommunityCommentInline(admin.TabularInline):
     model = CommunityComment
-    extra = 0
-    fields = ('author', 'body', 'is_deleted', 'created_at')
+    # Keep one blank inline row visible so admins can add comments directly
+    # from the CommunityPost admin change page without extra clicks.
+    extra = 1
+    fields = ('author', 'author_display_name', 'body', 'is_deleted', 'created_at')
     readonly_fields = ('created_at',)
     autocomplete_fields = ('author',)
     show_change_link = True
@@ -143,6 +145,7 @@ class CommunityPostAdmin(admin.ModelAdmin):
 class CommunityCommentAdmin(admin.ModelAdmin):
     list_display = (
         'body_preview',
+        'effective_author_name',
         'author_link',
         'post_link',
         'like_count_display',
@@ -150,7 +153,7 @@ class CommunityCommentAdmin(admin.ModelAdmin):
         'created_at',
     )
     list_filter = ('is_deleted', 'created_at')
-    search_fields = ('body', 'author__username', 'post__title')
+    search_fields = ('body', 'author__username', 'author_display_name', 'post__title')
     readonly_fields = ('created_at', 'author_admin_link')
     autocomplete_fields = ('author', 'post')
     actions = ['remove_comments', 'restore_comments', 'clear_likes']
@@ -161,6 +164,15 @@ class CommunityCommentAdmin(admin.ModelAdmin):
     def body_preview(self, obj):
         return obj.body[:80] + '...' if len(obj.body) > 80 else obj.body
     body_preview.short_description = 'Comment'
+
+    def effective_author_name(self, obj):
+        if obj.author_display_name:
+            return obj.author_display_name
+        if obj.author:
+            return obj.author.username
+        return '[deleted]'
+    effective_author_name.short_description = 'Author Name'
+    effective_author_name.admin_order_field = 'author_display_name'
 
     def author_link(self, obj):
         return _user_admin_link(obj.author)

@@ -6,6 +6,7 @@ from django.utils import timezone
 class CommunityPost(models.Model):
     CATEGORY_CHOICES = [
         ('help_me_reply', 'Help Me Reply'),
+        ('dating_advice', 'Dating Advice'),
         ('rate_my_profile', 'Rate My Profile'),
         ('wins', 'Wins'),
     ]
@@ -66,6 +67,7 @@ class CommunityComment(models.Model):
         null=True,
         related_name='community_comments',
     )
+    author_display_name = models.CharField(max_length=150, blank=True, default='')
     body = models.TextField()
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

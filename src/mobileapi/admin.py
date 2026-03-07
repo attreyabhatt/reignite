@@ -120,6 +120,7 @@ class MobileAppConfigAdmin(admin.ModelAdmin):
         ("OCR Thinking", {"fields": (
             "ocr_thinking",
         )}),
+        ("Community", {"fields": ("community_default_sort",)}),
         ("Fallback & Legacy", {"fields": ("fallback_model", "subscriber_weekly_limit")}),
         ("Blur Settings", {"fields": ("blur_preview_word_count",)}),
     )

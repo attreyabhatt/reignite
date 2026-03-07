@@ -27,7 +27,7 @@ from community.models import (
     PostVote,
     UserBlock,
 )
-from conversation.models import ChatCredit
+from conversation.models import ChatCredit, MobileAppConfig
 from .push_notifications import send_post_comment_notification
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ NEW_HOURS = 6
 # Trending = published within 24 h and score >= threshold
 TRENDING_HOURS = 24
 TRENDING_SCORE_THRESHOLD = 5
+VALID_SORTS = ('new', 'hot', 'top')
 
 
 # ---------------------------------------------------------------------------
@@ -165,9 +166,13 @@ def _comment_payload(comment, user_liked=False):
     like_count = getattr(comment, 'like_count', None)
     if like_count is None:
         like_count = comment.likes.count()
+    author = _author_payload(comment.author)
+    custom_author_name = (getattr(comment, 'author_display_name', '') or '').strip()
+    if custom_author_name:
+        author['username'] = custom_author_name
     return {
         'id': comment.id,
-        'author': _author_payload(comment.author),
+        'author': author,
         'body': comment.body,
         'like_count': like_count,
         'user_liked': user_liked,
@@ -203,6 +208,26 @@ def _ordered_posts_qs(qs, sort):
     return qs.order_by('-is_featured', '-published_at', '-vote_score', '-id')
 
 
+def _default_feed_sort():
+    try:
+        configured = (MobileAppConfig.load().community_default_sort or '').strip().lower()
+    except Exception as exc:
+        logger.warning('Falling back to community default sort "new": %s', exc)
+        return 'new'
+    if configured in VALID_SORTS:
+        return configured
+    return 'new'
+
+
+def _resolve_feed_sort(raw_sort):
+    if raw_sort is None or str(raw_sort).strip() == '':
+        return _default_feed_sort()
+    normalized = str(raw_sort).strip().lower()
+    if normalized in VALID_SORTS:
+        return normalized
+    return 'hot'
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -220,7 +245,7 @@ def community_post_list(request):
 
 def _list_posts(request):
     category = request.GET.get('category', '').strip()
-    sort = request.GET.get('sort', 'hot').strip()
+    sort = _resolve_feed_sort(request.GET.get('sort'))
     try:
         page = max(1, int(request.GET.get('page', 1)))
     except (ValueError, TypeError):
@@ -259,6 +284,7 @@ def _list_posts(request):
     return Response({
         'posts': [_post_payload(p, user_votes.get(p.id), now, request_user=request.user) for p in page_posts],
         'page': page,
+        'sort': sort,
         'has_more': total_posts > start + PAGE_SIZE,
         'total': total_posts,
     })

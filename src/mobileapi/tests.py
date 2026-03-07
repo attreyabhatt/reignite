@@ -1547,6 +1547,39 @@ class CommunityApiTests(TestCase):
         created = CommunityPost.objects.get(pk=response.data["id"])
         self.assertFalse(created.is_anonymous)
 
+    def test_create_and_filter_dating_advice_category(self):
+        self._auth(self.author_token)
+        create_response = self.client.post(
+            reverse("community_post_list"),
+            {
+                "title": "Dating advice question",
+                "body": "Should I text first after the date?",
+                "category": "dating_advice",
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.data["category"], "dating_advice")
+
+        CommunityPost.objects.create(
+            author=self.author,
+            title="Different category",
+            body="Control post",
+            category="wins",
+            published_at=timezone.now() - timedelta(minutes=1),
+        )
+
+        self._as_guest()
+        filtered = self.client.get(
+            reverse("community_post_list"),
+            {"category": "dating_advice", "sort": "new", "page": 1},
+        )
+        self.assertEqual(filtered.status_code, 200)
+        ids = [item["id"] for item in filtered.data["posts"]]
+        self.assertIn(create_response.data["id"], ids)
+        self.assertEqual(len(ids), 1)
+
     def test_list_paginates_posts(self):
         now = timezone.now()
         for i in range(23):
@@ -1623,6 +1656,71 @@ class CommunityApiTests(TestCase):
         self._as_guest()
         response = self.client.get(reverse("community_post_list"), {"sort": "hot", "page": 1})
         self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.data["posts"]]
+        self.assertLess(ids.index(recent_low_score.id), ids.index(older_high_score.id))
+
+    def test_list_without_sort_uses_admin_default_sort(self):
+        now = timezone.now()
+        older_high_score = CommunityPost.objects.create(
+            author=self.author,
+            title="Older top-ranked",
+            body="Older top-ranked body",
+            category="wins",
+            published_at=now - timedelta(days=2),
+        )
+        recent_low_score = CommunityPost.objects.create(
+            author=self.author,
+            title="Recent low-ranked",
+            body="Recent low-ranked body",
+            category="wins",
+            published_at=now - timedelta(minutes=5),
+        )
+        PostVote.objects.create(user=self.other_user, post=older_high_score, vote_type="up")
+        PostVote.objects.create(user=self.reporter, post=older_high_score, vote_type="up")
+
+        cfg = MobileAppConfig.load()
+        cfg.community_default_sort = "top"
+        cfg.save(update_fields=["community_default_sort"])
+
+        self._as_guest()
+        response = self.client.get(reverse("community_post_list"), {"page": 1})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["sort"], "top")
+
+        ids = [item["id"] for item in response.data["posts"]]
+        self.assertLess(ids.index(older_high_score.id), ids.index(recent_low_score.id))
+
+    def test_list_explicit_sort_overrides_admin_default(self):
+        now = timezone.now()
+        older_high_score = CommunityPost.objects.create(
+            author=self.author,
+            title="Older top candidate",
+            body="Older top candidate body",
+            category="wins",
+            published_at=now - timedelta(days=2),
+        )
+        recent_low_score = CommunityPost.objects.create(
+            author=self.author,
+            title="Recent candidate",
+            body="Recent candidate body",
+            category="wins",
+            published_at=now - timedelta(minutes=5),
+        )
+        PostVote.objects.create(user=self.other_user, post=older_high_score, vote_type="up")
+        PostVote.objects.create(user=self.reporter, post=older_high_score, vote_type="up")
+
+        cfg = MobileAppConfig.load()
+        cfg.community_default_sort = "top"
+        cfg.save(update_fields=["community_default_sort"])
+
+        self._as_guest()
+        response = self.client.get(
+            reverse("community_post_list"),
+            {"sort": "new", "page": 1},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["sort"], "new")
+
         ids = [item["id"] for item in response.data["posts"]]
         self.assertLess(ids.index(recent_low_score.id), ids.index(older_high_score.id))
 
@@ -1767,6 +1865,54 @@ class CommunityApiTests(TestCase):
                 format="json",
             ).status_code,
             401,
+        )
+
+    def test_comment_detail_uses_author_display_name_when_present(self):
+        post = CommunityPost.objects.create(
+            author=self.author,
+            title="Display name post",
+            body="Body",
+            category="wins",
+            published_at=timezone.now() - timedelta(minutes=1),
+        )
+        comment = post.comments.create(
+            author=self.other_user,
+            author_display_name="Concierge Alias",
+            body="Alias should be shown.",
+        )
+
+        self._as_guest()
+        response = self.client.get(reverse("community_post_detail", args=[post.id]))
+
+        self.assertEqual(response.status_code, 200)
+        payload_comment = next(
+            item for item in response.data["comments"] if item["id"] == comment.id
+        )
+        self.assertEqual(payload_comment["author"]["username"], "Concierge Alias")
+
+    def test_comment_detail_falls_back_to_username_without_display_name(self):
+        post = CommunityPost.objects.create(
+            author=self.author,
+            title="Fallback name post",
+            body="Body",
+            category="wins",
+            published_at=timezone.now() - timedelta(minutes=1),
+        )
+        comment = post.comments.create(
+            author=self.other_user,
+            body="Fallback should use username.",
+        )
+
+        self._as_guest()
+        response = self.client.get(reverse("community_post_detail", args=[post.id]))
+
+        self.assertEqual(response.status_code, 200)
+        payload_comment = next(
+            item for item in response.data["comments"] if item["id"] == comment.id
+        )
+        self.assertEqual(
+            payload_comment["author"]["username"],
+            self.other_user.username,
         )
 
     def test_create_vote_comment_poll_report_and_delete_flow(self):
