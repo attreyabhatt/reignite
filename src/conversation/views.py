@@ -4,8 +4,8 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from .models import Conversation, ChatCredit, CopyEvent
 
-from conversation.utils.image_gpt import extract_conversation_from_image
-from conversation.utils.custom_gpt import generate_custom_response
+from conversation.utils.web.image_web import extract_conversation_from_image_web
+from conversation.utils.web.custom_web import generate_web_response
 
 from django_ratelimit.decorators import ratelimit
 import json
@@ -240,7 +240,7 @@ def ajax_reply(request):
             created = True
 
         try:
-            custom_response, success = generate_custom_response(last_text, situation, her_info, is_webapp=True)
+            custom_response, success = generate_web_response(last_text, situation, her_info)
         except Exception:
             return _json_or_htmx_error(request, is_htmx, "AI engine error. Please try again.", status=500)
 
@@ -289,7 +289,7 @@ def ajax_reply(request):
         return JsonResponse({'redirect_url': signup_url}, status=403)
 
     try:
-        custom_response, success = generate_custom_response(last_text, situation, her_info, is_webapp=True)
+        custom_response, success = generate_web_response(last_text, situation, her_info)
     except Exception:
         return _json_or_htmx_error(request, is_htmx, "AI engine error. Please try again.", status=500)
 
@@ -389,7 +389,7 @@ def ocr_screenshot(request):
         return _json_error("File too large. Please keep under 8 MB.", status=400)
 
     try:
-        text = extract_conversation_from_image(screenshot_file)
+        text = extract_conversation_from_image_web(screenshot_file)
         if not text or not text.strip():
             return _json_error("OCR returned empty text. Try a clearer screenshot.", status=422)
         return JsonResponse({'ocr_text': text})

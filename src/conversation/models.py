@@ -246,6 +246,52 @@ class MobileAppConfig(models.Model):
         return obj
 
 
+class WebAppConfig(models.Model):
+    """Singleton config for web AI provider routing."""
+
+    PROVIDER_GEMINI = "gemini"
+    PROVIDER_GPT = "gpt"
+    PROVIDER_CHOICES = [
+        (PROVIDER_GEMINI, "Gemini"),
+        (PROVIDER_GPT, "GPT"),
+    ]
+
+    primary_provider = models.CharField(
+        max_length=20,
+        choices=PROVIDER_CHOICES,
+        default=PROVIDER_GEMINI,
+        help_text="Primary AI provider for webapp generation and OCR.",
+    )
+
+    class Meta:
+        verbose_name = "Web App Config"
+        verbose_name_plural = "Web App Config"
+
+    def __str__(self):
+        return (
+            f"Web App Configuration "
+            f"(primary={self.primary_provider}, fallback={self.fallback_provider})"
+        )
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @property
+    def fallback_provider(self) -> str:
+        if self.primary_provider == self.PROVIDER_GPT:
+            return self.PROVIDER_GEMINI
+        return self.PROVIDER_GPT
+
+    def provider_order(self):
+        return [self.primary_provider, self.fallback_provider]
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class DegradationTier(models.Model):
     """One row per degradation tier. Admin can add/remove/reorder."""
     TIER_TYPE_CHOICES = [

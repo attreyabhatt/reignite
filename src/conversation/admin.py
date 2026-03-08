@@ -3,6 +3,7 @@ from .models import (
     ChatCredit,
     Conversation,
     CopyEvent,
+    WebAppConfig,
 )
 
 @admin.register(ChatCredit)
@@ -28,3 +29,23 @@ class CopyEventAdmin(admin.ModelAdmin):
     def get_username(self, obj):
         return obj.user.username if obj.user else "guest"
     get_username.short_description = 'User'
+
+
+@admin.register(WebAppConfig)
+class WebAppConfigAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ("Provider Routing", {"fields": ("primary_provider", "fallback_provider_display")}),
+    )
+    readonly_fields = ("fallback_provider_display",)
+
+    def fallback_provider_display(self, obj):
+        if not obj:
+            return WebAppConfig.PROVIDER_GPT
+        return obj.fallback_provider
+    fallback_provider_display.short_description = "Fallback Provider"
+
+    def has_add_permission(self, request):
+        return not WebAppConfig.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

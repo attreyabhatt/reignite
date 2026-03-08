@@ -14,7 +14,6 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
-from conversation.utils.custom_gpt import generate_custom_response
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
 from reignitehome.utils.ip_check import get_client_ip
