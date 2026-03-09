@@ -1,8 +1,11 @@
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
+from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 
+from conversation.models import ChatCredit, WebAppConfig
 from reignitehome.models import MarketingClickEvent
 
 
@@ -151,3 +154,44 @@ class FlirtfixRedirectTests(TestCase):
         )
         self._assert_valid_play_redirect(response)
         self.assertEqual(MarketingClickEvent.objects.count(), 0)
+
+
+class WebMarketingAndSignupConfigTests(TestCase):
+    def setUp(self):
+        self.cfg = WebAppConfig.load()
+        self.cfg.guest_reply_limit = 7
+        self.cfg.signup_bonus_credits = 11
+        self.cfg.save()
+
+    def test_home_marketing_lines_follow_web_app_config(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Need more than 7 free credits?")
+        self.assertContains(response, "Create a free account and get +11 bonus credits.")
+
+    def test_signup_template_marketing_line_follows_web_app_config(self):
+        response = self.client.get(reverse("account_signup"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "11 Free Credits (no card needed)")
+
+    def test_web_signup_applies_configured_signup_bonus_credits(self):
+        self.cfg.signup_bonus_credits = 9
+        self.cfg.save(update_fields=["signup_bonus_credits"])
+
+        response = self.client.post(
+            reverse("account_signup"),
+            data={
+                "email": "newwebsignup@example.com",
+                "password1": "VeryStrongPass123!",
+                "password2": "VeryStrongPass123!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(email="newwebsignup@example.com")
+        chat_credit = ChatCredit.objects.get(user=user)
+        self.assertEqual(chat_credit.balance, 9)
+        self.assertEqual(chat_credit.total_earned, 9)
+        self.assertTrue(chat_credit.signup_bonus_given)

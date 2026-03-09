@@ -149,6 +149,74 @@ class AjaxReplyViewTests(TestCase):
             "AI failed to generate a proper response. Try again. No credit deducted.",
         )
 
+    @patch('conversation.views.generate_web_response')
+    def test_authenticated_paid_credits_are_not_limited_by_signup_bonus_setting(self, mock_generate):
+        cfg = WebAppConfig.load()
+        cfg.signup_bonus_credits = 0
+        cfg.save()
+
+        chat_credit = self.user.chat_credit
+        chat_credit.balance = 2
+        chat_credit.save(update_fields=["balance"])
+
+        mock_generate.return_value = (
+            '[{"message":"Line 1","confidence_score":0.91}]',
+            True,
+        )
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({
+                'last_text': 'you: hi\nher: hey',
+                'situation': 'stuck_after_reply',
+                'her_info': '',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("credits_left"), 1)
+
+
+class GuestReplyLimitTests(TestCase):
+    def setUp(self):
+        self.url = reverse('ajax_reply')
+        self.cfg = WebAppConfig.load()
+        self.cfg.guest_reply_limit = 1
+        self.cfg.save()
+
+    @patch('conversation.views.generate_web_response')
+    def test_guest_reply_limit_uses_web_app_config(self, mock_generate):
+        mock_generate.return_value = (
+            '[{"message":"Line 1","confidence_score":0.91}]',
+            True,
+        )
+
+        first = self.client.post(
+            self.url,
+            data=json.dumps({
+                'last_text': 'you: hi\nher: hey',
+                'situation': 'stuck_after_reply',
+                'her_info': '',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json().get("credits_left"), 0)
+
+        second = self.client.post(
+            self.url,
+            data=json.dumps({
+                'last_text': 'you: hi again\nher: hey again',
+                'situation': 'stuck_after_reply',
+                'her_info': '',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(second.status_code, 403)
+        self.assertIn("redirect_url", second.json())
+
 
 class OcrScreenshotViewTests(TestCase):
     def setUp(self):
@@ -248,6 +316,8 @@ class WebAppConfigModelTests(TestCase):
         cfg = WebAppConfig.load()
 
         self.assertEqual(cfg.primary_provider, WebAppConfig.PROVIDER_GEMINI)
+        self.assertEqual(cfg.guest_reply_limit, 5)
+        self.assertEqual(cfg.signup_bonus_credits, 3)
         self.assertEqual(cfg.fallback_provider, WebAppConfig.PROVIDER_GPT)
         self.assertEqual(cfg.provider_order(), [WebAppConfig.PROVIDER_GEMINI, WebAppConfig.PROVIDER_GPT])
         self.assertEqual(WebAppConfig.objects.count(), 1)

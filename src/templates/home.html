@@ -240,8 +240,8 @@
 <section class="py-12 sm:py-16">
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="glass rounded-2xl p-8 sm:p-10 bg-white/55 dark:bg-dbrand-surface/50 border border-white/65 dark:border-dbrand-outline shadow-lg text-center">
-            <h3 class="text-2xl font-bold font-heading mb-2">Need more than 5 free credits?</h3>
-            <p class="text-brand-muted dark:text-dbrand-muted mb-5">Create a free account and get +10 bonus credits.</p>
+            <h3 class="text-2xl font-bold font-heading mb-2">Need more than {{ web_guest_reply_limit }} free credits?</h3>
+            <p class="text-brand-muted dark:text-dbrand-muted mb-5">Create a free account and get +{{ web_signup_bonus_credits }} bonus credits.</p>
             <a href="{% url 'account_signup' %}?next=/conversations/" class="px-8 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white shadow-lg hover:opacity-90 transition-opacity no-underline">
                 Create account
             </a>

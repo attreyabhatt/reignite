@@ -262,6 +262,14 @@ class WebAppConfig(models.Model):
         default=PROVIDER_GEMINI,
         help_text="Primary AI provider for webapp generation and OCR.",
     )
+    guest_reply_limit = models.PositiveIntegerField(
+        default=5,
+        help_text="Free reply generations for unauthenticated web users.",
+    )
+    signup_bonus_credits = models.PositiveIntegerField(
+        default=3,
+        help_text="Free credits granted to newly signed-up web users.",
+    )
 
     class Meta:
         verbose_name = "Web App Config"

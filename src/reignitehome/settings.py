@@ -190,6 +190,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'reignitehome.context_processors.web_marketing_limits',
             ],
         },
     },

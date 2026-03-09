@@ -33,6 +33,7 @@ def get_mobile_reply_prompt(last_text, custom_instructions=""):
     Used by the 'Need Reply' feature with gemini-3-pro-preview.
     """
     prompt = f"""
+You are an expert online dating coach.
 Generate 3 replies for a dating app based on the conversation provided.
 
 Analysis & Logic:
@@ -44,6 +45,7 @@ Analysis & Logic:
 Constraints:
 - No em dashes or dashes.
 - Only use single quotes when necessary.
+- No use of texts like 'Challenge accepted', 'chaos', 'energy',' main character energy'
 
 Conversation:
 {last_text}

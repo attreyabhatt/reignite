@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
-from .models import Conversation, ChatCredit, CopyEvent
+from .models import Conversation, ChatCredit, CopyEvent, WebAppConfig
 
 from conversation.utils.web.image_web import extract_conversation_from_image_web
 from conversation.utils.web.custom_web import generate_web_response
@@ -38,6 +38,10 @@ def _json_error(msg, status=400, redirect_url=None):
     if redirect_url:
         payload["redirect_url"] = redirect_url
     return JsonResponse(payload, status=status)
+
+
+def _get_web_config():
+    return WebAppConfig.load()
 
 
 def _read_reply_input(request):
@@ -281,7 +285,8 @@ def ajax_reply(request):
         html_response["HX-Trigger"] = json.dumps(triggers)
         return html_response
 
-    credits = int(request.session.get('chat_credits', 5))
+    guest_limit = _get_web_config().guest_reply_limit
+    credits = int(request.session.get('chat_credits', guest_limit))
     if credits < 1:
         signup_url = reverse('account_signup') + "?next=/conversations/&message=out_of_credits"
         if is_htmx:
@@ -349,7 +354,7 @@ def ocr_screenshot(request):
     # Auth / session credits
     if not request.user.is_authenticated:
         # Initialize session credits if missing
-        request.session.setdefault('chat_credits', 5)
+        request.session.setdefault('chat_credits', _get_web_config().guest_reply_limit)
         request.session.setdefault('screenshot_credits', 5)
 
         # Deduct one screenshot credit (floor at 0)
@@ -360,14 +365,6 @@ def ocr_screenshot(request):
                 status=403, redirect_url=signup_url
             )
         request.session['screenshot_credits'] = max(0, request.session['screenshot_credits'] - 1)
-
-        # Check chat credits (for consistency with your flow)
-        if request.session.get('chat_credits', 0) <= 0:
-            signup_url = reverse('account_signup')
-            return _json_error(
-                "You’re out of chat credits. Sign up to unlock unlimited replies.",
-                status=403, redirect_url=signup_url
-            )
     else:
         chat_credit = request.user.chat_credit
         if chat_credit.balance < 1:
@@ -462,4 +459,3 @@ def log_copy(request):
     )
 
     return JsonResponse({'ok': True})
-

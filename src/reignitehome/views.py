@@ -14,6 +14,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
+from conversation.models import WebAppConfig
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
 from reignitehome.utils.ip_check import get_client_ip
@@ -76,6 +77,10 @@ BOT_UA_SUBSTRINGS = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _get_web_config():
+    return WebAppConfig.load()
 
 
 def _sanitize_utm_value(raw_value, default="", max_len=160):
@@ -209,7 +214,7 @@ def ratelimited_error(request, exception=None):
 
 def home(request):
     if 'chat_credits' not in request.session:
-        request.session['chat_credits'] = 5
+        request.session['chat_credits'] = _get_web_config().guest_reply_limit
         
     current_chat_credits = request.session['chat_credits']
     
@@ -250,7 +255,7 @@ def ajax_reply_home(request):
             'redirect_url': signup_url
         }, status=403)
 
-    credits = request.session.get('chat_credits', 0)
+    credits = request.session.get('chat_credits', _get_web_config().guest_reply_limit)
     if credits <= 0:
         trial_record.trial_used = True
         trial_record.save()

@@ -34,6 +34,7 @@ class CopyEventAdmin(admin.ModelAdmin):
 @admin.register(WebAppConfig)
 class WebAppConfigAdmin(admin.ModelAdmin):
     fieldsets = (
+        ("Free Usage", {"fields": ("guest_reply_limit", "signup_bonus_credits")}),
         ("Provider Routing", {"fields": ("primary_provider", "fallback_provider_display")}),
     )
     readonly_fields = ("fallback_provider_display",)
