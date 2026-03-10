@@ -344,6 +344,38 @@ class LockedReply(models.Model):
         return f"LockedReply #{self.pk} for {self.user.username} ({'unlocked' if self.unlocked else 'locked'})"
 
 
+class GuestWebConversationAttempt(models.Model):
+    class Endpoint(models.TextChoices):
+        CONVERSATIONS_AJAX_REPLY = "conversations_ajax_reply", "Conversations Ajax Reply"
+        AJAX_REPLY_HOME = "ajax_reply_home", "Ajax Reply Home"
+
+    class Status(models.TextChoices):
+        SUCCESS = "success", "Success"
+        VALIDATION_ERROR = "validation_error", "Validation Error"
+        CREDITS_BLOCKED = "credits_blocked", "Credits Blocked"
+        AI_ERROR = "ai_error", "AI Error"
+        PARSE_ERROR = "parse_error", "Parse Error"
+        REQUEST_ERROR = "request_error", "Request Error"
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    session_key_hash = models.CharField(max_length=64, db_index=True)
+    endpoint = models.CharField(max_length=64, choices=Endpoint.choices, db_index=True)
+    status = models.CharField(max_length=32, choices=Status.choices, db_index=True)
+    http_status = models.PositiveSmallIntegerField()
+    input_payload = models.JSONField(default=dict, blank=True)
+    output_payload = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["endpoint", "status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.endpoint} {self.status} ({self.http_status})"
+
+
 class CopyEvent(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='copy_events')
     conversation = models.ForeignKey('Conversation', on_delete=models.SET_NULL, null=True, blank=True, related_name='copy_events')

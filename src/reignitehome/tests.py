@@ -4,8 +4,9 @@ from uuid import UUID
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from unittest.mock import patch
 
-from conversation.models import ChatCredit, WebAppConfig
+from conversation.models import ChatCredit, GuestWebConversationAttempt, WebAppConfig
 from reignitehome.models import MarketingClickEvent
 
 
@@ -195,3 +196,67 @@ class WebMarketingAndSignupConfigTests(TestCase):
         self.assertEqual(chat_credit.balance, 9)
         self.assertEqual(chat_credit.total_earned, 9)
         self.assertTrue(chat_credit.signup_bonus_given)
+
+
+class AjaxReplyHomeGuestLoggingTests(TestCase):
+    def setUp(self):
+        self.url = reverse("ajax_reply_home")
+
+    def test_content_type_invalid_is_logged_as_request_error(self):
+        response = self.client.post(
+            self.url,
+            data="not-json",
+            content_type="text/plain",
+        )
+
+        self.assertEqual(response.status_code, 415)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 1)
+
+        event = GuestWebConversationAttempt.objects.get()
+        self.assertEqual(event.endpoint, GuestWebConversationAttempt.Endpoint.AJAX_REPLY_HOME)
+        self.assertEqual(event.status, GuestWebConversationAttempt.Status.REQUEST_ERROR)
+        self.assertEqual(event.http_status, 415)
+
+    @patch("reignitehome.views.generate_reignite_comeback")
+    def test_success_is_logged_with_output_payload(self, mock_generate):
+        mock_generate.return_value = ("Suggested reply", True)
+
+        response = self.client.post(
+            self.url,
+            data={
+                "last_text": "you: hi\\nher: hello there",
+                "platform": "Tinder",
+                "what_happened": "Not sure / Just stopped",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 1)
+
+        event = GuestWebConversationAttempt.objects.get()
+        self.assertEqual(event.status, GuestWebConversationAttempt.Status.SUCCESS)
+        self.assertEqual(event.http_status, 200)
+        self.assertEqual(event.output_payload.get("custom"), "Suggested reply")
+        self.assertIn("credits_left", event.output_payload)
+
+    @patch("reignitehome.views.generate_reignite_comeback")
+    def test_generation_failure_is_logged_as_ai_error(self, mock_generate):
+        mock_generate.side_effect = Exception("upstream failure")
+
+        response = self.client.post(
+            self.url,
+            data={
+                "last_text": "you: hi\\nher: hello there",
+                "platform": "Tinder",
+                "what_happened": "Not sure / Just stopped",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 1)
+
+        event = GuestWebConversationAttempt.objects.get()
+        self.assertEqual(event.status, GuestWebConversationAttempt.Status.AI_ERROR)
+        self.assertEqual(event.http_status, 502)

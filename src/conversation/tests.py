@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import WebAppConfig
+from .models import GuestWebConversationAttempt, WebAppConfig
 
 class AjaxReplyViewTests(TestCase):
     def setUp(self):
@@ -177,6 +177,7 @@ class AjaxReplyViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload.get("credits_left"), 1)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 0)
 
 
 class GuestReplyLimitTests(TestCase):
@@ -216,6 +217,127 @@ class GuestReplyLimitTests(TestCase):
         )
         self.assertEqual(second.status_code, 403)
         self.assertIn("redirect_url", second.json())
+
+
+class GuestWebConversationAttemptLoggingTests(TestCase):
+    def setUp(self):
+        self.url = reverse('ajax_reply')
+
+    @patch('conversation.views.generate_web_response')
+    def test_guest_success_logs_input_and_output_payloads(self, mock_generate):
+        mock_generate.return_value = (
+            '[{"message":"Line 1","confidence_score":0.91}]',
+            True,
+        )
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({
+                'last_text': 'you: hi\\nher: hey',
+                'situation': 'stuck_after_reply',
+                'her_info': 'likes coffee',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 1)
+
+        event = GuestWebConversationAttempt.objects.get()
+        self.assertEqual(
+            event.endpoint,
+            GuestWebConversationAttempt.Endpoint.CONVERSATIONS_AJAX_REPLY,
+        )
+        self.assertEqual(event.status, GuestWebConversationAttempt.Status.SUCCESS)
+        self.assertEqual(event.http_status, 200)
+        self.assertEqual(len(event.session_key_hash), 64)
+        self.assertEqual(event.input_payload.get("situation"), "stuck_after_reply")
+        self.assertEqual(event.input_payload.get("her_info"), "likes coffee")
+        self.assertIn("custom", event.output_payload)
+        self.assertIn("suggestions", event.output_payload)
+
+    def test_guest_validation_error_is_logged(self):
+        response = self.client.post(
+            self.url,
+            data=json.dumps({
+                'last_text': '',
+                'situation': 'dry_reply',
+                'her_info': '',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 1)
+
+        event = GuestWebConversationAttempt.objects.get()
+        self.assertEqual(event.status, GuestWebConversationAttempt.Status.VALIDATION_ERROR)
+        self.assertEqual(event.http_status, 400)
+
+    def test_guest_no_credit_block_is_logged(self):
+        session = self.client.session
+        session["chat_credits"] = 0
+        session.save()
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({
+                'last_text': 'you: hi\\nher: hey',
+                'situation': 'stuck_after_reply',
+                'her_info': '',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 1)
+
+        event = GuestWebConversationAttempt.objects.get()
+        self.assertEqual(event.status, GuestWebConversationAttempt.Status.CREDITS_BLOCKED)
+        self.assertEqual(event.http_status, 403)
+        self.assertIn("redirect_url", event.output_payload)
+
+    @patch('conversation.views.generate_web_response')
+    def test_guest_ai_error_is_logged(self, mock_generate):
+        mock_generate.side_effect = Exception("boom")
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({
+                'last_text': 'you: hi\\nher: hey',
+                'situation': 'stuck_after_reply',
+                'her_info': '',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 1)
+
+        event = GuestWebConversationAttempt.objects.get()
+        self.assertEqual(event.status, GuestWebConversationAttempt.Status.AI_ERROR)
+        self.assertEqual(event.http_status, 500)
+
+    @patch('conversation.views.generate_web_response')
+    def test_guest_parse_error_is_logged(self, mock_generate):
+        mock_generate.return_value = ("not-json", True)
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({
+                'last_text': 'you: hi\\nher: hey',
+                'situation': 'stuck_after_reply',
+                'her_info': '',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(GuestWebConversationAttempt.objects.count(), 1)
+
+        event = GuestWebConversationAttempt.objects.get()
+        self.assertEqual(event.status, GuestWebConversationAttempt.Status.PARSE_ERROR)
+        self.assertEqual(event.http_status, 500)
 
 
 class OcrScreenshotViewTests(TestCase):

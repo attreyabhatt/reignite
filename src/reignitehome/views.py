@@ -14,7 +14,8 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 from django_ratelimit.decorators import ratelimit
 
-from conversation.models import WebAppConfig
+from conversation.models import GuestWebConversationAttempt, WebAppConfig
+from conversation.utils.web_guest_logging import log_guest_web_attempt
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
 from reignitehome.utils.ip_check import get_client_ip
@@ -238,30 +239,75 @@ def home(request):
 @ratelimit(key='ip', rate='10/d', block=True)   # keep your current limit
 @require_POST
 def ajax_reply_home(request):
+    endpoint = GuestWebConversationAttempt.Endpoint.AJAX_REPLY_HOME
+    guest_input_payload = {
+        "content_type": (request.META.get("CONTENT_TYPE") or "").strip().lower(),
+    }
+
     # 1) Quick size & content-type guards
     clen = int(request.META.get("CONTENT_LENGTH") or 0)
+    guest_input_payload["content_length"] = clen
     if clen and clen > 32_768:
-        return JsonResponse({"error": "Payload too large."}, status=413)
+        error_message = "Payload too large."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.REQUEST_ERROR,
+            http_status=413,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return JsonResponse({"error": error_message}, status=413)
     if "application/json" not in (request.META.get("CONTENT_TYPE") or ""):
-        return JsonResponse({"error": "Content-Type must be application/json."}, status=415)
+        error_message = "Content-Type must be application/json."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.REQUEST_ERROR,
+            http_status=415,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return JsonResponse({"error": error_message}, status=415)
 
     # 2) Trial/credits gate (your original logic)
     ip = get_client_ip(request)
     trial_record, created = TrialIP.objects.get_or_create(ip_address=ip)
     if not created and trial_record.trial_used:
         signup_url = reverse('account_signup')
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.CREDITS_BLOCKED,
+            http_status=403,
+            input_payload=guest_input_payload,
+            output_payload={"redirect_url": signup_url},
+            error_message="Guest out of credits.",
+        )
         return JsonResponse({
-            'error': 'You’re out of chat credits. Sign up to unlock unlimited replies.',
+            'error': "You're out of chat credits. Sign up to unlock unlimited replies.",
             'redirect_url': signup_url
         }, status=403)
 
     credits = request.session.get('chat_credits', _get_web_config().guest_reply_limit)
+    guest_input_payload["credits_before"] = int(credits)
     if credits <= 0:
         trial_record.trial_used = True
         trial_record.save()
         signup_url = reverse('account_signup')
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.CREDITS_BLOCKED,
+            http_status=403,
+            input_payload=guest_input_payload,
+            output_payload={"redirect_url": signup_url},
+            error_message="Guest out of credits.",
+        )
         return JsonResponse({
-            'error': 'You’re out of chat credits. Sign up to unlock unlimited replies.',
+            'error': "You're out of chat credits. Sign up to unlock unlimited replies.",
             'redirect_url': signup_url
         }, status=403)
 
@@ -269,34 +315,108 @@ def ajax_reply_home(request):
     try:
         data = json.loads(request.body.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({"error": "Invalid JSON."}, status=400)
+        error_message = "Invalid JSON."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.REQUEST_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return JsonResponse({"error": error_message}, status=400)
 
     last_text = (data.get('last_text') or "").strip()
     platform = (data.get('platform') or "").strip()
     what_happened = (data.get('what_happened') or "").strip()
+    guest_input_payload.update({
+        "last_text": last_text,
+        "platform": platform,
+        "what_happened": what_happened,
+    })
 
     # 4) Validate fields
     if not (5 <= len(last_text) <= 1200):
-        return JsonResponse({"error": "Please enter the full conversation."}, status=400)
+        error_message = "Please enter the full conversation."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.VALIDATION_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return JsonResponse({"error": error_message}, status=400)
     if platform not in PLATFORM_ALLOWED:
-        return JsonResponse({"error": "Invalid platform."}, status=400)
+        error_message = "Invalid platform."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.VALIDATION_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return JsonResponse({"error": error_message}, status=400)
     if what_happened not in WHAT_ALLOWED:
-        return JsonResponse({"error": "Invalid what_happened."}, status=400)
+        error_message = "Invalid what_happened."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.VALIDATION_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return JsonResponse({"error": error_message}, status=400)
 
     # 5) Call generator; deduct credit only on success
     try:
         custom_response, success = generate_reignite_comeback(last_text, platform, what_happened)
     except Exception:
-        return JsonResponse({"error": "Generation failed. Try again."}, status=502)
+        error_message = "Generation failed. Try again."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.AI_ERROR,
+            http_status=502,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return JsonResponse({"error": error_message}, status=502)
 
     if not success:
-        return JsonResponse({"error": "Generation failed. Try again."}, status=502)
+        error_message = "Generation failed. Try again."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.AI_ERROR,
+            http_status=502,
+            input_payload=guest_input_payload,
+            output_payload={"custom": custom_response, "error": error_message},
+            error_message=error_message,
+        )
+        return JsonResponse({"error": error_message}, status=502)
 
     request.session['chat_credits'] = max(0, credits - 1)
-    return JsonResponse({
+    payload = {
         "custom": custom_response,
         "credits_left": request.session['chat_credits'],
-    })
+    }
+    log_guest_web_attempt(
+        request=request,
+        endpoint=endpoint,
+        status=GuestWebConversationAttempt.Status.SUCCESS,
+        http_status=200,
+        input_payload=guest_input_payload,
+        output_payload=payload,
+    )
+    return JsonResponse(payload)
 
 
 

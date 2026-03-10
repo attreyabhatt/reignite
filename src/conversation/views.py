@@ -2,10 +2,11 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
-from .models import Conversation, ChatCredit, CopyEvent, WebAppConfig
+from .models import Conversation, ChatCredit, CopyEvent, GuestWebConversationAttempt, WebAppConfig
 
 from conversation.utils.web.image_web import extract_conversation_from_image_web
 from conversation.utils.web.custom_web import generate_web_response
+from conversation.utils.web_guest_logging import log_guest_web_attempt
 
 from django_ratelimit.decorators import ratelimit
 import json
@@ -186,32 +187,92 @@ def conversation_home(request):
 @ratelimit(key='ip', rate='50/d', block=True)
 def ajax_reply(request):
     is_htmx = _is_htmx_request(request)
+    endpoint = GuestWebConversationAttempt.Endpoint.CONVERSATIONS_AJAX_REPLY
+    guest_input_payload = {
+        "content_type": (request.content_type or "").split(";")[0].strip().lower(),
+        "is_htmx": is_htmx,
+    }
 
     try:
         data = _read_reply_input(request)
     except ValueError as exc:
-        return _json_or_htmx_error(request, is_htmx, str(exc), status=400)
+        error_message = str(exc)
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.REQUEST_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return _json_or_htmx_error(request, is_htmx, error_message, status=400)
 
     last_text = (data.get('last_text') or "").strip()
     situation = (data.get('situation') or "").strip()
     her_info = (data.get('her_info') or "").strip()
+    guest_input_payload.update({
+        "last_text": last_text,
+        "situation": situation,
+        "her_info": her_info,
+    })
 
     if not last_text and situation != "just_matched":
-        return _json_or_htmx_error(request, is_htmx, "Conversation text is required.", status=400)
+        error_message = "Conversation text is required."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.VALIDATION_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return _json_or_htmx_error(request, is_htmx, error_message, status=400)
     if len(last_text) > MAX_LAST_TEXT:
+        error_message = f"Conversation is too long (>{MAX_LAST_TEXT} chars). Please shorten it."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.VALIDATION_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
         return _json_or_htmx_error(
             request,
             is_htmx,
-            f"Conversation is too long (>{MAX_LAST_TEXT} chars). Please shorten it.",
+            error_message,
             status=400,
         )
     if not situation or len(situation) > MAX_SITUATION_LEN or situation not in ALLOWED_SITUATIONS:
-        return _json_or_htmx_error(request, is_htmx, "Invalid 'situation' value.", status=400)
+        error_message = "Invalid 'situation' value."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.VALIDATION_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return _json_or_htmx_error(request, is_htmx, error_message, status=400)
     if len(her_info) > MAX_HER_INFO:
+        error_message = f"'Her information' is too long (>{MAX_HER_INFO} chars)."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.VALIDATION_ERROR,
+            http_status=400,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
         return _json_or_htmx_error(
             request,
             is_htmx,
-            f"'Her information' is too long (>{MAX_HER_INFO} chars).",
+            error_message,
             status=400,
         )
 
@@ -289,6 +350,15 @@ def ajax_reply(request):
     credits = int(request.session.get('chat_credits', guest_limit))
     if credits < 1:
         signup_url = reverse('account_signup') + "?next=/conversations/&message=out_of_credits"
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.CREDITS_BLOCKED,
+            http_status=403,
+            input_payload=guest_input_payload,
+            output_payload={"redirect_url": signup_url},
+            error_message="Guest out of credits.",
+        )
         if is_htmx:
             return _render_htmx_redirect(signup_url)
         return JsonResponse({'redirect_url': signup_url}, status=403)
@@ -296,20 +366,50 @@ def ajax_reply(request):
     try:
         custom_response, success = generate_web_response(last_text, situation, her_info)
     except Exception:
-        return _json_or_htmx_error(request, is_htmx, "AI engine error. Please try again.", status=500)
+        error_message = "AI engine error. Please try again."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.AI_ERROR,
+            http_status=500,
+            input_payload=guest_input_payload,
+            output_payload={"error": error_message},
+            error_message=error_message,
+        )
+        return _json_or_htmx_error(request, is_htmx, error_message, status=500)
 
     if not success:
+        error_message = "AI failed to generate a proper response. Try again. No credit deducted."
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.AI_ERROR,
+            http_status=500,
+            input_payload=guest_input_payload,
+            output_payload={"custom": custom_response, "error": error_message},
+            error_message=error_message,
+        )
         return _json_or_htmx_error(
             request,
             is_htmx,
-            "AI failed to generate a proper response. Try again. No credit deducted.",
+            error_message,
             status=500,
         )
 
     try:
         suggestions = parse_suggestions(custom_response)
     except ValueError as exc:
-        return _json_or_htmx_error(request, is_htmx, f"Could not parse generated response: {exc}", status=500)
+        error_message = f"Could not parse generated response: {exc}"
+        log_guest_web_attempt(
+            request=request,
+            endpoint=endpoint,
+            status=GuestWebConversationAttempt.Status.PARSE_ERROR,
+            http_status=500,
+            input_payload=guest_input_payload,
+            output_payload={"custom": custom_response, "error": error_message},
+            error_message=error_message,
+        )
+        return _json_or_htmx_error(request, is_htmx, error_message, status=500)
 
     request.session['chat_credits'] = max(0, credits - 1)
     credits_left = request.session['chat_credits']
@@ -319,6 +419,14 @@ def ajax_reply(request):
         "suggestions": suggestions,
         "credits_left": credits_left,
     }
+    log_guest_web_attempt(
+        request=request,
+        endpoint=endpoint,
+        status=GuestWebConversationAttempt.Status.SUCCESS,
+        http_status=200,
+        input_payload=guest_input_payload,
+        output_payload=payload,
+    )
 
     if not is_htmx:
         return JsonResponse(payload)

@@ -3,6 +3,7 @@ from .models import (
     ChatCredit,
     Conversation,
     CopyEvent,
+    GuestWebConversationAttempt,
     WebAppConfig,
 )
 
@@ -29,6 +30,34 @@ class CopyEventAdmin(admin.ModelAdmin):
     def get_username(self, obj):
         return obj.user.username if obj.user else "guest"
     get_username.short_description = 'User'
+
+
+@admin.register(GuestWebConversationAttempt)
+class GuestWebConversationAttemptAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "endpoint",
+        "status",
+        "http_status",
+        "session_key_hash",
+    )
+    list_filter = ("endpoint", "status", "http_status", "created_at")
+    search_fields = ("session_key_hash", "error_message")
+    date_hierarchy = "created_at"
+    readonly_fields = (
+        "created_at",
+        "session_key_hash",
+        "endpoint",
+        "status",
+        "http_status",
+        "input_payload",
+        "output_payload",
+        "error_message",
+    )
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(WebAppConfig)
