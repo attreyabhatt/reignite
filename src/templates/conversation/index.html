@@ -1,60 +1,274 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Conversations - Reignite{% endblock %}
+{% block head_title %}Conversations | TryAgainText{% endblock head_title %}
 
 {% block extra_head %}
 <style>
-    body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        z-index: -1;
-        pointer-events: none;
-        background:
-            radial-gradient(1200px 600px at 15% -10%, rgba(153, 27, 56, .06), transparent 60%),
-            linear-gradient(180deg, #F9F8F6 0%, #F1EEE9 100%);
-    }
-
-    :is(.dark) body::before {
-        background:
-            radial-gradient(1200px 600px at 15% -10%, rgba(255, 45, 109, .08), transparent 60%),
-            linear-gradient(180deg, #0E0F12 0%, #12141A 100%);
-    }
-
     .convo-item:hover .delete-convo-btn {
-        opacity: 0.7;
+        opacity: 0.75;
     }
 
     .delete-convo-btn:hover {
         opacity: 1 !important;
     }
+
+    .convo-item-frame {
+        border-left: 2px solid transparent;
+        transition: background-color .2s ease, border-left-color .2s ease;
+        background: transparent;
+    }
+
+    .convo-item.is-active .convo-item-frame {
+        background: #2E323B;
+        border-left-color: #FF2D6D;
+    }
+
+    .convo-item.is-active .convo-item-frame:hover {
+        background: #2E323B;
+    }
+
+    .convo-item.is-active .convo-link {
+        color: #F4F2EE;
+    }
+
+    .convo-item:not(.is-active) .convo-item-frame:hover {
+        background: #1B1E25;
+    }
+
+    .new-convo-link {
+        color: #FF2D6D;
+        border-radius: 8px;
+        padding: .45rem .55rem;
+        font-size: .78rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: .6rem;
+        transition: background-color .2s ease;
+    }
+
+    .new-convo-link:hover {
+        background: rgba(255, 45, 109, 0.12);
+    }
+
+    .situation-pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .55rem;
+    }
+
+    .situation-tag {
+        border: 1px solid #3A3F4A;
+        border-radius: 999px;
+        padding: .55rem .9rem;
+        font-size: .85rem;
+        font-weight: 600;
+        color: #8F9BB3;
+        background: #14171E;
+        transition: border-color .2s ease, color .2s ease, background-color .2s ease;
+    }
+
+    .situation-tag:hover {
+        color: #F4F2EE;
+        border-color: #525A69;
+    }
+
+    .situation-tag.is-active {
+        border-color: #FF2D6D;
+        color: #12141A;
+        background: #FF2D6D;
+    }
+
+    .custom-scenario-wrap {
+        position: relative;
+    }
+
+    .custom-scenario-wrap.is-active .situation-tag {
+        border-color: #FF2D6D;
+        color: #F4F2EE;
+        background: rgba(255, 45, 109, 0.15);
+    }
+
+    .custom-scenario-menu {
+        position: absolute;
+        top: calc(100% + .5rem);
+        left: 0;
+        width: min(24rem, 80vw);
+        max-height: 18rem;
+        overflow-y: auto;
+        background: #16181F;
+        border: 1px solid #3A3F4A;
+        border-radius: 10px;
+        padding: .4rem;
+        z-index: 30;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .custom-scenario-option {
+        width: 100%;
+        text-align: left;
+        border-radius: 8px;
+        font-size: .82rem;
+        color: #8F9BB3;
+        padding: .5rem .65rem;
+        transition: background-color .2s ease, color .2s ease;
+    }
+
+    .custom-scenario-option:hover {
+        background: #1B1E25;
+        color: #F4F2EE;
+    }
+
+    #last-reply,
+    #her_info {
+        scrollbar-width: thin;
+        scrollbar-color: #3A3F4A #12141A;
+    }
+
+    #last-reply::-webkit-scrollbar,
+    #her_info::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    #last-reply::-webkit-scrollbar-track,
+    #her_info::-webkit-scrollbar-track {
+        background: #12141A;
+        border-radius: 999px;
+    }
+
+    #last-reply::-webkit-scrollbar-thumb,
+    #her_info::-webkit-scrollbar-thumb {
+        background: #3A3F4A;
+        border-radius: 999px;
+        border: 2px solid #12141A;
+    }
+
+    #last-reply::-webkit-scrollbar-thumb:hover,
+    #her_info::-webkit-scrollbar-thumb:hover {
+        background: #525A69;
+    }
+
+    .command-input-shell {
+        position: relative;
+        background: #0d0f14;
+        border: 1px solid #2E323B;
+        border-radius: 16px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+        transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .command-input-shell:focus-within {
+        border-color: #FF2D6D;
+        box-shadow: 0 0 0 1px rgba(255, 45, 109, 0.26);
+    }
+
+    .command-input-textarea {
+        width: 100%;
+        min-height: 180px;
+        background: transparent;
+        color: #F4F2EE;
+        border: 0;
+        outline: none;
+        resize: none;
+        padding: 1.1rem 1.1rem 3.2rem;
+        font-size: .95rem;
+        line-height: 1.45;
+    }
+
+    .command-input-textarea::placeholder {
+        color: #4A5568;
+    }
+
+    .command-input-actions {
+        position: absolute;
+        left: .6rem;
+        right: .6rem;
+        bottom: .55rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+    }
+
+    .command-upload-btn {
+        cursor: pointer;
+        color: #8F9BB3;
+        background: #16181F;
+        border: 1px solid #2E323B;
+        border-radius: 8px;
+        font-size: .8rem;
+        font-weight: 600;
+        padding: .38rem .65rem;
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        transition: color .2s ease, border-color .2s ease, background-color .2s ease;
+    }
+
+    .command-upload-btn:hover {
+        color: #FF2D6D;
+        border-color: #3A3F4A;
+        background: #1B1E25;
+    }
+
+    .command-char-count {
+        color: #4A5568;
+        font-size: .75rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .command-ocr-status {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        color: #8F9BB3;
+        font-size: .75rem;
+    }
+
+    .hidden-file-input {
+        display: none;
+    }
+
+    @media (min-width: 768px) {
+        .command-input-textarea {
+            min-height: 200px;
+        }
+    }
 </style>
 {% endblock extra_head %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<div class="w-full bg-[#12141A]">
+    <div class="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
 
-        <aside class="lg:col-span-3 order-1">
+            <aside class="order-1 lg:w-72 lg:shrink-0">
             <button onclick="document.getElementById('sidebarContent').classList.toggle('hidden')"
-                class="w-full lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-brand-outline dark:border-dbrand-outline text-sm font-medium text-brand-text dark:text-dbrand-text mb-3">
+                class="w-full lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-brand-outline text-sm font-medium text-brand-text mb-3">
                 <i class="fa fa-bars"></i> Conversations <i class="fa fa-chevron-down text-xs"></i>
             </button>
 
-            <div id="sidebarContent" class="hidden lg:block">
-                <div class="text-xs font-medium text-brand-muted dark:text-dbrand-muted uppercase tracking-wide mb-3 hidden lg:block">Conversations</div>
+            <div id="sidebarContent" class="hidden lg:block matte-card p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs font-medium text-brand-muted uppercase tracking-wide hidden lg:block">Conversations</div>
+                    <a href="{% url 'conversation_home' %}" class="new-convo-link no-underline" aria-label="Start a new conversation">
+                        <i class="fa fa-plus text-[0.68rem]"></i>
+                        <span>New</span>
+                    </a>
+                </div>
 
                 <ul id="convoList" class="space-y-0.5 {% if not conversations %}hidden{% endif %}">
                     {% for conversation in conversations %}
                     <li class="convo-item" data-conversation-item-id="{{ conversation.id }}">
-                        <div class="flex items-center gap-2 px-2 py-1.5 rounded-xl border-b border-brand-outline/30 dark:border-dbrand-outline/30 hover:bg-brand-blush dark:hover:bg-dbrand-surface-container transition-colors">
-                            <a href="#" class="convo-link flex-1 min-w-0 text-sm text-brand-text dark:text-dbrand-text no-underline" data-id="{{ conversation.id }}">
+                        <div class="convo-item-frame flex items-center gap-2 px-2.5 py-2 rounded-xl">
+                            <a href="#" class="convo-link flex-1 min-w-0 text-sm text-brand-text no-underline" data-id="{{ conversation.id }}">
                                 <span class="truncate block">{{ conversation.girl_title }}</span>
                             </a>
                             <button
                                 type="button"
-                                class="delete-convo-btn opacity-0 transition-opacity text-brand-muted dark:text-dbrand-muted hover:text-red-500 dark:hover:text-red-400 text-lg leading-none"
+                                class="delete-convo-btn opacity-0 transition-opacity text-brand-muted hover:text-red-400 text-lg leading-none"
                                 data-id="{{ conversation.id }}"
                                 title="Delete"
                             >&times;</button>
@@ -63,21 +277,15 @@
                     {% endfor %}
                 </ul>
 
-                <div id="convoListEmpty" class="text-center text-brand-muted dark:text-dbrand-muted py-6 {% if conversations %}hidden{% endif %}">
+                <div id="convoListEmpty" class="text-center text-brand-muted py-6 {% if conversations %}hidden{% endif %}">
                     <div class="text-2xl mb-2 opacity-50">??</div>
                     <p class="text-sm">No conversations yet</p>
                 </div>
-
-                <div class="mt-4">
-                    <a href="{% url 'conversation_home' %}" class="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl border border-brand-outline dark:border-dbrand-outline text-sm font-medium text-brand-text dark:text-dbrand-text hover:bg-brand-blush dark:hover:bg-dbrand-surface-container transition-colors no-underline">
-                        <i class="fa fa-plus"></i> New conversation
-                    </a>
-                </div>
             </div>
-        </aside>
+            </aside>
 
-        <main class="lg:col-span-6 order-2">
-            <div class="glass rounded-2xl p-5 sm:p-6 bg-white/55 dark:bg-dbrand-surface/50 border border-white/65 dark:border-dbrand-outline shadow-lg min-h-[60vh]">
+            <main class="order-2 lg:flex-1 lg:max-w-3xl">
+                <div class="matte-card p-6 sm:p-8 min-h-[60vh]">
                 <form
                     id="chatForm"
                     data-web-reply-form
@@ -88,90 +296,114 @@
                     {% csrf_token %}
                     <input type="hidden" id="conversation-id" name="conversation_id" value="">
 
-                    <div class="mb-4">
-                        <label for="situation" class="block text-sm font-semibold mb-1.5">
-                            <i class="fa fa-bullseye mr-1 text-brand-primary dark:text-dbrand-primary"></i> What's the situation?
-                        </label>
-                        <select class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary" id="situation" name="situation" required>
+                    <div class="mb-6">
+                        <div class="situation-pill-row" data-situation-tags>
+                            <button type="button" class="situation-tag is-active" data-situation-tag="stuck_after_reply">Stuck After Reply</button>
+                            <button type="button" class="situation-tag" data-situation-tag="just_matched">Just Matched</button>
+                            <button type="button" class="situation-tag" data-situation-tag="dry_reply">Dry Reply</button>
+                            <button type="button" class="situation-tag" data-situation-tag="left_on_read">Left on Read</button>
+                            <button type="button" class="situation-tag" data-situation-tag="ask_her_out">Asking Her Out</button>
+                            <div class="custom-scenario-wrap" data-situation-custom-wrap>
+                                <button type="button" class="situation-tag inline-flex items-center gap-1.5" data-situation-custom-trigger aria-haspopup="menu" aria-expanded="false">
+                                    <i class="fa fa-plus text-[0.65rem]"></i>
+                                    <span data-situation-custom-label>Custom Scenario</span>
+                                </button>
+                                <div class="custom-scenario-menu hidden" data-situation-custom-menu role="menu" aria-label="Custom scenarios">
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="spark_interest">I want to spark her interest</button>
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="she_asked_question">She asked me a question</button>
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="feels_like_interview">Conversation feels like an interview</button>
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="sassy_challenge">She is being Sassy / Challenging</button>
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="spark_deeper_conversation">I want to be sincere / vulnerable</button>
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="pivot_conversation">Change the topic</button>
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="reviving_old_chat">I haven't talked to her in a while</button>
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="recovering_after_cringe">I think I said something off</button>
+                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="switching_platforms">Trying to move to another platform</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <select id="situation" name="situation" required class="hidden">
                             <option value="stuck_after_reply" selected>She replied, but I don't know what to say</option>
-                            <optgroup label="&#x1F7E2; Early-Conversation">
-                                <option value="just_matched">We just matched</option>
-                                <option value="spark_interest">I want to spark her interest</option>
-                            </optgroup>
-                            <optgroup label="&#x1F7E1; Mid-Conversation">
-                                <option value="stuck_after_reply">She replied, but I don't know what to say</option>
-                                <option value="dry_reply">She gave a dry or one-word reply</option>
-                                <option value="sassy_challenge">She is being Sassy / Challenging</option>
-                                <option value="spark_deeper_conversation">I want to be sincere / vulnerable</option>
-                                <option value="pivot_conversation">Change the topic</option>
-                            </optgroup>
-                            <optgroup label="&#x1F501; Recovery or Reigniting">
-                                <option value="left_on_read">She left me on read</option>
-                            </optgroup>
-                            <optgroup label="&#x1F7E3; Late-Conversation">
-                                <option value="ask_her_out">Ask her out</option>
-                                <option value="switching_platforms">Trying to move to another platform</option>
-                            </optgroup>
+                            <option value="just_matched">We just matched</option>
+                            <option value="spark_interest">I want to spark her interest</option>
+                            <option value="dry_reply">She gave a dry or one-word reply</option>
+                            <option value="she_asked_question">She asked me a question</option>
+                            <option value="feels_like_interview">Conversation feels like an interview</option>
+                            <option value="sassy_challenge">She is being Sassy / Challenging</option>
+                            <option value="spark_deeper_conversation">I want to be sincere / vulnerable</option>
+                            <option value="pivot_conversation">Change the topic</option>
+                            <option value="left_on_read">She left me on read</option>
+                            <option value="reviving_old_chat">I haven't talked to her in a while</option>
+                            <option value="recovering_after_cringe">I think I said something off</option>
+                            <option value="ask_her_out">Ask her out</option>
+                            <option value="switching_platforms">Trying to move to another platform</option>
                         </select>
                     </div>
 
                     <div class="mb-4 hidden" id="her-info-div">
                         <label for="her_info" class="block text-sm font-semibold mb-1.5">
-                            <i class="fa-solid fa-user-secret mr-1 text-brand-secondary dark:text-dbrand-secondary"></i> Her Information (optional)
+                            <i class="fa-solid fa-user-secret mr-1 text-[#D4AF37]"></i> Her Information (optional)
                         </label>
-                        <textarea name="her_info" id="her_info" rows="3"
-                            class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary resize-y"
+                        <textarea name="her_info" id="her_info" rows="3" class="matte-textarea resize-y"
                             placeholder="Add anything that might help - her bio, hobbies, vibe, or her hairstyle."></textarea>
-                        <p class="text-xs text-brand-muted dark:text-dbrand-muted mt-1">Adding details can improve your results.</p>
-                    </div>
-
-                    <div class="mb-4 glass rounded-xl p-4 bg-white/40 dark:bg-dbrand-surface/40 border border-white/50 dark:border-dbrand-outline" id="screenshot-upload">
-                        <label for="formFile" class="block text-sm font-semibold mb-1.5">
-                            Upload Screenshot
-                            <span class="text-xs text-brand-muted dark:text-dbrand-muted font-normal">(optional - we'll extract the messages)</span>
-                        </label>
-                        <input class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-blush file:text-brand-primary dark:file:bg-dbrand-surface-container dark:file:text-dbrand-primary hover:file:opacity-80 border border-brand-outline dark:border-dbrand-outline rounded-xl bg-white dark:bg-dbrand-surface-container px-3 py-2" type="file" id="formFile">
-                        <p class="text-xs text-brand-muted dark:text-dbrand-muted mt-1.5">Drag & drop a chat screenshot, or paste your convo below.</p>
-                        <div id="ocr-status" class="mt-2 hidden">
-                            <span class="inline-block w-4 h-4 border-2 border-brand-primary dark:border-dbrand-primary border-t-transparent rounded-full animate-spin align-middle"></span>
-                            <span class="ml-2 text-sm text-brand-muted dark:text-dbrand-muted">Analyzing screenshot...</span>
-                        </div>
+                        <p class="text-xs text-brand-muted mt-1">Adding details can improve your results.</p>
                     </div>
 
                     <div class="mb-4" id="conversation-paste-area">
-                        <label for="last-reply" class="block text-sm font-semibold mb-1.5">Conversation</label>
-                        <textarea name="last_text" id="last-reply" rows="5"
-                            class="w-full rounded-xl border border-brand-outline dark:border-dbrand-outline bg-white dark:bg-dbrand-surface-container text-brand-text dark:text-dbrand-text px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-secondary dark:focus:ring-dbrand-primary resize-y"
-                            placeholder="you: hey, free thursday?&#10;her: (seen, no reply)"></textarea>
-                        <p class="text-xs text-brand-muted dark:text-dbrand-muted mt-1 text-right"><span id="charCount">0</span> characters</p>
+                        <div class="command-input-shell">
+                            <textarea
+                                name="last_text"
+                                id="last-reply"
+                                rows="5"
+                                class="command-input-textarea"
+                                placeholder="Paste your chat here, or type it out..."
+                            ></textarea>
+                            <div class="command-input-actions">
+                                <div class="flex items-center gap-2">
+                                    <div id="screenshot-upload">
+                                        <input type="file" id="formFile" class="hidden-file-input">
+                                        <label for="formFile" class="command-upload-btn">
+                                            <i class="fa-regular fa-image"></i>
+                                            <span>Upload Screenshot</span>
+                                        </label>
+                                    </div>
+                                    <div id="ocr-status" class="hidden command-ocr-status">
+                                        <span class="inline-block w-3.5 h-3.5 border-2 border-[#FF2D6D] border-t-transparent rounded-full animate-spin"></span>
+                                        <span>Analyzing...</span>
+                                    </div>
+                                </div>
+                                <span class="command-char-count"><span id="charCount">0</span>/8000</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="flex justify-between items-center">
+                    <div>
                         <button
                             type="submit"
                             id="generate-btn"
                             data-generate-btn
-                            class="px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white shadow-lg hover:opacity-90 transition-opacity"
+                            class="matte-btn-primary w-full px-6 py-3 text-sm"
                         >
-                            <i class="fa fa-fire mr-2"></i>Generate Reply
+                            <i class="fa fa-fire mr-2"></i>Generate Replies
                         </button>
                     </div>
                 </form>
-            </div>
-        </main>
+                </div>
+            </main>
 
-        <aside class="lg:col-span-3 order-3" id="responseArea">
-            <div class="text-xs font-medium text-brand-muted dark:text-dbrand-muted uppercase tracking-wide mb-3">Suggested responses</div>
-            <div id="responsePanel">
-                {% include "conversation/partials/response_empty.html" %}
-            </div>
-        </aside>
+            <aside class="order-3 lg:w-80 lg:shrink-0" id="responseArea">
+                <div class="text-xs font-medium text-brand-muted uppercase tracking-wide mb-3">Suggested responses</div>
+                <div id="responsePanel">
+                    {% include "conversation/partials/response_empty_workspace.html" %}
+                </div>
+            </aside>
 
+        </div>
     </div>
 </div>
 
 <template id="response-empty-template">
-    {% include "conversation/partials/response_empty.html" %}
+    {% include "conversation/partials/response_empty_workspace.html" %}
 </template>
 
 <div id="paymentToast" class="hidden fixed bottom-4 right-4 z-50 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg">

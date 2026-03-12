@@ -39,6 +39,8 @@ class AjaxReplyViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Want to grab coffee?')
         self.assertContains(response, 'Drinks this week?')
+        self.assertContains(response, 'data-suggestion-rank="01"', html=False)
+        self.assertContains(response, 'data-suggestion-rank="02"', html=False)
         self.assertIn('HX-Trigger', response.headers)
 
     def test_htmx_invalid_input_returns_inline_error_partial(self):

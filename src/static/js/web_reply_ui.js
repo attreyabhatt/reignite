@@ -1,4 +1,6 @@
 (function () {
+    const DEFAULT_CUSTOM_SCENARIO_LABEL = 'Custom Scenario';
+
     function getCsrfToken() {
         return document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
     }
@@ -29,6 +31,16 @@
         counter.textContent = String(textarea.value.length);
     }
 
+    function normalizeOcrTranscript(text) {
+        if (!text) {
+            return '';
+        }
+
+        return String(text)
+            .replace(/^\s*you\s*\[\s*\]\s*:/gim, 'You:')
+            .replace(/^\s*her\s*\[\s*\]\s*:/gim, 'Her:');
+    }
+
     function toggleInputVisibility() {
         const situation = document.getElementById('situation');
         const screenshotUpload = document.getElementById('screenshot-upload');
@@ -52,6 +64,161 @@
         if (herInfoDiv) {
             herInfoDiv.classList.toggle('hidden', !showHerInfo);
         }
+    }
+
+    function getSituationLabel(value) {
+        const situation = document.getElementById('situation');
+        if (!situation || !value) {
+            return DEFAULT_CUSTOM_SCENARIO_LABEL;
+        }
+
+        const option = Array.from(situation.options).find(function (item) {
+            return item.value === value;
+        });
+        return option ? option.textContent.trim() : DEFAULT_CUSTOM_SCENARIO_LABEL;
+    }
+
+    function closeCustomScenarioMenu() {
+        const menu = document.querySelector('[data-situation-custom-menu]');
+        const trigger = document.querySelector('[data-situation-custom-trigger]');
+        if (menu) {
+            menu.classList.add('hidden');
+        }
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function syncSituationControls() {
+        const situation = document.getElementById('situation');
+        if (!situation) {
+            return;
+        }
+
+        const selected = situation.value;
+        const tags = document.querySelectorAll('[data-situation-tag]');
+        let selectedFromPrimaryTags = false;
+
+        tags.forEach(function (tag) {
+            const isActive = tag.getAttribute('data-situation-tag') === selected;
+            tag.classList.toggle('is-active', isActive);
+            if (isActive) {
+                selectedFromPrimaryTags = true;
+            }
+        });
+
+        const customWrap = document.querySelector('[data-situation-custom-wrap]');
+        const customLabel = document.querySelector('[data-situation-custom-label]');
+        if (customWrap) {
+            const isCustomSelected = !!selected && !selectedFromPrimaryTags;
+            customWrap.classList.toggle('is-active', isCustomSelected);
+            if (customLabel) {
+                customLabel.textContent = isCustomSelected ? getSituationLabel(selected) : DEFAULT_CUSTOM_SCENARIO_LABEL;
+            }
+        }
+
+        const moreSelect = document.querySelector('[data-situation-more]');
+        if (moreSelect) {
+            if (!selected || selectedFromPrimaryTags) {
+                moreSelect.value = '';
+                return;
+            }
+
+            const optionExists = Array.from(moreSelect.options).some(function (option) {
+                return option.value === selected;
+            });
+            moreSelect.value = optionExists ? selected : '';
+        }
+    }
+
+    function setSituationSelection(nextValue) {
+        const situation = document.getElementById('situation');
+        if (!situation || !nextValue) {
+            return;
+        }
+
+        const optionExists = Array.from(situation.options).some(function (option) {
+            return option.value === nextValue;
+        });
+        if (!optionExists) {
+            return;
+        }
+
+        const changed = situation.value !== nextValue;
+        situation.value = nextValue;
+
+        if (changed) {
+            situation.dispatchEvent(new Event('change', { bubbles: true }));
+            return;
+        }
+
+        syncSituationControls();
+        closeCustomScenarioMenu();
+    }
+
+    function setupSituationControls() {
+        const situation = document.getElementById('situation');
+        if (!situation) {
+            return;
+        }
+
+        document.querySelectorAll('[data-situation-tag]').forEach(function (tag) {
+            tag.addEventListener('click', function () {
+                const nextValue = tag.getAttribute('data-situation-tag');
+                setSituationSelection(nextValue);
+                closeCustomScenarioMenu();
+            });
+        });
+
+        const moreSelect = document.querySelector('[data-situation-more]');
+        if (moreSelect) {
+            moreSelect.addEventListener('change', function () {
+                const nextValue = moreSelect.value;
+                if (!nextValue) {
+                    syncSituationControls();
+                    return;
+                }
+                setSituationSelection(nextValue);
+            });
+        }
+
+        const customTrigger = document.querySelector('[data-situation-custom-trigger]');
+        const customMenu = document.querySelector('[data-situation-custom-menu]');
+        if (customTrigger && customMenu) {
+            customTrigger.addEventListener('click', function (event) {
+                event.preventDefault();
+                const nextHiddenState = !customMenu.classList.contains('hidden');
+                customMenu.classList.toggle('hidden');
+                customTrigger.setAttribute('aria-expanded', String(!nextHiddenState));
+            });
+
+            customMenu.querySelectorAll('[data-situation-custom-option]').forEach(function (option) {
+                option.addEventListener('click', function () {
+                    const nextValue = option.getAttribute('data-situation-custom-option');
+                    if (!nextValue) {
+                        return;
+                    }
+                    setSituationSelection(nextValue);
+                    closeCustomScenarioMenu();
+                });
+            });
+
+            document.addEventListener('click', function (event) {
+                const insideCustomMenu = event.target.closest('[data-situation-custom-wrap]');
+                if (!insideCustomMenu) {
+                    closeCustomScenarioMenu();
+                }
+            });
+        }
+
+        situation.addEventListener('change', function () {
+            toggleInputVisibility();
+            syncSituationControls();
+            closeCustomScenarioMenu();
+        });
+
+        toggleInputVisibility();
+        syncSituationControls();
     }
 
     function setGenerateButtonLoading(form, isLoading) {
@@ -114,11 +281,20 @@
         empty.classList.toggle('hidden', hasItems);
     }
 
+    function setActiveConversationItem(activeId) {
+        const normalizedActiveId = activeId ? String(activeId) : '';
+        document.querySelectorAll('[data-conversation-item-id]').forEach(function (item) {
+            const itemId = item.getAttribute('data-conversation-item-id') || '';
+            item.classList.toggle('is-active', normalizedActiveId !== '' && itemId === normalizedActiveId);
+        });
+    }
+
     function setConversationId(value) {
         const conversationInput = document.getElementById('conversation-id');
         if (conversationInput) {
             conversationInput.value = value ? String(value) : '';
         }
+        setActiveConversationItem(value);
     }
 
     function escapeHtml(value) {
@@ -136,11 +312,11 @@
         li.dataset.conversationItemId = String(id);
 
         li.innerHTML = [
-            '<div class="flex items-center gap-2 px-2 py-1.5 rounded-xl border-b border-brand-outline/30 dark:border-dbrand-outline/30 hover:bg-brand-blush dark:hover:bg-dbrand-surface-container transition-colors">',
-            '  <a href="#" class="convo-link flex-1 min-w-0 text-sm text-brand-text dark:text-dbrand-text no-underline" data-id="' + String(id) + '">',
+            '<div class="convo-item-frame flex items-center gap-2 px-2.5 py-2 rounded-xl">',
+            '  <a href="#" class="convo-link flex-1 min-w-0 text-sm text-brand-text no-underline" data-id="' + String(id) + '">',
             '      <span class="truncate block">' + escapeHtml(title || 'Conversation') + '</span>',
             '  </a>',
-            '  <button type="button" class="delete-convo-btn opacity-0 transition-opacity text-brand-muted dark:text-dbrand-muted hover:text-red-500 dark:hover:text-red-400 text-lg leading-none" data-id="' + String(id) + '" title="Delete">&times;</button>',
+            '  <button type="button" class="delete-convo-btn opacity-0 transition-opacity text-brand-muted hover:text-red-400 text-lg leading-none" data-id="' + String(id) + '" title="Delete">&times;</button>',
             '</div>'
         ].join('');
 
@@ -327,7 +503,7 @@
                     const herInfo = document.getElementById('her_info');
 
                     if (text) {
-                        text.value = data.content || '';
+                        text.value = normalizeOcrTranscript(data.content || '');
                     }
                     if (situation) {
                         situation.value = data.situation || 'stuck_after_reply';
@@ -339,6 +515,7 @@
                     setConversationId(conversationId);
                     updateCharCount();
                     toggleInputVisibility();
+                    syncSituationControls();
                     resetResponsePanel();
                 })
                 .catch(function () {
@@ -391,8 +568,9 @@
                         return;
                     }
 
+                    const normalizedOcrText = normalizeOcrTranscript(data.ocr_text);
                     const existing = conversationInput.value.trim();
-                    conversationInput.value = existing ? (existing + '\n\n' + data.ocr_text) : data.ocr_text;
+                    conversationInput.value = existing ? (existing + '\n\n' + normalizedOcrText) : normalizedOcrText;
                     updateCharCount();
                 })
                 .catch(function () {
@@ -424,17 +602,13 @@
 
     function initialize() {
         const textarea = document.getElementById('last-reply');
-        const situation = document.getElementById('situation');
 
         if (textarea) {
             updateCharCount();
             textarea.addEventListener('input', updateCharCount);
         }
 
-        if (situation) {
-            toggleInputVisibility();
-            situation.addEventListener('change', toggleInputVisibility);
-        }
+        setupSituationControls();
 
         setupKeyboardSubmit();
         setupHtmxFormLifecycle();
@@ -442,6 +616,7 @@
         setupConversationLoadAndDelete();
         setupOcrUpload();
         setSidebarVisibility();
+        setActiveConversationItem(document.getElementById('conversation-id')?.value || '');
 
         document.body.addEventListener('conversationCreated', handleConversationCreated);
         document.body.addEventListener('creditsUpdated', handleCreditsUpdated);

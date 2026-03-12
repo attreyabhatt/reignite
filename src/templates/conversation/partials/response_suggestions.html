@@ -1,19 +1,25 @@
 {% if suggestions %}
     {% for suggestion in suggestions %}
-    <div class="relative bg-white dark:bg-dbrand-surface-container rounded-xl p-4 border border-brand-outline/30 dark:border-dbrand-outline shadow-sm {% if not forloop.last %}mb-3{% endif %}">
+    <div class="relative matte-card-tight p-4 {% if not forloop.last %}mb-3{% endif %}">
+        <div
+            class="absolute left-3 top-3 inline-flex items-center justify-center w-7 h-7 rounded-full border border-[#3A3F4A] bg-[#12141A] text-[#D4AF37] text-xs font-semibold"
+            data-suggestion-rank="{% if forloop.counter < 10 %}0{% endif %}{{ forloop.counter }}"
+        >
+            {% if forloop.counter < 10 %}0{% endif %}{{ forloop.counter }}
+        </div>
         <button
             type="button"
-            class="copy-btn absolute right-3 top-3 text-brand-muted dark:text-dbrand-muted hover:text-brand-primary dark:hover:text-dbrand-primary transition-colors"
+            class="copy-btn absolute right-3 top-3 text-brand-muted hover:text-brand-primary transition-colors"
             data-copy-target="suggestedReplyMsg{{ forloop.counter }}"
             data-suggestion-id="{{ forloop.counter }}"
             title="Copy"
         >
             <i class="fa fa-copy"></i>
-            <span class="copied-tooltip bg-brand-text dark:bg-dbrand-surface-container text-white">Copied!</span>
+            <span class="copied-tooltip bg-[#1B1E25] text-white">Copied!</span>
         </button>
-        <div id="suggestedReplyMsg{{ forloop.counter }}" class="text-sm whitespace-pre-wrap pr-8">{{ suggestion.message }}</div>
+        <div id="suggestedReplyMsg{{ forloop.counter }}" class="text-sm whitespace-pre-wrap pl-10 pr-8">{{ suggestion.message }}</div>
         {% if suggestion.confidence_label %}
-        <div class="text-xs text-brand-muted dark:text-dbrand-muted mt-1">{{ suggestion.confidence_label }}</div>
+        <div class="text-xs text-brand-muted mt-1 pl-10">{{ suggestion.confidence_label }}</div>
         {% endif %}
     </div>
     {% endfor %}

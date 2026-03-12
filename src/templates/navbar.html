@@ -1,10 +1,8 @@
-<nav class="sticky top-0 z-50 border-b border-brand-outline dark:border-dbrand-outline bg-white/80 dark:bg-dbrand-surface/80 backdrop-blur-lg">
+<nav class="sticky top-0 z-50 border-b border-brand-outline bg-[#12141A]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
-            <!-- Brand -->
-            <a href="/" class="flex items-center gap-2 no-underline group">
-                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" role="img" aria-label="TryAgainText"
-                    class="inline-block align-middle">
+            <a href="/" class="flex items-center gap-3 no-underline group">
+                <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" role="img" aria-label="TryAgainText" class="inline-block align-middle text-[#F4F2EE]">
                     <title>TryAgainText</title>
                     <path d="M6 4.5h9a4.5 4.5 0 0 1 0 9H10l-4.2 3a.8.8 0 0 1-1.3-.66V13.5A4.5 4.5 0 0 1 6 4.5Z" fill="none"
                         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
@@ -12,81 +10,76 @@
                     <circle cx="10.75" cy="9.75" r="1" fill="currentColor" />
                     <circle cx="13.75" cy="9.75" r="1" fill="currentColor" />
                     <path d="M17.9 4.85c-.8 0-1.5.39-1.9.98a2.4 2.4 0 0 0-1.9-.98c-1.2 0-2.2 1-2.2 2.22 0 .58.22 1.1.58 1.5.73.86 2.08 1.96 3.52 3.02 1.44-1.06 2.79-2.16 3.52-3.02.36-.4.58-.92.58-1.5 0-1.22-1-2.22-2.2-2.22Z"
-                        class="fill-brand-primary dark:fill-dbrand-primary transition-transform duration-200 origin-[75%_35%] group-hover:scale-110" />
+                        class="fill-[#D4AF37] transition-transform duration-200 origin-[75%_35%] group-hover:scale-110" />
                 </svg>
-                <span class="text-xl font-semibold tracking-tight font-heading text-brand-text dark:text-dbrand-text">TryAgainText</span>
+                <span class="flex flex-col leading-tight">
+                    <span class="text-lg font-semibold tracking-tight font-heading text-[#F4F2EE]">TryAgainText</span>
+                    <span class="text-[0.68rem] uppercase tracking-[0.08em] text-[#D4AF37]">Powered by FlirtFix</span>
+                </span>
             </a>
 
-            <!-- Desktop nav -->
             <div class="hidden md:flex items-center gap-1">
-                <a href="{% url 'contact' %}" class="px-3 py-2 text-sm font-medium text-brand-muted dark:text-dbrand-muted hover:text-brand-text dark:hover:text-dbrand-text transition-colors no-underline">Contact</a>
-
                 {% if user.is_authenticated %}
-                <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted dark:text-dbrand-muted hover:text-brand-text dark:hover:text-dbrand-text transition-colors no-underline">Pricing</a>
+                <a href="{% url 'conversation_home' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Conversations</a>
+                <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Pricing</a>
+                <a href="{% url 'contact' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Contact</a>
 
-                <!-- Credits badge -->
-                <a href="{% url 'pricing:pricing' %}" class="no-underline">
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white">
-                        <i class="fa fa-bolt"></i>
+                <a href="{% url 'pricing:pricing' %}" class="no-underline ml-1">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#3A3F4A] bg-[#16181F] text-[#F4F2EE]">
+                        <i class="fa fa-bolt text-[#D4AF37]"></i>
                         <span id="chatCreditsCount">{{ request.user.chat_credit.balance }}</span> credits
                     </span>
                 </a>
 
-                <!-- User dropdown -->
                 <div class="relative ml-2" data-nav-dropdown>
-                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand-text dark:text-dbrand-text hover:bg-brand-blush dark:hover:bg-dbrand-surface-container rounded-xl transition-colors">
-                        <i class="fa fa-user-circle text-brand-muted dark:text-dbrand-muted"></i>
+                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand-text hover:bg-[#1B1E25] rounded-xl transition-colors">
+                        <i class="fa fa-user-circle text-brand-muted"></i>
                         {{ user.email }}
-                        <i class="fa fa-chevron-down text-xs text-brand-muted dark:text-dbrand-muted"></i>
+                        <i class="fa fa-chevron-down text-xs text-brand-muted"></i>
                     </button>
-                    <div class="hidden absolute right-0 mt-2 w-56 rounded-xl bg-white dark:bg-dbrand-surface-container border border-brand-outline dark:border-dbrand-outline shadow-lg py-1 z-50" data-nav-dropdown-menu>
-                        <a href="{% url 'account_email' %}" class="block px-4 py-2 text-sm text-brand-text dark:text-dbrand-text hover:bg-brand-blush dark:hover:bg-dbrand-surface-high no-underline">Manage Email</a>
-                        <a href="{% url 'account_change_password' %}" class="block px-4 py-2 text-sm text-brand-text dark:text-dbrand-text hover:bg-brand-blush dark:hover:bg-dbrand-surface-high no-underline">Change Password</a>
-                        <hr class="my-1 border-brand-outline dark:border-dbrand-outline">
-                        <a href="{% url 'account_logout' %}" class="block px-4 py-2 text-sm text-brand-primary dark:text-dbrand-primary hover:bg-brand-blush dark:hover:bg-dbrand-surface-high no-underline">Logout</a>
+                    <div class="hidden absolute right-0 mt-2 w-56 rounded-xl bg-[#16181F] border border-[#3A3F4A] shadow-lg py-1 z-50" data-nav-dropdown-menu>
+                        <a href="{% url 'account_email' %}" class="block px-4 py-2 text-sm text-brand-text hover:bg-[#1B1E25] no-underline">Manage Email</a>
+                        <a href="{% url 'account_change_password' %}" class="block px-4 py-2 text-sm text-brand-text hover:bg-[#1B1E25] no-underline">Change Password</a>
+                        <hr class="my-1 border-[#3A3F4A]">
+                        <a href="{% url 'account_logout' %}" class="block px-4 py-2 text-sm text-brand-primary hover:bg-[#1B1E25] no-underline">Logout</a>
                     </div>
                 </div>
                 {% else %}
-                <a href="{% url 'account_login' %}" class="ml-2 px-5 py-2 text-sm font-semibold rounded-full bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white hover:opacity-90 transition-opacity no-underline">
+                <a href="/#why-it-works" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">How it Works</a>
+                <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Pricing</a>
+                <a href="{% url 'contact' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Contact</a>
+                <a href="{% url 'account_login' %}" class="ml-2 px-5 py-2 text-sm font-semibold rounded-[10px] bg-[#FF2D6D] border border-[#FF2D6D] text-[#F4F2EE] hover:opacity-90 transition-opacity no-underline">
                     Login / Signup
                 </a>
                 {% endif %}
-
-                <!-- Dark mode toggle -->
-                <button onclick="toggleDarkMode()" class="ml-2 p-2 rounded-full text-brand-muted dark:text-dbrand-muted hover:bg-brand-blush dark:hover:bg-dbrand-surface-container transition-colors" title="Toggle dark mode">
-                    <i class="fa fa-moon dark:hidden"></i>
-                    <i class="fa fa-sun hidden dark:inline"></i>
-                </button>
             </div>
 
-            <!-- Mobile menu button -->
-            <div class="flex items-center gap-2 md:hidden">
-                <button onclick="toggleDarkMode()" class="p-2 rounded-full text-brand-muted dark:text-dbrand-muted hover:bg-brand-blush dark:hover:bg-dbrand-surface-container transition-colors" title="Toggle dark mode">
-                    <i class="fa fa-moon dark:hidden"></i>
-                    <i class="fa fa-sun hidden dark:inline"></i>
-                </button>
-                <button onclick="document.getElementById('mobileMenu').classList.toggle('hidden')" class="p-2 rounded-lg text-brand-text dark:text-dbrand-text">
+            <div class="md:hidden">
+                <button onclick="document.getElementById('mobileMenu').classList.toggle('hidden')" class="p-2 rounded-lg text-[#F4F2EE] border border-[#3A3F4A]">
                     <i class="fa fa-bars text-lg"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Mobile menu -->
-        <div id="mobileMenu" class="hidden md:hidden pb-4 border-t border-brand-outline dark:border-dbrand-outline">
+        <div id="mobileMenu" class="hidden md:hidden pb-4 border-t border-[#2E323B]">
             <div class="flex flex-col gap-1 pt-3">
-                <a href="{% url 'contact' %}" class="px-3 py-2 text-sm font-medium text-brand-muted dark:text-dbrand-muted hover:text-brand-text dark:hover:text-dbrand-text no-underline">Contact</a>
                 {% if user.is_authenticated %}
-                <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted dark:text-dbrand-muted hover:text-brand-text dark:hover:text-dbrand-text no-underline">Pricing</a>
+                <a href="{% url 'conversation_home' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Conversations</a>
+                <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Pricing</a>
+                <a href="{% url 'contact' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Contact</a>
                 <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 no-underline">
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white">
-                        <i class="fa fa-bolt"></i> <span>{{ request.user.chat_credit.balance }}</span> credits
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#3A3F4A] bg-[#16181F] text-[#F4F2EE]">
+                        <i class="fa fa-bolt text-[#D4AF37]"></i> <span>{{ request.user.chat_credit.balance }}</span> credits
                     </span>
                 </a>
-                <a href="{% url 'account_email' %}" class="px-3 py-2 text-sm text-brand-muted dark:text-dbrand-muted no-underline">Manage Email</a>
-                <a href="{% url 'account_change_password' %}" class="px-3 py-2 text-sm text-brand-muted dark:text-dbrand-muted no-underline">Change Password</a>
-                <a href="{% url 'account_logout' %}" class="px-3 py-2 text-sm text-brand-primary dark:text-dbrand-primary no-underline">Logout</a>
+                <a href="{% url 'account_email' %}" class="px-3 py-2 text-sm text-brand-muted no-underline">Manage Email</a>
+                <a href="{% url 'account_change_password' %}" class="px-3 py-2 text-sm text-brand-muted no-underline">Change Password</a>
+                <a href="{% url 'account_logout' %}" class="px-3 py-2 text-sm text-brand-primary no-underline">Logout</a>
                 {% else %}
-                <a href="{% url 'account_login' %}" class="mx-3 mt-2 px-5 py-2 text-sm font-semibold rounded-full bg-gradient-to-r from-brand-primary to-brand-tertiary dark:from-dbrand-primary dark:to-dbrand-tertiary text-white text-center no-underline">
+                <a href="/#why-it-works" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">How it Works</a>
+                <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Pricing</a>
+                <a href="{% url 'contact' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Contact</a>
+                <a href="{% url 'account_login' %}" class="mx-3 mt-2 px-5 py-2 text-sm font-semibold rounded-[10px] bg-[#FF2D6D] border border-[#FF2D6D] text-[#F4F2EE] text-center no-underline">
                     Login / Signup
                 </a>
                 {% endif %}
@@ -95,7 +88,6 @@
     </div>
 </nav>
 
-<!-- Close dropdown on outside click -->
 <script>
     document.addEventListener('click', function(e) {
         const dropdowns = document.querySelectorAll('[data-nav-dropdown]');
