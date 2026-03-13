@@ -8,7 +8,7 @@ from urllib.parse import urlencode, urlparse
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
@@ -18,6 +18,12 @@ from conversation.models import GuestWebConversationAttempt, WebAppConfig
 from conversation.utils.web_guest_logging import log_guest_web_attempt
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
+from reignitehome.situation_pages import (
+    SITUATION_PAGE_ORDER,
+    get_situation_page,
+    list_related_pages,
+    list_situation_pages,
+)
 from reignitehome.utils.ip_check import get_client_ip
 
 # Whitelists (match your <select> values in home.html)
@@ -82,6 +88,22 @@ logger = logging.getLogger(__name__)
 
 def _get_web_config():
     return WebAppConfig.load()
+
+
+def _build_guest_chat_context(request):
+    if "chat_credits" not in request.session:
+        request.session["chat_credits"] = _get_web_config().guest_reply_limit
+
+    current_chat_credits = request.session["chat_credits"]
+
+    ip = get_client_ip(request)
+    trial_record, created = TrialIP.objects.get_or_create(ip_address=ip)
+    if not created and trial_record.trial_used:
+        current_chat_credits = 0
+
+    return {
+        "chat_credits": current_chat_credits,
+    }
 
 
 def _sanitize_utm_value(raw_value, default="", max_len=160):
@@ -214,26 +236,89 @@ def ratelimited_error(request, exception=None):
 
 
 def home(request):
-    if 'chat_credits' not in request.session:
-        request.session['chat_credits'] = _get_web_config().guest_reply_limit
-        
-    current_chat_credits = request.session['chat_credits']
-    
-    
-    ip = get_client_ip(request)
-    trial_record, created = TrialIP.objects.get_or_create(ip_address=ip)
-        
-    if not created and trial_record.trial_used:
-        current_chat_credits = 0
-        
-    context = {
-        'chat_credits':current_chat_credits,
-    }
-        
-    
+    context = _build_guest_chat_context(request)
+    context["situation_pages"] = list_situation_pages()
+
     if request.user.is_authenticated:
         return redirect('conversation_home')
     return render(request, 'home.html',context)
+
+
+@require_http_methods(["GET"])
+def situation_index(request):
+    canonical_url = request.build_absolute_uri(reverse("situation_index"))
+    context = _build_guest_chat_context(request)
+    context.update(
+        {
+            "situation_pages": list_situation_pages(),
+            "meta_description": (
+                "Explore texting guides for every dating app scenario, from dry replies to asking for dates. "
+                "Open the exact guide and generate send-ready responses."
+            ),
+            "canonical_url": canonical_url,
+            "og_title": "Texting Guides | TryAgainText",
+            "og_description": (
+                "Browse all TryAgainText scenario guides and jump into the exact texting situation you need help with."
+            ),
+            "og_url": canonical_url,
+        }
+    )
+    return render(request, "situations_index.html", context)
+
+
+@require_http_methods(["GET"])
+def situation_landing(request, slug):
+    situation_page = get_situation_page(slug)
+    if not situation_page:
+        raise Http404("Situation page not found.")
+
+    canonical_url = request.build_absolute_uri(
+        reverse("situation_landing", kwargs={"slug": situation_page["slug"]})
+    )
+    context = _build_guest_chat_context(request)
+    context.update(
+        {
+            "situation_page": situation_page,
+            "related_pages": list_related_pages(situation_page),
+            "situation_pages": list_situation_pages(),
+            "meta_description": situation_page["meta_description"],
+            "canonical_url": canonical_url,
+            "og_title": situation_page["title"],
+            "og_description": situation_page["meta_description"],
+            "og_url": canonical_url,
+        }
+    )
+    return render(request, "situation_layout.html", context)
+
+
+@require_http_methods(["GET"])
+def sitemap_xml(request):
+    absolute_urls = [
+        request.build_absolute_uri(reverse("home")),
+        request.build_absolute_uri(reverse("situation_index")),
+        request.build_absolute_uri(reverse("pricing:pricing")),
+        request.build_absolute_uri(reverse("privacy_policy")),
+        request.build_absolute_uri(reverse("terms_and_conditions")),
+        request.build_absolute_uri(reverse("refund_policy")),
+        request.build_absolute_uri(reverse("contact")),
+        request.build_absolute_uri(reverse("delete_account_request")),
+        request.build_absolute_uri(reverse("safety_standards")),
+        request.build_absolute_uri(reverse("screenclean_privacy_policy")),
+    ]
+
+    for slug in SITUATION_PAGE_ORDER:
+        absolute_urls.append(
+            request.build_absolute_uri(
+                reverse("situation_landing", kwargs={"slug": slug})
+            )
+        )
+
+    return render(
+        request,
+        "sitemap.xml",
+        {"urls": absolute_urls},
+        content_type="application/xml",
+    )
 
 
 @ratelimit(key='ip', rate='10/d', block=True)   # keep your current limit

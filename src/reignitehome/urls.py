@@ -11,6 +11,9 @@ from reignitehome.views import (
     privacy_policy,
     refund_policy,
     safety_standards,
+    sitemap_xml,
+    situation_index,
+    situation_landing,
     terms_and_conditions,
 )
 
@@ -18,6 +21,9 @@ from reignitehome.views import (
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
+    path("situations/", situation_index, name="situation_index"),
+    path("situations/<slug:slug>/", situation_landing, name="situation_landing"),
+    path("sitemap.xml", sitemap_xml, name="sitemap_xml"),
     re_path(r'^flirtfix/?$', flirtfix_redirect, name='flirtfix_redirect'),
     path('conversations/',include('conversation.urls')), 
     path('ajax-reply-home/', ajax_reply_home, name='ajax_reply_home'),

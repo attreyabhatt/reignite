@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block head_title %}Texting Guides | TryAgainText{% endblock head_title %}
+{% block meta_description %}Explore texting guides for every dating app scenario, from dry replies to asking for dates. Open the exact guide and generate send-ready responses.{% endblock meta_description %}
+{% block canonical_url %}{{ canonical_url }}{% endblock canonical_url %}
+{% block og_title %}Texting Guides | TryAgainText{% endblock og_title %}
+{% block og_description %}Browse all TryAgainText scenario guides and jump into the exact texting situation you need help with.{% endblock og_description %}
+{% block og_url %}{{ canonical_url }}{% endblock og_url %}
+
+{% block extra_head %}
+<style>
+    .guides-hero {
+        border: 1px solid var(--matte-border);
+        border-radius: 16px;
+        background:
+            radial-gradient(circle at 0% 0%, rgba(212, 175, 55, 0.18), transparent 40%),
+            radial-gradient(circle at 100% 100%, rgba(255, 45, 109, 0.22), transparent 42%),
+            var(--matte-surface);
+    }
+
+    .guide-card {
+        background: var(--matte-surface);
+        border: 1px solid var(--matte-border-soft);
+        border-radius: 12px;
+        transition: border-color .2s ease, transform .2s ease;
+    }
+
+    .guide-card:hover {
+        border-color: #FF2D6D;
+        transform: translateY(-2px);
+    }
+
+    .guide-card p {
+        color: var(--matte-muted);
+    }
+
+    .guide-cta {
+        color: #FF2D6D;
+        font-weight: 600;
+        font-size: .9rem;
+    }
+</style>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="matte-shell py-12 sm:py-14">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section class="guides-hero p-6 sm:p-10 mb-8">
+            <p class="text-xs uppercase tracking-[0.12em] text-[#D4AF37] mb-3">Texting Guides</p>
+            <h1 class="matte-headline text-3xl sm:text-4xl font-bold leading-tight mb-4">
+                Find the Exact Texting Playbook for Your Situation
+            </h1>
+            <p class="matte-copy text-base sm:text-lg max-w-3xl mb-6">
+                Each guide maps to a real-world dating app pain point and opens a pre-configured AI flow with the right scenario selected.
+                Pick your situation, generate options fast, and keep the conversation moving.
+            </p>
+            <div class="flex flex-wrap gap-3">
+                <a href="{% url 'home' %}#try" class="matte-btn-primary px-6 py-3 text-sm no-underline">Open The Reply Tool</a>
+                <a href="{% url 'home' %}" class="matte-btn-secondary px-6 py-3 text-sm no-underline">Back to Homepage</a>
+            </div>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold matte-headline mb-4">All Scenario Guides</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {% for page in situation_pages %}
+                <a href="{% url 'situation_landing' page.slug %}" class="guide-card no-underline p-5">
+                    <h3 class="text-lg font-semibold text-brand-text mb-2">{{ page.h1 }}</h3>
+                    <p class="text-sm mb-4">{{ page.meta_description }}</p>
+                    <span class="guide-cta">Open guide &rarr;</span>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="matte-card p-6 sm:p-8">
+            <h2 class="text-2xl font-bold matte-headline mb-3">How to Use These Guides</h2>
+            <p class="matte-copy mb-4">
+                Start with the guide that matches your chat, paste your real conversation, and generate three send-ready options.
+                Use the response that fits your style and the current vibe.
+            </p>
+            <p class="matte-copy mb-0">
+                For best results, include recent context and timing signals. If you are restarting an old conversation or handling a tricky reply,
+                upload a screenshot so the model can match tone more accurately.
+            </p>
+        </section>
+    </div>
+</div>
+{% endblock %}

@@ -46,6 +46,7 @@
         const screenshotUpload = document.getElementById('screenshot-upload');
         const conversationArea = document.getElementById('conversation-paste-area');
         const herInfoDiv = document.getElementById('her-info-div');
+        const replyForm = document.querySelector('form[data-web-reply-form]');
 
         if (!situation) {
             return;
@@ -53,10 +54,12 @@
 
         const value = situation.value;
         const showConversationInputs = value !== 'just_matched';
+        const forceShowUpload = replyForm?.getAttribute('data-force-show-upload') === '1';
+        const showScreenshotUpload = showConversationInputs || (forceShowUpload && value === 'just_matched');
         const showHerInfo = value === 'just_matched' || value === 'spark_interest';
 
         if (screenshotUpload) {
-            screenshotUpload.classList.toggle('hidden', !showConversationInputs);
+            screenshotUpload.classList.toggle('hidden', !showScreenshotUpload);
         }
         if (conversationArea) {
             conversationArea.classList.toggle('hidden', !showConversationInputs);

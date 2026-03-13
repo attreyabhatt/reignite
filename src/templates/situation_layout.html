@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block head_title %}{{ situation_page.title }}{% endblock head_title %}
+{% block meta_description %}{{ situation_page.meta_description }}{% endblock meta_description %}
+{% block canonical_url %}{{ canonical_url }}{% endblock canonical_url %}
+{% block og_title %}{{ situation_page.title }}{% endblock og_title %}
+{% block og_description %}{{ situation_page.meta_description }}{% endblock og_description %}
+{% block og_url %}{{ canonical_url }}{% endblock og_url %}
+
+{% block extra_head %}
+<style>
+    .situation-tag-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .6rem;
+    }
+
+    .situation-tag {
+        border: 1px solid var(--matte-border);
+        border-radius: 999px;
+        padding: .55rem .9rem;
+        font-size: .85rem;
+        font-weight: 600;
+        color: var(--matte-muted);
+        background: #14171E;
+        transition: border-color .2s ease, color .2s ease, background-color .2s ease;
+    }
+
+    .situation-tag:hover {
+        color: var(--matte-text);
+        border-color: #525A69;
+    }
+
+    .situation-tag.is-active {
+        border-color: var(--matte-pink);
+        color: #12141A;
+        background: var(--matte-pink);
+    }
+
+    .matte-upload-zone {
+        background: #12141A;
+        border: 1px dashed var(--matte-border);
+        border-radius: 10px;
+        padding: 1rem;
+    }
+
+    .matte-upload-zone.is-emphasis {
+        border-color: var(--matte-pink);
+        box-shadow: 0 0 0 1px rgba(255, 45, 109, .3);
+    }
+
+    .matte-upload-zone input[type="file"] {
+        border: 1px solid var(--matte-border-soft);
+        border-radius: 10px;
+        background: #16181F;
+        color: var(--matte-muted);
+        width: 100%;
+        padding: .55rem .75rem;
+    }
+
+    .matte-upload-zone input[type="file"]::file-selector-button {
+        border: 1px solid #3A3F4A;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--matte-muted);
+        font-weight: 600;
+        padding: .4rem .8rem;
+        margin-right: .8rem;
+        transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+    }
+
+    .matte-upload-zone input[type="file"]::file-selector-button:hover {
+        background: #2E323B;
+        color: var(--matte-text);
+        border-color: #525A69;
+    }
+
+    .seo-body p {
+        color: var(--matte-muted);
+        margin-bottom: 1rem;
+        line-height: 1.75;
+    }
+
+    .seo-body h2 {
+        font-size: 1.45rem;
+        margin: 1.5rem 0 .75rem;
+        color: var(--matte-text);
+    }
+
+    .seo-body h3 {
+        font-size: 1.1rem;
+        margin: 1rem 0 .5rem;
+        color: var(--matte-text);
+    }
+
+    .seo-rules {
+        margin: .5rem 0 1.25rem;
+        padding-left: 1.25rem;
+        color: var(--matte-muted);
+    }
+
+    .seo-rules li {
+        margin-bottom: .5rem;
+        line-height: 1.65;
+    }
+
+    .seo-tip {
+        background: #12141A;
+        border: 1px solid #FF2D6D;
+        border-radius: 10px;
+        padding: .9rem 1rem;
+        margin: .5rem 0 1.25rem;
+    }
+
+    .seo-tip strong {
+        color: #FF2D6D;
+    }
+
+    .seo-tip p {
+        margin: .35rem 0 0;
+    }
+
+    @media (min-width: 768px) {
+        .situation-tag-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+</style>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="matte-shell py-12 sm:py-14">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section class="mb-8">
+            <p class="text-xs uppercase tracking-wide matte-copy mb-2">Situation Guide</p>
+            <h1 class="matte-headline text-3xl sm:text-4xl font-bold leading-tight mb-3">{{ situation_page.h1 }}</h1>
+            <p class="matte-copy max-w-3xl">
+                Built for this exact texting moment. Use the pre-selected scenario, generate send-ready responses, and adapt fast.
+            </p>
+        </section>
+
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+            <div class="lg:col-span-2">
+                <div class="matte-card p-5 sm:p-6">
+                    <form
+                        id="chatForm"
+                        data-web-reply-form
+                        data-force-show-upload="{% if situation_page.force_show_upload %}1{% else %}0{% endif %}"
+                        hx-post="{% url 'ajax_reply' %}"
+                        hx-target="#responsePanel"
+                        hx-swap="innerHTML"
+                    >
+                        {% csrf_token %}
+                        <input type="hidden" id="conversation-id" name="conversation_id" value="">
+
+                        <div class="mb-4">
+                            <label for="situation-more" class="block text-sm font-semibold mb-2">
+                                <i class="fa fa-bullseye mr-1 text-[#FF2D6D]"></i> What's the situation?
+                            </label>
+
+                            <div class="situation-tag-grid" data-situation-tags>
+                                <button type="button" class="situation-tag{% if situation_page.situation == 'stuck_after_reply' %} is-active{% endif %}" data-situation-tag="stuck_after_reply">Stuck After Reply</button>
+                                <button type="button" class="situation-tag{% if situation_page.situation == 'just_matched' %} is-active{% endif %}" data-situation-tag="just_matched">Just Matched</button>
+                                <button type="button" class="situation-tag{% if situation_page.situation == 'dry_reply' %} is-active{% endif %}" data-situation-tag="dry_reply">Dry Reply</button>
+                                <button type="button" class="situation-tag{% if situation_page.situation == 'left_on_read' %} is-active{% endif %}" data-situation-tag="left_on_read">Left on Read</button>
+                                <button type="button" class="situation-tag{% if situation_page.situation == 'ask_her_out' %} is-active{% endif %}" data-situation-tag="ask_her_out">Asking Her Out</button>
+                            </div>
+
+                            <div class="mt-3">
+                                <label for="situation-more" class="block text-xs matte-copy mb-1">More scenarios</label>
+                                <select id="situation-more" class="matte-select" data-situation-more>
+                                    <option value="">Select another scenario...</option>
+                                    <option value="spark_interest"{% if situation_page.situation == 'spark_interest' %} selected{% endif %}>I want to spark her interest</option>
+                                    <option value="she_asked_question"{% if situation_page.situation == 'she_asked_question' %} selected{% endif %}>She asked me a question</option>
+                                    <option value="feels_like_interview"{% if situation_page.situation == 'feels_like_interview' %} selected{% endif %}>Conversation feels like an interview</option>
+                                    <option value="sassy_challenge"{% if situation_page.situation == 'sassy_challenge' %} selected{% endif %}>She is being Sassy / Challenging</option>
+                                    <option value="spark_deeper_conversation"{% if situation_page.situation == 'spark_deeper_conversation' %} selected{% endif %}>I want to be sincere / vulnerable</option>
+                                    <option value="pivot_conversation"{% if situation_page.situation == 'pivot_conversation' %} selected{% endif %}>Change the topic</option>
+                                    <option value="reviving_old_chat"{% if situation_page.situation == 'reviving_old_chat' %} selected{% endif %}>I haven't talked to her in a while</option>
+                                    <option value="recovering_after_cringe"{% if situation_page.situation == 'recovering_after_cringe' %} selected{% endif %}>I think I said something off</option>
+                                    <option value="switching_platforms"{% if situation_page.situation == 'switching_platforms' %} selected{% endif %}>Trying to move to another platform</option>
+                                </select>
+                            </div>
+
+                            <select id="situation" name="situation" required class="hidden">
+                                <option value="stuck_after_reply"{% if situation_page.situation == 'stuck_after_reply' %} selected{% endif %}>She replied, but I don't know what to say</option>
+                                <option value="just_matched"{% if situation_page.situation == 'just_matched' %} selected{% endif %}>We just matched</option>
+                                <option value="spark_interest"{% if situation_page.situation == 'spark_interest' %} selected{% endif %}>I want to spark her interest</option>
+                                <option value="dry_reply"{% if situation_page.situation == 'dry_reply' %} selected{% endif %}>She gave a dry or one-word reply</option>
+                                <option value="she_asked_question"{% if situation_page.situation == 'she_asked_question' %} selected{% endif %}>She asked me a question</option>
+                                <option value="feels_like_interview"{% if situation_page.situation == 'feels_like_interview' %} selected{% endif %}>Conversation feels like an interview</option>
+                                <option value="sassy_challenge"{% if situation_page.situation == 'sassy_challenge' %} selected{% endif %}>She is being Sassy / Challenging</option>
+                                <option value="spark_deeper_conversation"{% if situation_page.situation == 'spark_deeper_conversation' %} selected{% endif %}>I want to be sincere / vulnerable</option>
+                                <option value="pivot_conversation"{% if situation_page.situation == 'pivot_conversation' %} selected{% endif %}>Change the topic</option>
+                                <option value="left_on_read"{% if situation_page.situation == 'left_on_read' %} selected{% endif %}>She left me on read</option>
+                                <option value="reviving_old_chat"{% if situation_page.situation == 'reviving_old_chat' %} selected{% endif %}>I haven't talked to her in a while</option>
+                                <option value="recovering_after_cringe"{% if situation_page.situation == 'recovering_after_cringe' %} selected{% endif %}>I think I said something off</option>
+                                <option value="ask_her_out"{% if situation_page.situation == 'ask_her_out' %} selected{% endif %}>Ask her out</option>
+                                <option value="switching_platforms"{% if situation_page.situation == 'switching_platforms' %} selected{% endif %}>Trying to move to another platform</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4 hidden" id="her-info-div">
+                            <label for="her_info" class="block text-sm font-semibold mb-1.5">
+                                <i class="fa-solid fa-user-secret mr-1 text-[#D4AF37]"></i> Her Information (optional)
+                            </label>
+                            <textarea name="her_info" id="her_info" rows="3" class="matte-textarea resize-y"
+                                placeholder="Add anything that might help - her bio, hobbies, vibe, or her style."></textarea>
+                            <p class="text-xs matte-copy mt-1">Adding details can improve your results.</p>
+                        </div>
+
+                        <div class="mb-4 matte-upload-zone{% if situation_page.force_show_upload %} is-emphasis{% endif %}" id="screenshot-upload">
+                            <label for="formFile" class="block text-sm font-semibold mb-1.5">
+                                Upload Screenshot
+                                <span class="text-xs matte-copy font-normal">(optional - we'll extract the messages)</span>
+                            </label>
+                            <input type="file" id="formFile">
+                            <p class="text-xs mt-1.5 {% if situation_page.force_show_upload %}text-[#FF2D6D] font-semibold{% else %}matte-copy{% endif %}">
+                                {{ situation_page.upload_hint }}
+                            </p>
+                            <div id="ocr-status" class="mt-2 hidden">
+                                <span class="inline-block w-4 h-4 border-2 border-[#FF2D6D] border-t-transparent rounded-full animate-spin align-middle"></span>
+                                <span class="ml-2 text-sm matte-copy">Analyzing screenshot...</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4" id="conversation-paste-area">
+                            <label for="last-reply" class="block text-sm font-semibold mb-1.5">Conversation</label>
+                            <textarea name="last_text" id="last-reply" rows="5" class="matte-textarea resize-y"
+                                placeholder="you: hey, free thursday?&#10;her: (seen, no reply)">{{ situation_page.prefill_text }}</textarea>
+                            <p class="text-xs matte-copy mt-1 text-right"><span id="charCount">0</span> characters</p>
+                        </div>
+
+                        <div>
+                            <button
+                                type="submit"
+                                id="generate-btn"
+                                data-generate-btn
+                                class="matte-btn-primary w-full px-6 py-3 text-sm"
+                            >
+                                <i class="fa fa-fire mr-2"></i>Generate Replies
+                            </button>
+                            <p class="mt-3 text-center text-[#D4AF37] text-sm font-semibold">
+                                <i class="fa fa-bolt"></i> <span id="chatCredits">{{ chat_credits }}</span> Free Uses Today
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <aside class="space-y-4">
+                <div id="suggestions" class="matte-card-tight p-4">
+                    <div class="text-xs font-semibold matte-copy uppercase tracking-wide mb-3">Send-Ready Replies</div>
+                    <div id="responsePanel">
+                        {% include "conversation/partials/response_empty.html" %}
+                    </div>
+                </div>
+                <div class="matte-card-tight p-4">
+                    <p class="text-xs font-semibold matte-copy uppercase tracking-wide mb-3">Browse All Situations</p>
+                    <div class="space-y-2">
+                        {% for page in situation_pages %}
+                        <a href="{% url 'situation_landing' page.slug %}" class="block text-sm no-underline {% if page.slug == situation_page.slug %}text-[#FF2D6D] font-semibold{% else %}matte-copy hover:text-[#FF2D6D]{% endif %}">
+                            {{ page.sidebar_label }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <template id="response-empty-template">
+            {% include "conversation/partials/response_empty.html" %}
+        </template>
+
+        <section class="matte-card p-6 sm:p-8 mb-8">
+            <h2 class="text-2xl font-bold matte-headline mb-4">Why This Situation Matters</h2>
+            <div class="seo-body">
+                {% for section in situation_page.seo_sections %}
+                <article>
+                    <h2>{{ section.heading }}</h2>
+                    {% if section.subheading %}
+                    <h3>{{ section.subheading }}</h3>
+                    {% endif %}
+                    {% for paragraph in section.paragraphs %}
+                    <p>{{ paragraph|safe }}</p>
+                    {% endfor %}
+                    {% if section.bullets %}
+                    <ul class="seo-rules">
+                        {% for bullet in section.bullets %}
+                        <li>{{ bullet }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </article>
+                {% if forloop.counter == 2 %}
+                <div class="seo-tip">
+                    <strong>Pro Tip:</strong>
+                    <p>{{ situation_page.screenshot_tip }}</p>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="matte-card p-6 sm:p-8">
+            <h2 class="text-2xl font-bold matte-headline mb-4">Related Situation Guides</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {% for page in related_pages %}
+                <a href="{% url 'situation_landing' page.slug %}" class="matte-card-tight p-4 text-sm no-underline text-brand-text hover:border-[#FF2D6D]">
+                    {{ page.h1 }}
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/web_reply_ui.js' %}"></script>
+{% endblock %}

@@ -5,7 +5,13 @@
     {% load static %}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block head_title %}{% endblock head_title %}</title>
+    <title>{% block head_title %}TryAgainText{% endblock head_title %}</title>
+    <meta name="description" content="{% block meta_description %}Generate send-ready dating app replies with AI, tailored to your real conversation context.{% endblock meta_description %}">
+    <link rel="canonical" href="{% block canonical_url %}{% firstof canonical_url request.build_absolute_uri %}{% endblock canonical_url %}">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{% block og_title %}{% firstof og_title 'TryAgainText' %}{% endblock og_title %}">
+    <meta property="og:description" content="{% block og_description %}{% firstof og_description 'Generate send-ready dating app replies with AI, tailored to your real conversation context.' %}{% endblock og_description %}">
+    <meta property="og:url" content="{% block og_url %}{% firstof og_url canonical_url request.build_absolute_uri %}{% endblock og_url %}">
 
     <link rel="icon" href="{% static 'images/favicon.svg' %}" type="image/svg+xml">
     <link rel="alternate icon" href="{% static 'images/favicon.ico' %}" type="image/x-icon">
