@@ -301,7 +301,6 @@ def sitemap_xml(request):
         request.build_absolute_uri(reverse("terms_and_conditions")),
         request.build_absolute_uri(reverse("refund_policy")),
         request.build_absolute_uri(reverse("contact")),
-        request.build_absolute_uri(reverse("delete_account_request")),
         request.build_absolute_uri(reverse("safety_standards")),
         request.build_absolute_uri(reverse("screenclean_privacy_policy")),
     ]

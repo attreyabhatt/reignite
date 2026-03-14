@@ -367,7 +367,6 @@ class SituationSeoPagesTests(TestCase):
             "http://testserver/terms/",
             "http://testserver/refund-policy/",
             "http://testserver/contact/",
-            "http://testserver/delete-account/",
             "http://testserver/safety-standards/",
             "http://testserver/policy/screenclean/",
         ]
