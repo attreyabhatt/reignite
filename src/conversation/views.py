@@ -26,6 +26,33 @@ MAX_HER_INFO = 4000
 MAX_SITUATION_LEN = 150
 
 
+def _build_conversation_tool_config(**overrides):
+    config = {
+        "ui_variant": "pickup",
+        "selected_situation": "stuck_after_reply",
+        "prefill_text": "",
+        "upload_hint": "Drag & drop a chat screenshot, or paste your convo below.",
+        "force_show_upload": False,
+        "conversation_placeholder": "Paste your chat here, or upload a screenshot of the conversation",
+        "situation_label": "What's the situation?",
+        "her_info_label": "Her Information (optional)",
+        "upload_label": "Upload Conversation",
+        "submit_label": "Generate Replies",
+        "show_credits": True,
+        "credits_label": "Credits Remaining",
+        "wrapper_class": "",
+        "form_col_class": "",
+        "suggestions_card_class": "",
+        "response_heading": "Send-Ready Replies",
+        "response_empty_template": "conversation/partials/response_empty_pickup.html",
+    }
+    for key, value in overrides.items():
+        if value is None:
+            continue
+        config[key] = value
+    return config
+
+
 def _is_htmx_request(request):
     return request.headers.get("HX-Request", "").lower() == "true"
 
@@ -179,6 +206,7 @@ def conversation_home(request):
     context = {
         'conversations': conversations,
         'chat_credits': chat_credit.balance,
+        'tool_config': _build_conversation_tool_config(),
     }
     return render(request, 'conversation/index.html', context)
 

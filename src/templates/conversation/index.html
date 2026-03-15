@@ -51,360 +51,64 @@
     .new-convo-link:hover {
         background: rgba(255, 45, 109, 0.12);
     }
-
-    .situation-pill-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .55rem;
-    }
-
-    .situation-tag {
-        border: 1px solid #3A3F4A;
-        border-radius: 999px;
-        padding: .55rem .9rem;
-        font-size: .85rem;
-        font-weight: 600;
-        color: #8F9BB3;
-        background: #14171E;
-        transition: border-color .2s ease, color .2s ease, background-color .2s ease;
-    }
-
-    .situation-tag:hover {
-        color: #F4F2EE;
-        border-color: #525A69;
-    }
-
-    .situation-tag.is-active {
-        border-color: #FF2D6D;
-        color: #12141A;
-        background: #FF2D6D;
-    }
-
-    .custom-scenario-wrap {
-        position: relative;
-    }
-
-    .custom-scenario-wrap.is-active .situation-tag {
-        border-color: #FF2D6D;
-        color: #F4F2EE;
-        background: rgba(255, 45, 109, 0.15);
-    }
-
-    .custom-scenario-menu {
-        position: absolute;
-        top: calc(100% + .5rem);
-        left: 0;
-        width: min(24rem, 80vw);
-        max-height: 18rem;
-        overflow-y: auto;
-        background: #16181F;
-        border: 1px solid #3A3F4A;
-        border-radius: 10px;
-        padding: .4rem;
-        z-index: 30;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-    }
-
-    .custom-scenario-option {
-        width: 100%;
-        text-align: left;
-        border-radius: 8px;
-        font-size: .82rem;
-        color: #8F9BB3;
-        padding: .5rem .65rem;
-        transition: background-color .2s ease, color .2s ease;
-    }
-
-    .custom-scenario-option:hover {
-        background: #1B1E25;
-        color: #F4F2EE;
-    }
-
-    #last-reply,
-    #her_info {
-        scrollbar-width: thin;
-        scrollbar-color: #3A3F4A #12141A;
-    }
-
-    #last-reply::-webkit-scrollbar,
-    #her_info::-webkit-scrollbar {
-        width: 10px;
-    }
-
-    #last-reply::-webkit-scrollbar-track,
-    #her_info::-webkit-scrollbar-track {
-        background: #12141A;
-        border-radius: 999px;
-    }
-
-    #last-reply::-webkit-scrollbar-thumb,
-    #her_info::-webkit-scrollbar-thumb {
-        background: #3A3F4A;
-        border-radius: 999px;
-        border: 2px solid #12141A;
-    }
-
-    #last-reply::-webkit-scrollbar-thumb:hover,
-    #her_info::-webkit-scrollbar-thumb:hover {
-        background: #525A69;
-    }
-
-    .command-input-shell {
-        position: relative;
-        background: #0d0f14;
-        border: 1px solid #2E323B;
-        border-radius: 16px;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
-        transition: border-color .2s ease, box-shadow .2s ease;
-    }
-
-    .command-input-shell:focus-within {
-        border-color: #FF2D6D;
-        box-shadow: 0 0 0 1px rgba(255, 45, 109, 0.26);
-    }
-
-    .command-input-textarea {
-        width: 100%;
-        min-height: 180px;
-        background: transparent;
-        color: #F4F2EE;
-        border: 0;
-        outline: none;
-        resize: none;
-        padding: 1.1rem 1.1rem 3.2rem;
-        font-size: .95rem;
-        line-height: 1.45;
-    }
-
-    .command-input-textarea::placeholder {
-        color: #4A5568;
-    }
-
-    .command-input-actions {
-        position: absolute;
-        left: .6rem;
-        right: .6rem;
-        bottom: .55rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: .5rem;
-    }
-
-    .command-upload-btn {
-        cursor: pointer;
-        color: #8F9BB3;
-        background: #16181F;
-        border: 1px solid #2E323B;
-        border-radius: 8px;
-        font-size: .8rem;
-        font-weight: 600;
-        padding: .38rem .65rem;
-        display: inline-flex;
-        align-items: center;
-        gap: .4rem;
-        transition: color .2s ease, border-color .2s ease, background-color .2s ease;
-    }
-
-    .command-upload-btn:hover {
-        color: #FF2D6D;
-        border-color: #3A3F4A;
-        background: #1B1E25;
-    }
-
-    .command-char-count {
-        color: #4A5568;
-        font-size: .75rem;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-
-    .command-ocr-status {
-        display: inline-flex;
-        align-items: center;
-        gap: .35rem;
-        color: #8F9BB3;
-        font-size: .75rem;
-    }
-
-    .hidden-file-input {
-        display: none;
-    }
-
-    @media (min-width: 768px) {
-        .command-input-textarea {
-            min-height: 200px;
-        }
-    }
 </style>
+<link rel="stylesheet" href="{% static 'css/pickup_playground.css' %}">
 {% endblock extra_head %}
 
 {% block content %}
 <div class="w-full bg-[#12141A]">
     <div class="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
         <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
-
             <aside class="order-1 lg:w-72 lg:shrink-0">
-            <button onclick="document.getElementById('sidebarContent').classList.toggle('hidden')"
-                class="w-full lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-brand-outline text-sm font-medium text-brand-text mb-3">
-                <i class="fa fa-bars"></i> Conversations <i class="fa fa-chevron-down text-xs"></i>
-            </button>
+                <button
+                    onclick="document.getElementById('sidebarContent').classList.toggle('hidden')"
+                    class="w-full lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-brand-outline text-sm font-medium text-brand-text mb-3"
+                >
+                    <i class="fa fa-bars"></i> Conversations <i class="fa fa-chevron-down text-xs"></i>
+                </button>
 
-            <div id="sidebarContent" class="hidden lg:block matte-card p-4">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="text-xs font-medium text-brand-muted uppercase tracking-wide hidden lg:block">Conversations</div>
-                    <a href="{% url 'conversation_home' %}" class="new-convo-link no-underline" aria-label="Start a new conversation">
-                        <i class="fa fa-plus text-[0.68rem]"></i>
-                        <span>New</span>
-                    </a>
+                <div id="sidebarContent" class="hidden lg:block matte-card p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-xs font-medium text-brand-muted uppercase tracking-wide hidden lg:block">Conversations</div>
+                        <a href="{% url 'conversation_home' %}" class="new-convo-link no-underline" aria-label="Start a new conversation">
+                            <i class="fa fa-plus text-[0.68rem]"></i>
+                            <span>New</span>
+                        </a>
+                    </div>
+
+                    <ul id="convoList" class="space-y-0.5 {% if not conversations %}hidden{% endif %}">
+                        {% for conversation in conversations %}
+                        <li class="convo-item" data-conversation-item-id="{{ conversation.id }}">
+                            <div class="convo-item-frame flex items-center gap-2 px-2.5 py-2 rounded-xl">
+                                <a href="#" class="convo-link flex-1 min-w-0 text-sm text-brand-text no-underline" data-id="{{ conversation.id }}">
+                                    <span class="truncate block">{{ conversation.girl_title }}</span>
+                                </a>
+                                <button
+                                    type="button"
+                                    class="delete-convo-btn opacity-0 transition-opacity text-brand-muted hover:text-red-400 text-lg leading-none"
+                                    data-id="{{ conversation.id }}"
+                                    title="Delete"
+                                >&times;</button>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <div id="convoListEmpty" class="text-center text-brand-muted py-6 {% if conversations %}hidden{% endif %}">
+                        <div class="text-2xl mb-2 opacity-50">--</div>
+                        <p class="text-sm">No conversations yet</p>
+                    </div>
                 </div>
-
-                <ul id="convoList" class="space-y-0.5 {% if not conversations %}hidden{% endif %}">
-                    {% for conversation in conversations %}
-                    <li class="convo-item" data-conversation-item-id="{{ conversation.id }}">
-                        <div class="convo-item-frame flex items-center gap-2 px-2.5 py-2 rounded-xl">
-                            <a href="#" class="convo-link flex-1 min-w-0 text-sm text-brand-text no-underline" data-id="{{ conversation.id }}">
-                                <span class="truncate block">{{ conversation.girl_title }}</span>
-                            </a>
-                            <button
-                                type="button"
-                                class="delete-convo-btn opacity-0 transition-opacity text-brand-muted hover:text-red-400 text-lg leading-none"
-                                data-id="{{ conversation.id }}"
-                                title="Delete"
-                            >&times;</button>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-
-                <div id="convoListEmpty" class="text-center text-brand-muted py-6 {% if conversations %}hidden{% endif %}">
-                    <div class="text-2xl mb-2 opacity-50">??</div>
-                    <p class="text-sm">No conversations yet</p>
-                </div>
-            </div>
             </aside>
 
-            <main class="order-2 lg:flex-1 lg:max-w-3xl">
-                <div class="matte-card p-6 sm:p-8 min-h-[60vh]">
-                <form
-                    id="chatForm"
-                    data-web-reply-form
-                    hx-post="{% url 'ajax_reply' %}"
-                    hx-target="#responsePanel"
-                    hx-swap="innerHTML"
-                >
-                    {% csrf_token %}
-                    <input type="hidden" id="conversation-id" name="conversation_id" value="">
-
-                    <div class="mb-6">
-                        <div class="situation-pill-row" data-situation-tags>
-                            <button type="button" class="situation-tag is-active" data-situation-tag="stuck_after_reply">Stuck After Reply</button>
-                            <button type="button" class="situation-tag" data-situation-tag="just_matched">Just Matched</button>
-                            <button type="button" class="situation-tag" data-situation-tag="dry_reply">Dry Reply</button>
-                            <button type="button" class="situation-tag" data-situation-tag="left_on_read">Left on Read</button>
-                            <button type="button" class="situation-tag" data-situation-tag="ask_her_out">Asking Her Out</button>
-                            <div class="custom-scenario-wrap" data-situation-custom-wrap>
-                                <button type="button" class="situation-tag inline-flex items-center gap-1.5" data-situation-custom-trigger aria-haspopup="menu" aria-expanded="false">
-                                    <i class="fa fa-plus text-[0.65rem]"></i>
-                                    <span data-situation-custom-label>Custom Scenario</span>
-                                </button>
-                                <div class="custom-scenario-menu hidden" data-situation-custom-menu role="menu" aria-label="Custom scenarios">
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="spark_interest">I want to spark her interest</button>
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="she_asked_question">She asked me a question</button>
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="feels_like_interview">Conversation feels like an interview</button>
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="sassy_challenge">She is being Sassy / Challenging</button>
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="spark_deeper_conversation">I want to be sincere / vulnerable</button>
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="pivot_conversation">Change the topic</button>
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="reviving_old_chat">I haven't talked to her in a while</button>
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="recovering_after_cringe">I think I said something off</button>
-                                    <button type="button" class="custom-scenario-option" data-situation-custom-option="switching_platforms">Trying to move to another platform</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <select id="situation" name="situation" required class="hidden">
-                            <option value="stuck_after_reply" selected>She replied, but I don't know what to say</option>
-                            <option value="just_matched">We just matched</option>
-                            <option value="spark_interest">I want to spark her interest</option>
-                            <option value="dry_reply">She gave a dry or one-word reply</option>
-                            <option value="she_asked_question">She asked me a question</option>
-                            <option value="feels_like_interview">Conversation feels like an interview</option>
-                            <option value="sassy_challenge">She is being Sassy / Challenging</option>
-                            <option value="spark_deeper_conversation">I want to be sincere / vulnerable</option>
-                            <option value="pivot_conversation">Change the topic</option>
-                            <option value="left_on_read">She left me on read</option>
-                            <option value="reviving_old_chat">I haven't talked to her in a while</option>
-                            <option value="recovering_after_cringe">I think I said something off</option>
-                            <option value="ask_her_out">Ask her out</option>
-                            <option value="switching_platforms">Trying to move to another platform</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-4 hidden" id="her-info-div">
-                        <label for="her_info" class="block text-sm font-semibold mb-1.5">
-                            <i class="fa-solid fa-user-secret mr-1 text-[#D4AF37]"></i> Her Information (optional)
-                        </label>
-                        <textarea name="her_info" id="her_info" rows="3" class="matte-textarea resize-y"
-                            placeholder="Add anything that might help - her bio, hobbies, vibe, or her hairstyle."></textarea>
-                        <p class="text-xs text-brand-muted mt-1">Adding details can improve your results.</p>
-                    </div>
-
-                    <div class="mb-4" id="conversation-paste-area">
-                        <div class="command-input-shell">
-                            <textarea
-                                name="last_text"
-                                id="last-reply"
-                                rows="5"
-                                class="command-input-textarea"
-                                placeholder="Paste your chat here, or upload a screenshot of the conversation"
-                            ></textarea>
-                            <div class="command-input-actions">
-                                <div class="flex items-center gap-2">
-                                    <div id="screenshot-upload">
-                                        <input type="file" id="formFile" class="hidden-file-input">
-                                        <label for="formFile" class="command-upload-btn">
-                                            <i class="fa-regular fa-image"></i>
-                                            <span>Upload Screenshot</span>
-                                        </label>
-                                    </div>
-                                    <div id="ocr-status" class="hidden command-ocr-status">
-                                        <span class="inline-block w-3.5 h-3.5 border-2 border-[#FF2D6D] border-t-transparent rounded-full animate-spin"></span>
-                                        <span>Analyzing...</span>
-                                    </div>
-                                </div>
-                                <span class="command-char-count"><span id="charCount">0</span>/8000</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <button
-                            type="submit"
-                            id="generate-btn"
-                            data-generate-btn
-                            class="matte-btn-primary w-full px-6 py-3 text-sm"
-                        >
-                            <i class="fa fa-fire mr-2"></i>Generate Replies
-                        </button>
-                    </div>
-                </form>
+            <main class="order-2 lg:flex-1">
+                <div class="pickup-tool-shell">
+                    {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
                 </div>
             </main>
-
-            <aside class="order-3 lg:w-80 lg:shrink-0" id="responseArea">
-                <div class="text-xs font-medium text-brand-muted uppercase tracking-wide mb-3">Suggested responses</div>
-                <div id="responsePanel">
-                    {% include "conversation/partials/response_empty_workspace.html" %}
-                </div>
-            </aside>
-
         </div>
     </div>
 </div>
-
-<template id="response-empty-template">
-    {% include "conversation/partials/response_empty_workspace.html" %}
-</template>
 
 <div id="paymentToast" class="hidden fixed bottom-4 right-4 z-50 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg">
     <div class="flex items-center gap-3">

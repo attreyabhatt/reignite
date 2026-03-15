@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import GuestWebConversationAttempt, WebAppConfig
+from .models import Conversation, GuestWebConversationAttempt, WebAppConfig
 
 class AjaxReplyViewTests(TestCase):
     def setUp(self):
@@ -180,6 +180,39 @@ class AjaxReplyViewTests(TestCase):
         payload = response.json()
         self.assertEqual(payload.get("credits_left"), 1)
         self.assertEqual(GuestWebConversationAttempt.objects.count(), 0)
+
+
+class ConversationHomeTemplateTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='conversationtemplateuser',
+            email='conversationtemplateuser@example.com',
+            password='password123',
+        )
+        self.client.force_login(self.user)
+
+    def test_conversation_home_uses_shared_pickup_playground_and_keeps_sidebar(self):
+        convo = Conversation.objects.create(
+            user=self.user,
+            content='you: hey\nher: hi',
+            situation='stuck_after_reply',
+            her_info='',
+            girl_title='Hi...',
+        )
+
+        response = self.client.get(reverse('conversation_home'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-reply-tool-shared="1"', html=False)
+        self.assertContains(response, 'data-tool-variant="pickup"', html=False)
+        self.assertContains(response, 'id="playground"', html=False)
+        self.assertContains(
+            response,
+            '<link rel="stylesheet" href="/static/css/pickup_playground.css">',
+            html=False,
+        )
+        self.assertContains(response, 'id="convoList"', html=False)
+        self.assertContains(response, f'data-conversation-item-id="{convo.id}"', html=False)
+        self.assertContains(response, "No response generated yet.")
 
 
 class GuestReplyLimitTests(TestCase):

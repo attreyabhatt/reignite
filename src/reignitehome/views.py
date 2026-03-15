@@ -123,7 +123,7 @@ def _build_tool_config(**overrides):
         "upload_label": "Upload Screenshot",
         "submit_label": "Generate Replies",
         "show_credits": True,
-        "credits_label": "Free Uses Today",
+        "credits_label": "Credits Remaining",
         "credits_note_class": "matte-credit-note mt-3 text-center",
         "her_info_placeholder": "Add anything that might help - her bio, hobbies, vibe, or her style.",
         "her_info_prefill": "",

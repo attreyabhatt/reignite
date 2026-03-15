@@ -176,7 +176,7 @@ class WebMarketingAndSignupConfigTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Powered by FlirtFix")
-        self.assertContains(response, 'id="chatCredits">7</span> Free Uses Today')
+        self.assertContains(response, 'id="chatCredits">7</span> Credits Remaining')
         self.assertContains(response, "Never lose a match to a bad reply.")
 
     def test_signup_template_marketing_line_follows_web_app_config(self):

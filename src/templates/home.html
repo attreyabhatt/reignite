@@ -5,25 +5,332 @@
 
 {% block extra_head %}
 <style>
-    .matte-phone-stage {
+    .home-stage {
+        background:
+            radial-gradient(circle at 78% 16%, rgba(255, 45, 109, 0.18), transparent 34%),
+            radial-gradient(circle at 16% -5%, rgba(212, 175, 55, 0.08), transparent 38%),
+            var(--matte-bg);
+        overflow-x: clip;
+    }
+
+    .home-section-title {
+        font-size: clamp(2rem, 3.8vw, 3.2rem);
+        line-height: 1.08;
+    }
+
+    .home-section-copy {
+        color: var(--matte-muted);
+        max-width: 44rem;
+        margin-inline: auto;
+        line-height: 1.65;
+    }
+
+    .home-hero {
+        position: relative;
+        padding-top: clamp(3rem, 8vw, 6rem);
+        padding-bottom: clamp(3.5rem, 8vw, 6.5rem);
+    }
+
+    .home-hero::after {
+        content: "";
+        position: absolute;
+        inset: auto 8% 0 auto;
+        width: min(42vw, 520px);
+        height: min(42vw, 520px);
+        transform: translate(20%, 20%);
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 45, 109, .2), rgba(255, 45, 109, 0) 68%);
+        filter: blur(16px);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .home-hero-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: clamp(2rem, 4vw, 3.5rem);
+        align-items: center;
+    }
+
+    .home-hero-title {
+        font-size: clamp(2.4rem, 5.8vw, 5.15rem);
+        line-height: .98;
+        letter-spacing: -0.02em;
+        margin-bottom: 1.2rem;
+        max-width: 12ch;
+    }
+
+    .home-hero-title .accent {
+        color: var(--matte-pink);
+        font-style: italic;
+    }
+
+    .home-hero-copy {
+        color: var(--matte-muted);
+        font-size: clamp(1rem, 1.6vw, 1.12rem);
+        line-height: 1.72;
+        max-width: 34rem;
+        margin-bottom: 2rem;
+    }
+
+    .home-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .8rem;
+    }
+
+    .home-hero-btn {
+        min-width: 10.75rem;
+        text-align: center;
+        padding: .88rem 1.45rem;
+        border-radius: .85rem;
+        font-size: .9rem;
+        letter-spacing: .01em;
+    }
+
+    .home-phone-column {
+        position: relative;
+        display: flex;
+        justify-content: center;
+    }
+
+    .home-phone-glow {
+        position: absolute;
+        inset: 50% auto auto 50%;
+        transform: translate(-50%, -50%);
+        width: clamp(280px, 52vw, 560px);
+        height: clamp(280px, 52vw, 560px);
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 45, 109, .16), rgba(255, 45, 109, 0) 64%);
+        filter: blur(16px);
+        pointer-events: none;
+    }
+
+    .home-phone-stage {
+        position: relative;
+        width: clamp(228px, 27vw, 320px);
+        border-radius: 2.35rem;
         border: 1px solid var(--matte-border);
-        border-radius: 12px;
-        background: var(--matte-surface);
-        padding: .9rem;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, .02), rgba(255, 255, 255, 0)),
+            #0f1118;
+        padding: .58rem;
+        box-shadow: 0 34px 80px rgba(0, 0, 0, .56);
     }
 
-    .matte-phone-image {
-        width: min(100%, 300px);
-        border-radius: 28px;
+    .home-phone-image {
+        width: 100%;
+        border-radius: 1.95rem;
         border: 1px solid #2A2E37;
-        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.65);
         display: block;
-        margin: 0 auto;
     }
 
-    .matte-section-title {
-        font-size: 2rem;
+    .home-phone-badge {
+        position: absolute;
+        right: -1.75rem;
+        bottom: 3.2rem;
+        border: 1px solid var(--matte-border);
+        border-radius: .95rem;
+        background: var(--matte-surface);
+        padding: .7rem .78rem;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, .42);
+        animation: homeBadgeFloat 3.6s ease-in-out infinite;
+    }
+
+    .home-phone-badge-title {
+        color: var(--matte-text);
+        font-size: .67rem;
         line-height: 1.2;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+
+    .home-phone-badge-copy {
+        color: var(--matte-muted);
+        font-size: .63rem;
+        line-height: 1.2;
+        margin-top: .2rem;
+    }
+
+    .home-playground {
+        padding-top: clamp(2.25rem, 6vw, 4.2rem);
+        padding-bottom: clamp(3rem, 8vw, 4.8rem);
+    }
+
+    .home-playground-title-wrap {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .home-playground-shell {
+        border-radius: 1.5rem;
+    }
+
+    .home-why {
+        padding-top: clamp(3.2rem, 8vw, 5.2rem);
+        padding-bottom: clamp(3rem, 8vw, 5rem);
+        border-top: 1px solid var(--matte-border-soft);
+        border-bottom: 1px solid var(--matte-border-soft);
+        background: linear-gradient(180deg, rgba(255, 255, 255, .01), rgba(255, 255, 255, 0));
+    }
+
+    .home-section-underline {
+        height: 3px;
+        width: 4.7rem;
+        border-radius: 999px;
+        margin: .7rem auto 0;
+        background: linear-gradient(90deg, var(--matte-pink), rgba(255, 45, 109, .15));
+    }
+
+    .home-feature-grid {
+        margin-top: 2.15rem;
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .home-feature-card {
+        border: 1px solid var(--matte-border-soft);
+        border-radius: 1rem;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, .012), transparent 42%),
+            var(--matte-surface);
+        padding: 1.4rem 1.2rem;
+    }
+
+    .home-feature-icon {
+        width: 2rem;
+        height: 2rem;
+        border-radius: .65rem;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(255, 45, 109, .3);
+        background: rgba(255, 45, 109, .08);
+        color: var(--matte-pink);
+        font-size: .78rem;
+        margin-bottom: .88rem;
+    }
+
+    .home-feature-title {
+        font-size: 1.1rem;
+        margin-bottom: .48rem;
+    }
+
+    .home-feature-copy {
+        color: var(--matte-muted);
+        font-size: .9rem;
+        line-height: 1.64;
+    }
+
+    .home-privacy {
+        padding-top: clamp(3rem, 7vw, 4.8rem);
+        padding-bottom: clamp(2.9rem, 7vw, 4.6rem);
+    }
+
+    .home-privacy-shell {
+        border-radius: 1.4rem;
+        border: 1px solid var(--matte-border);
+        background:
+            linear-gradient(150deg, rgba(255, 255, 255, .02), rgba(255, 255, 255, 0) 55%),
+            var(--matte-surface);
+        padding: clamp(1.2rem, 3vw, 2rem);
+    }
+
+    .home-privacy-grid {
+        display: grid;
+        gap: 1.65rem;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        align-items: center;
+    }
+
+    .home-privacy-copy {
+        color: var(--matte-muted);
+        line-height: 1.66;
+        max-width: 33rem;
+    }
+
+    .home-privacy-list {
+        margin-top: 1.12rem;
+        display: grid;
+        gap: .52rem;
+    }
+
+    .home-privacy-list-item {
+        display: flex;
+        align-items: flex-start;
+        gap: .58rem;
+        color: var(--matte-text);
+        font-size: .92rem;
+        line-height: 1.56;
+    }
+
+    .home-privacy-check {
+        color: var(--matte-pink);
+        font-size: .66rem;
+        margin-top: .4rem;
+    }
+
+    .home-privacy-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .65rem;
+    }
+
+    .home-privacy-metric {
+        border: 1px solid var(--matte-border-soft);
+        border-radius: .78rem;
+        background: rgba(16, 18, 24, .72);
+        padding: .8rem .7rem;
+        text-align: center;
+    }
+
+    .home-privacy-metric-label {
+        color: var(--matte-muted);
+        font-size: .6rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+
+    .home-privacy-metric-value {
+        margin-top: .22rem;
+        color: var(--matte-text);
+        font-size: .85rem;
+        font-weight: 700;
+    }
+
+    .home-cta {
+        padding-top: clamp(2.8rem, 7vw, 4.8rem);
+        padding-bottom: clamp(3.2rem, 8vw, 5.8rem);
+    }
+
+    .home-cta-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.45rem;
+        border: 1px solid var(--matte-border);
+        background:
+            radial-gradient(circle at 14% 18%, rgba(255, 45, 109, .15), transparent 40%),
+            radial-gradient(circle at 86% 82%, rgba(212, 175, 55, .1), transparent 45%),
+            var(--matte-surface);
+        padding: clamp(1.55rem, 4.5vw, 3rem);
+        text-align: center;
+    }
+
+    .home-cta-copy {
+        color: var(--matte-muted);
+        max-width: 35rem;
+        margin: .9rem auto 1.6rem;
+        line-height: 1.64;
+    }
+
+    .home-cta-btn {
+        padding: .94rem 1.75rem;
+        border-radius: .85rem;
+        font-size: .9rem;
     }
 
     #last-reply,
@@ -55,60 +362,56 @@
         background: #525A69;
     }
 
-    .matte-credit-note {
-        color: var(--matte-gold);
-        font-size: .9rem;
-        font-weight: 600;
+    @keyframes homeBadgeFloat {
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+        50% {
+            transform: translateY(-8px);
+        }
     }
 
-    .matte-feature-card i {
-        font-size: 1.25rem;
+    @media (min-width: 768px) {
+        .home-feature-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1.2rem;
+        }
     }
 
-    .matte-feature-card p {
-        color: var(--matte-muted);
+    @media (min-width: 1024px) {
+        .home-hero-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .home-phone-column {
+            justify-content: flex-end;
+        }
+
+        .home-privacy-grid {
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 2.1rem;
+        }
     }
 
-    .matte-privacy-grid {
-        background: var(--matte-surface);
-        border: 1px solid var(--matte-border);
-        border-radius: 12px;
-        padding: 1.5rem;
-    }
-
-    .matte-check {
-        color: var(--matte-pink);
-        font-size: .75rem;
-        margin-top: .45rem;
-    }
-
-    .matte-divider {
-        border-top: 1px solid var(--matte-border-soft);
-    }
-
-    /* Laptop-only: keep hero left block in upper-middle of first viewport. */
     @media (min-width: 1024px) and (max-width: 1439px) {
-        .hero-section {
-            padding-top: 0;
-            padding-bottom: 0;
+        .home-hero-grid > div:first-child {
+            margin-top: -2.25rem;
         }
-
-        .hero-grid {
-            min-height: calc(100vh - 96px);
-            align-items: center;
-        }
-
-        .hero-left-column {
-            align-self: flex-start;
-            justify-content: flex-start !important;
-            padding-top: clamp(2rem, 6vh, 3.75rem);
-        }
-
     }
 
     @media (max-width: 767px) {
-        .matte-section-title {
-            font-size: 1.75rem;
+        .home-hero {
+            padding-top: 2.5rem;
+        }
+
+        .home-phone-badge {
+            right: -1rem;
+            bottom: 2.1rem;
+        }
+
+        .home-playground-title-wrap {
+            margin-bottom: 1.25rem;
         }
     }
 </style>
@@ -116,96 +419,124 @@
 {% endblock extra_head %}
 
 {% block content %}
-<div class="matte-shell">
-    <section class="hero-section py-12 sm:py-14">
+<div class="matte-shell home-stage">
+    <section class="home-hero">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="hero-grid grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-center">
-                <div class="hero-left-column lg:flex lg:flex-col lg:justify-center">
-                    <h1 class="matte-headline text-4xl sm:text-5xl font-bold tracking-tight leading-tight mb-5">
-                        Master the Art of Conversation.
+            <div class="home-hero-grid">
+                <div>
+                    <h1 class="matte-headline home-hero-title font-bold">
+                        Get the Perfect Response for <span class="accent">Every Dating App Chat.</span>
                     </h1>
-                    <p class="matte-copy text-lg mb-8 max-w-xl">
-                        The premium AI dating assistant. Upload a screenshot, get 3 send-ready replies, and never lose a match to a bad text.
+                    <p class="home-hero-copy">
+                        Upload a screenshot of any conversation and our AI will generate 3 clever, personality-driven replies instantly.
                     </p>
-                    <div class="flex flex-wrap gap-3 items-center">
-                        <a href="#try" class="matte-btn-primary px-6 py-3 text-sm no-underline">Try the Web App</a>
+                    <div class="home-hero-actions">
+                        <a href="#try" class="matte-btn-primary home-hero-btn no-underline">Try the Web App</a>
                         <a href="/flirtfix?utm_source=website&utm_medium=home_cta&utm_campaign=flirtfix_web_home"
-                           class="matte-btn-secondary px-6 py-3 text-sm no-underline"
+                           class="matte-btn-secondary home-hero-btn no-underline"
                            title="Download FlirtFix for Android on Google Play">
                             Get the Android App
                         </a>
                     </div>
                 </div>
-                <div class="matte-phone-stage">
-                    <img src="{% static 'images/flirtfix-hero-phone.png' %}" alt="FlirtFix mobile app screenshot with three reply options and explanations" class="matte-phone-image">
+                <div class="home-phone-column">
+                    <div class="home-phone-glow"></div>
+                    <div class="home-phone-stage">
+                        <img src="{% static 'images/flirtfix-hero-phone.png' %}" alt="FlirtFix mobile app screenshot with three reply options and explanations" class="home-phone-image">
+                        <div class="home-phone-badge">
+                            <p class="home-phone-badge-title">AI Suggestion</p>
+                            <p class="home-phone-badge-copy">3 Replies Ready</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="try" class="py-6 sm:py-10">
+    <section id="try" class="home-playground">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="pickup-tool-shell">
+            <div class="home-playground-title-wrap">
+                <h2 class="matte-headline home-section-title font-bold">Interactive Playground</h2>
+                <p class="home-section-copy text-sm sm:text-base">
+                    Experience the magic for yourself. Select a situation and see how our AI crafts the perfect response.
+                </p>
+            </div>
+            <div class="pickup-tool-shell home-playground-shell">
                 {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
             </div>
         </div>
     </section>
 
-    <section id="why-it-works" class="py-12 sm:py-16">
+    <section id="why-it-works" class="home-why">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="matte-section-title font-bold text-center mb-8">Why It Works</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="matte-card matte-feature-card p-6">
-                    <div class="mb-3"><i class="fa fa-camera text-[#D4AF37]"></i></div>
-                    <h3 class="text-xl font-semibold mb-2">Context is Everything.</h3>
-                    <p class="text-sm">Upload a screenshot. Our OCR reads the chat history instantly to match the exact vibe.</p>
-                </div>
-                <div class="matte-card matte-feature-card p-6">
-                    <div class="mb-3"><i class="fa fa-check-double text-[#FF2D6D]"></i></div>
-                    <h3 class="text-xl font-semibold mb-2">3 Unique Angles.</h3>
-                    <p class="text-sm">Get Playful, Flirty, and Mysterious options for every single message.</p>
-                </div>
-                <div class="matte-card matte-feature-card p-6">
-                    <div class="mb-3"><i class="fa fa-lightbulb text-[#D4AF37]"></i></div>
-                    <h3 class="text-xl font-semibold mb-2">Know Why It Works.</h3>
-                    <p class="text-sm">FlirtFix doesn't just give you the line; it explains the psychology behind the text so you learn to text better.</p>
-                </div>
+            <div class="text-center">
+                <h2 class="matte-headline home-section-title font-bold">Why It Works</h2>
+                <div class="home-section-underline"></div>
+            </div>
+            <div class="home-feature-grid">
+                <article class="home-feature-card">
+                    <div class="home-feature-icon"><i class="fa fa-camera"></i></div>
+                    <h3 class="matte-headline home-feature-title font-semibold">Context is Everything.</h3>
+                    <p class="home-feature-copy">Upload a screenshot. Our OCR reads the chat history instantly to match the exact vibe and flow of your conversation.</p>
+                </article>
+                <article class="home-feature-card">
+                    <div class="home-feature-icon"><i class="fa fa-check-double"></i></div>
+                    <h3 class="matte-headline home-feature-title font-semibold">3 Unique Angles.</h3>
+                    <p class="home-feature-copy">Get Playful, Flirty, and Mysterious options for every single message. You choose the energy you want to project.</p>
+                </article>
+                <article class="home-feature-card">
+                    <div class="home-feature-icon"><i class="fa fa-lightbulb"></i></div>
+                    <h3 class="matte-headline home-feature-title font-semibold">Know Why It Works.</h3>
+                    <p class="home-feature-copy">FlirtFix doesn't just give you the line; it explains the psychology behind the text so you learn to text better over time.</p>
+                </article>
             </div>
         </div>
     </section>
 
-    <section class="py-6 sm:py-10">
+    <section class="home-privacy">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="matte-privacy-grid">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div class="home-privacy-shell">
+                <div class="home-privacy-grid">
                     <div>
-                        <h2 class="matte-section-title font-bold mb-4">Your chats stay yours</h2>
-                        <p class="matte-copy mb-6">We only use the text you provide to generate responses. You control what you paste and what you keep.</p>
-                        <ul class="space-y-3">
-                            <li class="flex items-start gap-2 matte-copy"><i class="fa fa-check matte-check"></i> Screenshots processed for text only</li>
-                            <li class="flex items-start gap-2 matte-copy"><i class="fa fa-check matte-check"></i> One-tap delete</li>
-                            <li class="flex items-start gap-2 matte-copy"><i class="fa fa-check matte-check"></i> No messages shared with other users</li>
+                        <h2 class="matte-headline home-section-title font-bold">Your chats stay yours</h2>
+                        <p class="home-privacy-copy mt-4">We only use the text you provide to generate responses. You control what you paste and what you keep. Privacy isn't a feature; it's our standard.</p>
+                        <ul class="home-privacy-list">
+                            <li class="home-privacy-list-item"><i class="fa fa-check home-privacy-check"></i> Screenshots processed for text only</li>
+                            <li class="home-privacy-list-item"><i class="fa fa-check home-privacy-check"></i> One-tap data deletion</li>
+                            <li class="home-privacy-list-item"><i class="fa fa-check home-privacy-check"></i> No messages shared with other users</li>
                         </ul>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="matte-card-tight p-4 text-sm matte-copy font-medium">Fast suggestions</div>
-                        <div class="matte-card-tight p-4 text-sm matte-copy font-medium">Platform-agnostic</div>
-                        <div class="matte-card-tight p-4 text-sm matte-copy font-medium">Copy anywhere</div>
-                        <div class="matte-card-tight p-4 text-sm matte-copy font-medium">Mobile-friendly</div>
+                    <div class="home-privacy-metrics">
+                        <div class="home-privacy-metric">
+                            <p class="home-privacy-metric-label">Speed</p>
+                            <p class="home-privacy-metric-value">Fast suggestions</p>
+                        </div>
+                        <div class="home-privacy-metric">
+                            <p class="home-privacy-metric-label">Versatility</p>
+                            <p class="home-privacy-metric-value">Platform-agnostic</p>
+                        </div>
+                        <div class="home-privacy-metric">
+                            <p class="home-privacy-metric-label">Workflow</p>
+                            <p class="home-privacy-metric-value">Copy anywhere</p>
+                        </div>
+                        <div class="home-privacy-metric">
+                            <p class="home-privacy-metric-label">Design</p>
+                            <p class="home-privacy-metric-value">Mobile-friendly</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="py-12 sm:py-16">
+    <section class="home-cta">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="matte-card p-8 sm:p-10 text-center">
-                <h3 class="text-3xl font-bold matte-headline mb-3">Never lose a match to a bad reply.</h3>
-                <p class="matte-copy mb-6 max-w-2xl mx-auto">
+            <div class="home-cta-card">
+                <h3 class="matte-headline home-section-title font-bold">Never lose a match to a bad reply.</h3>
+                <p class="home-cta-copy">
                     Create your free account and keep your conversations moving with send-ready replies built for your exact chat context.
                 </p>
-                <a href="{% url 'account_signup' %}?next=/conversations/" class="matte-btn-primary inline-block px-8 py-3 text-sm no-underline">
+                <a href="{% url 'account_signup' %}?next=/conversations/" class="matte-btn-primary home-cta-btn inline-block no-underline">
                     Start Chatting for Free
                 </a>
             </div>

@@ -1,6 +1,6 @@
-<nav class="sticky top-0 z-50 border-b border-brand-outline bg-[#12141A]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
+<nav class="relative z-40 border-b border-[#2E323B] bg-[#0F121A]">
+    <div class="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-20">
             <a href="/" class="flex items-center gap-3 no-underline group">
                 <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" role="img" aria-label="TryAgainText" class="inline-block align-middle text-[#F4F2EE]">
                     <title>TryAgainText</title>
@@ -18,11 +18,11 @@
                 </span>
             </a>
 
-            <div class="hidden md:flex items-center gap-1">
+            <div class="hidden md:flex items-center gap-3">
                 {% if user.is_authenticated %}
-                <a href="{% url 'conversation_home' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Conversations</a>
-                <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Pricing</a>
-                <a href="{% url 'contact' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Contact</a>
+                <a href="{% url 'conversation_home' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Conversations</a>
+                <a href="{% url 'pricing:pricing' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Pricing</a>
+                <a href="{% url 'contact' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Contact</a>
 
                 <a href="{% url 'pricing:pricing' %}" class="no-underline ml-1">
                     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#3A3F4A] bg-[#16181F] text-[#F4F2EE]">
@@ -32,7 +32,7 @@
                 </a>
 
                 <div class="relative ml-2" data-nav-dropdown>
-                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand-text hover:bg-[#1B1E25] rounded-xl transition-colors">
+                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-[#F4F2EE] hover:bg-[#1B1E25] rounded-xl transition-colors">
                         <i class="fa fa-user-circle text-brand-muted"></i>
                         {{ user.email }}
                         <i class="fa fa-chevron-down text-xs text-brand-muted"></i>
@@ -45,10 +45,10 @@
                     </div>
                 </div>
                 {% else %}
-                <a href="/#why-it-works" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">How it Works</a>
-                <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Pricing</a>
-                <a href="{% url 'contact' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text transition-colors no-underline">Contact</a>
-                <a href="{% url 'account_login' %}" class="ml-2 px-5 py-2 text-sm font-semibold rounded-[10px] bg-[#FF2D6D] border border-[#FF2D6D] text-[#F4F2EE] hover:opacity-90 transition-opacity no-underline">
+                <a href="/#why-it-works" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">How it Works</a>
+                <a href="{% url 'pricing:pricing' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Pricing</a>
+                <a href="{% url 'contact' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Contact</a>
+                <a href="{% url 'account_login' %}" class="ml-1 px-8 py-3 text-[1.02rem] font-semibold rounded-full bg-[#FF2D6D] border border-[#FF2D6D] text-[#F4F2EE] hover:opacity-90 transition-opacity no-underline leading-none">
                     Login / Signup
                 </a>
                 {% endif %}
