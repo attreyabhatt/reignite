@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block head_title %}{{ pickup_topic.title }}{% endblock head_title %}
+{% block meta_description %}{{ pickup_topic.meta_description }}{% endblock meta_description %}
+{% block canonical_url %}{{ canonical_url }}{% endblock canonical_url %}
+{% block og_title %}{{ pickup_topic.title }}{% endblock og_title %}
+{% block og_description %}{{ pickup_topic.meta_description }}{% endblock og_description %}
+{% block og_url %}{{ canonical_url }}{% endblock og_url %}
+
+{% block extra_head %}
+<style>
+    html {
+        scrollbar-gutter: stable;
+    }
+
+    @supports not (scrollbar-gutter: stable) {
+        body {
+            overflow-y: scroll;
+        }
+    }
+
+    .pickup-stage {
+        background:
+            radial-gradient(circle at 18% 0%, rgba(255, 45, 109, .08), transparent 40%),
+            radial-gradient(circle at 83% 16%, rgba(212, 175, 55, .06), transparent 38%),
+            var(--matte-bg);
+    }
+
+    .pickup-breadcrumb {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .45rem;
+        color: #75809A;
+        font-size: .62rem;
+        letter-spacing: .13em;
+        text-transform: uppercase;
+        margin-bottom: 1.05rem;
+    }
+
+    .pickup-breadcrumb a {
+        color: #75809A;
+        text-decoration: none;
+        transition: color .2s ease;
+    }
+
+    .pickup-breadcrumb a:hover {
+        color: var(--matte-pink);
+    }
+
+    .pickup-breadcrumb .sep {
+        color: #4E586D;
+    }
+
+    .pickup-hero-headline {
+        font-size: clamp(2.25rem, 5.1vw, 4.2rem);
+        line-height: 1.04;
+        letter-spacing: -0.015em;
+        margin-bottom: 1.2rem;
+        max-width: 48rem;
+    }
+
+    .pickup-hero-accent {
+        color: var(--matte-pink);
+        font-style: italic;
+        font-weight: 600;
+    }
+
+    .pickup-hero-copy {
+        color: var(--matte-muted);
+        max-width: 44rem;
+        line-height: 1.62;
+        font-size: 1.11rem;
+    }
+
+    .pickup-lines-card {
+        background: linear-gradient(180deg, rgba(255, 255, 255, .02), rgba(255, 255, 255, 0) 40%), var(--matte-surface);
+        border: 1px solid var(--matte-border-soft);
+        border-radius: 16px;
+        padding: 1.85rem 1.8rem;
+    }
+
+    .pickup-lines-title {
+        font-size: clamp(1.6rem, 3.6vw, 2.25rem);
+        line-height: 1.18;
+        margin-bottom: 1rem;
+    }
+
+    .pickup-lines-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: .92rem;
+    }
+
+    .pickup-lines-item {
+        display: flex;
+        gap: .65rem;
+        align-items: flex-start;
+        color: var(--matte-muted);
+        font-size: 1.02rem;
+        line-height: 1.65;
+    }
+
+    .pickup-lines-num {
+        color: var(--matte-pink);
+        font-weight: 700;
+        min-width: 1.2rem;
+    }
+
+    @media (max-width: 768px) {
+        .pickup-lines-card {
+            padding: 1.4rem 1.2rem;
+        }
+
+        .pickup-lines-title {
+            font-size: 1.6rem;
+        }
+    }
+</style>
+<link rel="stylesheet" href="{% static 'css/pickup_playground.css' %}">
+{% endblock extra_head %}
+
+{% block content %}
+<div class="pickup-stage py-12 sm:py-14">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+        <section class="mb-9">
+            <p class="pickup-breadcrumb">
+                <a href="{% url 'home' %}">Home</a>
+                <span class="sep">&gt;</span>
+                <a href="{% url 'pickup_lines_index' %}">Pickup Lines</a>
+                <span class="sep">&gt;</span>
+                <span>{{ pickup_topic.category_name }}</span>
+                <span class="sep">&gt;</span>
+                <span>{{ pickup_topic.keyword }}</span>
+            </p>
+            <h1 class="pickup-hero-headline matte-headline font-bold">
+                {{ pickup_heading.lead }}
+                {% if pickup_heading.accent %}
+                <span class="pickup-hero-accent">({{ pickup_heading.accent }})</span>
+                {% endif %}
+                {{ pickup_heading.tail }}
+            </h1>
+            <p class="pickup-hero-copy">{{ pickup_topic.seo_intro }}</p>
+        </section>
+
+        <section class="pickup-lines-card mb-7">
+            <h2 class="pickup-lines-title matte-headline font-bold">The "Intellectual &amp; Witty" Openers</h2>
+            <ol class="pickup-lines-list">
+                {% for line in pickup_topic.witty_lines %}
+                <li class="pickup-lines-item">
+                    <span class="pickup-lines-num">{{ forloop.counter }}.</span>
+                    <span>{{ line }}</span>
+                </li>
+                {% endfor %}
+            </ol>
+        </section>
+
+        <section class="pickup-tool-shell mb-7">
+            {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
+        </section>
+
+        <section class="pickup-lines-card mb-7">
+            <h2 class="pickup-lines-title matte-headline font-bold">The "Direct &amp; Flirty" Openers</h2>
+            <ol class="pickup-lines-list">
+                {% for line in pickup_topic.flirty_lines %}
+                <li class="pickup-lines-item">
+                    <span class="pickup-lines-num">{{ forloop.counter }}.</span>
+                    <span>{{ line }}</span>
+                </li>
+                {% endfor %}
+            </ol>
+        </section>
+
+        <section class="pickup-lines-card">
+            <h2 class="pickup-lines-title matte-headline font-bold">The "Cheesy &amp; Punny" Openers</h2>
+            <ol class="pickup-lines-list">
+                {% for line in pickup_topic.cheesy_lines %}
+                <li class="pickup-lines-item">
+                    <span class="pickup-lines-num">{{ forloop.counter }}.</span>
+                    <span>{{ line }}</span>
+                </li>
+                {% endfor %}
+            </ol>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/web_reply_ui.js' %}"></script>
+{% endblock %}

@@ -26,34 +26,6 @@
         line-height: 1.2;
     }
 
-    .situation-tag-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: .6rem;
-    }
-
-    .situation-tag {
-        border: 1px solid var(--matte-border);
-        border-radius: 999px;
-        padding: .55rem .9rem;
-        font-size: .85rem;
-        font-weight: 600;
-        color: var(--matte-muted);
-        background: #14171E;
-        transition: border-color .2s ease, color .2s ease, background-color .2s ease;
-    }
-
-    .situation-tag:hover {
-        color: var(--matte-text);
-        border-color: #525A69;
-    }
-
-    .situation-tag.is-active {
-        border-color: var(--matte-pink);
-        color: #12141A;
-        background: var(--matte-pink);
-    }
-
     #last-reply,
     #her_info {
         scrollbar-width: thin;
@@ -83,39 +55,6 @@
         background: #525A69;
     }
 
-    .matte-upload-zone {
-        background: #12141A;
-        border: 1px dashed var(--matte-border);
-        border-radius: 10px;
-        padding: 1rem;
-    }
-
-    .matte-upload-zone input[type="file"] {
-        border: 1px solid var(--matte-border-soft);
-        border-radius: 10px;
-        background: #16181F;
-        color: var(--matte-muted);
-        width: 100%;
-        padding: .55rem .75rem;
-    }
-
-    .matte-upload-zone input[type="file"]::file-selector-button {
-        border: 1px solid #3A3F4A;
-        border-radius: 999px;
-        background: transparent;
-        color: var(--matte-muted);
-        font-weight: 600;
-        padding: .4rem .8rem;
-        margin-right: .8rem;
-        transition: background-color .2s ease, color .2s ease, border-color .2s ease;
-    }
-
-    .matte-upload-zone input[type="file"]::file-selector-button:hover {
-        background: #2E323B;
-        color: var(--matte-text);
-        border-color: #525A69;
-    }
-
     .matte-credit-note {
         color: var(--matte-gold);
         font-size: .9rem;
@@ -143,36 +82,8 @@
         margin-top: .45rem;
     }
 
-    #responsePanel > div {
-        background: #12141A;
-        border: 1px solid var(--matte-border);
-        border-radius: 10px;
-        box-shadow: none;
-    }
-
-    #responsePanel .text-brand-muted,
-    #responsePanel .dark\:text-dbrand-muted,
-    #responsePanel .text-brand-text,
-    #responsePanel .dark\:text-dbrand-text {
-        color: var(--matte-muted) !important;
-    }
-
-    #responsePanel .copy-btn {
-        color: var(--matte-muted);
-    }
-
-    #responsePanel .copy-btn:hover {
-        color: var(--matte-pink);
-    }
-
     .matte-divider {
         border-top: 1px solid var(--matte-border-soft);
-    }
-
-    @media (min-width: 768px) {
-        .situation-tag-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
     }
 
     /* Laptop-only: keep hero left block in upper-middle of first viewport. */
@@ -201,6 +112,7 @@
         }
     }
 </style>
+<link rel="stylesheet" href="{% static 'css/pickup_playground.css' %}">
 {% endblock extra_head %}
 
 {% block content %}
@@ -233,125 +145,11 @@
 
     <section id="try" class="py-6 sm:py-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="matte-card p-5 sm:p-6">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2">
-                        <form
-                            id="chatForm"
-                            data-web-reply-form
-                            hx-post="{% url 'ajax_reply' %}"
-                            hx-target="#responsePanel"
-                            hx-swap="innerHTML"
-                        >
-                            {% csrf_token %}
-                            <input type="hidden" id="conversation-id" name="conversation_id" value="">
-
-                            <div class="mb-4">
-                                <label for="situation-more" class="block text-sm font-semibold mb-2">
-                                    <i class="fa fa-bullseye mr-1 text-[#FF2D6D]"></i> What's the situation?
-                                </label>
-
-                                <div class="situation-tag-grid" data-situation-tags>
-                                    <button type="button" class="situation-tag is-active" data-situation-tag="stuck_after_reply">Stuck After Reply</button>
-                                    <button type="button" class="situation-tag" data-situation-tag="just_matched">Just Matched</button>
-                                    <button type="button" class="situation-tag" data-situation-tag="dry_reply">Dry Reply</button>
-                                    <button type="button" class="situation-tag" data-situation-tag="left_on_read">Left on Read</button>
-                                    <button type="button" class="situation-tag" data-situation-tag="ask_her_out">Asking Her Out</button>
-                                </div>
-
-                                <div class="mt-3">
-                                    <label for="situation-more" class="block text-xs matte-copy mb-1">More scenarios</label>
-                                    <select id="situation-more" class="matte-select" data-situation-more>
-                                        <option value="">Select another scenario...</option>
-                                        <option value="spark_interest">I want to spark her interest</option>
-                                        <option value="she_asked_question">She asked me a question</option>
-                                        <option value="feels_like_interview">Conversation feels like an interview</option>
-                                        <option value="sassy_challenge">She is being Sassy / Challenging</option>
-                                        <option value="spark_deeper_conversation">I want to be sincere / vulnerable</option>
-                                        <option value="pivot_conversation">Change the topic</option>
-                                        <option value="reviving_old_chat">I haven't talked to her in a while</option>
-                                        <option value="recovering_after_cringe">I think I said something off</option>
-                                        <option value="switching_platforms">Trying to move to another platform</option>
-                                    </select>
-                                </div>
-
-                                <select id="situation" name="situation" required class="hidden">
-                                    <option value="stuck_after_reply" selected>She replied, but I don't know what to say</option>
-                                    <option value="just_matched">We just matched</option>
-                                    <option value="spark_interest">I want to spark her interest</option>
-                                    <option value="dry_reply">She gave a dry or one-word reply</option>
-                                    <option value="she_asked_question">She asked me a question</option>
-                                    <option value="feels_like_interview">Conversation feels like an interview</option>
-                                    <option value="sassy_challenge">She is being Sassy / Challenging</option>
-                                    <option value="spark_deeper_conversation">I want to be sincere / vulnerable</option>
-                                    <option value="pivot_conversation">Change the topic</option>
-                                    <option value="left_on_read">She left me on read</option>
-                                    <option value="reviving_old_chat">I haven't talked to her in a while</option>
-                                    <option value="recovering_after_cringe">I think I said something off</option>
-                                    <option value="ask_her_out">Ask her out</option>
-                                    <option value="switching_platforms">Trying to move to another platform</option>
-                                </select>
-                            </div>
-
-                            <div class="mb-4 hidden" id="her-info-div">
-                                <label for="her_info" class="block text-sm font-semibold mb-1.5">
-                                    <i class="fa-solid fa-user-secret mr-1 text-[#D4AF37]"></i> Her Information (optional)
-                                </label>
-                                <textarea name="her_info" id="her_info" rows="3" class="matte-textarea resize-y"
-                                    placeholder="Add anything that might help - her bio, hobbies, vibe, or her hairstyle."></textarea>
-                                <p class="text-xs matte-copy mt-1">Adding details can improve your results.</p>
-                            </div>
-
-                            <div class="mb-4 matte-upload-zone" id="screenshot-upload">
-                                <label for="formFile" class="block text-sm font-semibold mb-1.5">
-                                    Upload Screenshot
-                                    <span class="text-xs matte-copy font-normal">(optional - we'll extract the messages)</span>
-                                </label>
-                                <input type="file" id="formFile">
-                                <p class="text-xs matte-copy mt-1.5">Drag & drop a chat screenshot, or paste your convo below.</p>
-                                <div id="ocr-status" class="mt-2 hidden">
-                                    <span class="inline-block w-4 h-4 border-2 border-[#FF2D6D] border-t-transparent rounded-full animate-spin align-middle"></span>
-                                    <span class="ml-2 text-sm matte-copy">Analyzing screenshot...</span>
-                                </div>
-                            </div>
-
-                            <div class="mb-4" id="conversation-paste-area">
-                                <label for="last-reply" class="block text-sm font-semibold mb-1.5">Conversation</label>
-                                <textarea name="last_text" id="last-reply" rows="5" class="matte-textarea resize-y"
-                                    placeholder="you: hey, free thursday?&#10;her: (seen, no reply)"></textarea>
-                                <p class="text-xs matte-copy mt-1 text-right"><span id="charCount">0</span> characters</p>
-                            </div>
-
-                            <div>
-                                <button
-                                    type="submit"
-                                    id="generate-btn"
-                                    data-generate-btn
-                                    class="matte-btn-primary w-full px-6 py-3 text-sm"
-                                >
-                                    <i class="fa fa-fire mr-2"></i>Generate Replies
-                                </button>
-                                <p class="matte-credit-note mt-3 text-center">
-                                    <i class="fa fa-bolt"></i> <span id="chatCredits">{{ chat_credits }}</span> Free Uses Today
-                                </p>
-                            </div>
-                        </form>
-                    </div>
-
-                    <div id="suggestions" class="matte-card-tight p-4 h-full">
-                        <div class="text-xs font-semibold matte-copy uppercase tracking-wide mb-3">Send-Ready Replies</div>
-                        <div id="responsePanel">
-                            {% include "conversation/partials/response_empty.html" %}
-                        </div>
-                    </div>
-                </div>
+            <div class="pickup-tool-shell">
+                {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
             </div>
         </div>
     </section>
-
-    <template id="response-empty-template">
-        {% include "conversation/partials/response_empty.html" %}
-    </template>
 
     <section id="why-it-works" class="py-12 sm:py-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

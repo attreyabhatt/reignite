@@ -8,6 +8,8 @@ from reignitehome.views import (
     delete_account_request,
     flirtfix_redirect,
     home,
+    pickup_line_detail,
+    pickup_lines_index,
     privacy_policy,
     refund_policy,
     safety_standards,
@@ -21,6 +23,12 @@ from reignitehome.views import (
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
+    path("pickup-lines/", pickup_lines_index, name="pickup_lines_index"),
+    path(
+        "pickup-lines/<slug:category_slug>/<slug:topic_slug>/",
+        pickup_line_detail,
+        name="pickup_line_detail",
+    ),
     path("situations/", situation_index, name="situation_index"),
     path("situations/<slug:slug>/", situation_landing, name="situation_landing"),
     path("sitemap.xml", sitemap_xml, name="sitemap_xml"),

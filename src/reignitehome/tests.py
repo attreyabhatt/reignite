@@ -1,7 +1,9 @@
 import re
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -10,7 +12,9 @@ from unittest.mock import patch
 
 from conversation.models import ChatCredit, GuestWebConversationAttempt, WebAppConfig
 from reignitehome.models import MarketingClickEvent
+from reignitehome.pickup_pages import list_pickup_topics
 from reignitehome.situation_pages import SITUATION_PAGE_ORDER, list_situation_pages
+from reignitehome.views import DEFAULT_TOOL_CONVERSATION_PLACEHOLDER
 
 
 class FlirtfixRedirectTests(TestCase):
@@ -289,7 +293,10 @@ class SituationSeoPagesTests(TestCase):
                     f'<option value="{page["situation"]}" selected>',
                     html=False,
                 )
-                self.assertContains(response, escape(page["prefill_text"]))
+                self.assertContains(response, 'id="last-reply"', html=False)
+                self.assertNotContains(response, escape(page["prefill_text"]))
+                self.assertContains(response, 'data-tool-variant="pickup"', html=False)
+                self.assertContains(response, 'id="playground"', html=False)
 
     def test_each_situation_page_renders_structured_seo_sections(self):
         for page in list_situation_pages():
@@ -452,3 +459,165 @@ class SituationSeoPagesTests(TestCase):
                 words = [word for word in re.split(r"\s+", text.strip()) if word]
                 self.assertGreaterEqual(len(words), 400)
                 self.assertLessEqual(len(words), 600)
+
+    def test_home_and_situation_pages_render_shared_reply_tool_marker(self):
+        home_response = self.client.get(reverse("home"))
+        self.assertEqual(home_response.status_code, 200)
+        self.assertContains(home_response, 'data-reply-tool-shared="1"', html=False)
+        self.assertContains(home_response, 'id="playground"', html=False)
+        self.assertContains(home_response, 'data-tool-variant="pickup"', html=False)
+        self.assertContains(
+            home_response,
+            '<link rel="stylesheet" href="/static/css/pickup_playground.css">',
+            html=False,
+        )
+
+        first_situation = list_situation_pages()[0]
+        situation_response = self.client.get(
+            reverse("situation_landing", kwargs={"slug": first_situation["slug"]})
+        )
+        self.assertEqual(situation_response.status_code, 200)
+        self.assertContains(situation_response, 'data-reply-tool-shared="1"', html=False)
+        self.assertContains(situation_response, 'id="playground"', html=False)
+        self.assertContains(situation_response, 'data-tool-variant="pickup"', html=False)
+        self.assertContains(
+            situation_response,
+            '<link rel="stylesheet" href="/static/css/pickup_playground.css">',
+            html=False,
+        )
+
+    def test_pickup_pages_render_with_shared_tool_and_just_matched_defaults(self):
+        index_response = self.client.get(reverse("pickup_lines_index"))
+        self.assertEqual(index_response.status_code, 200)
+        self.assertContains(index_response, "Ultra-Niche Pickup Line Guides")
+
+        topic = list_pickup_topics()[0]
+        detail_response = self.client.get(
+            reverse(
+                "pickup_line_detail",
+                kwargs={
+                    "category_slug": topic["category_slug"],
+                    "topic_slug": topic["topic_slug"],
+                },
+            )
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, 'data-reply-tool-shared="1"', html=False)
+        self.assertContains(detail_response, 'data-tool-variant="pickup"', html=False)
+        self.assertContains(detail_response, 'id="playground"', html=False)
+        self.assertContains(detail_response, "pickup-playground")
+        self.assertContains(detail_response, "pickup-tool-shell")
+        self.assertContains(detail_response, 'data-force-show-upload="1"', html=False)
+        self.assertContains(
+            detail_response,
+            'id="screenshot-upload" class="pickup-form-section pickup-upload-shell is-emphasis"',
+            html=False,
+        )
+        self.assertContains(
+            detail_response,
+            'id="conversation-paste-area" class="pickup-form-section hidden"',
+            html=False,
+        )
+        self.assertContains(
+            detail_response,
+            'id="her-info-div" class="pickup-form-section"',
+            html=False,
+        )
+        self.assertContains(
+            detail_response,
+            '<option value="just_matched" selected>',
+            html=False,
+        )
+        self.assertContains(detail_response, 'href="/"', html=False)
+        self.assertContains(detail_response, 'href="/pickup-lines/"', html=False)
+        self.assertNotContains(detail_response, escape(topic["prefill_text"]))
+        self.assertContains(detail_response, 'id="last-reply"', html=False)
+        self.assertContains(
+            detail_response,
+            escape(DEFAULT_TOOL_CONVERSATION_PLACEHOLDER),
+        )
+        self.assertContains(
+            detail_response,
+            'id="last-reply"',
+            html=False,
+        )
+        self.assertContains(detail_response, escape(topic["upload_hint"]))
+        self.assertContains(detail_response, "data-upload-hint-text", html=False)
+        self.assertContains(detail_response, escape(topic["her_info_prefill"]))
+        self.assertContains(detail_response, "pickup-empty-state")
+        self.assertContains(
+            detail_response,
+            '<script src="/static/js/web_reply_ui.js"></script>',
+            html=False,
+        )
+
+    def test_pickup_detail_uses_shared_pickup_playground_css_with_chip_rules(self):
+        topic = list_pickup_topics()[0]
+        response = self.client.get(
+            reverse(
+                "pickup_line_detail",
+                kwargs={
+                    "category_slug": topic["category_slug"],
+                    "topic_slug": topic["topic_slug"],
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<link rel="stylesheet" href="/static/css/pickup_playground.css">',
+            html=False,
+        )
+
+        css_path = Path(settings.BASE_DIR) / "static" / "css" / "pickup_playground.css"
+        self.assertTrue(css_path.exists())
+        css_content = css_path.read_text(encoding="utf-8")
+        self.assertIn('[data-tool-variant="pickup"] .pickup-tool-inputs {', css_content)
+        self.assertIn("align-content: start;", css_content)
+        self.assertIn('[data-tool-variant="pickup"] .pickup-situation-grid > * {', css_content)
+        self.assertIn("grid-auto-rows: max-content;", css_content)
+        self.assertIn("min-height: 2.55rem;", css_content)
+        self.assertIn(
+            '[data-tool-variant="pickup"] .pickup-more-select.more-scenarios-select {',
+            css_content,
+        )
+        self.assertIn("font-size: .74rem;", css_content)
+        self.assertIn("font-weight: 600;", css_content)
+        self.assertIn("line-height: 1.2;", css_content)
+
+    def test_situation_pages_include_shared_pickup_playground_css(self):
+        response = self.client.get(
+            reverse("situation_landing", kwargs={"slug": list_situation_pages()[0]["slug"]})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<link rel="stylesheet" href="/static/css/pickup_playground.css">',
+            html=False,
+        )
+
+    def test_spark_interest_situation_keeps_her_information_hidden_initially(self):
+        spark_page = next(
+            page for page in list_situation_pages() if page["situation"] == "spark_interest"
+        )
+        response = self.client.get(
+            reverse("situation_landing", kwargs={"slug": spark_page["slug"]})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-tool-variant="pickup"', html=False)
+        self.assertContains(response, 'id="playground"', html=False)
+        self.assertContains(
+            response,
+            'id="her-info-div" class="pickup-form-section hidden"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'id="screenshot-upload" class="pickup-form-section pickup-upload-shell"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'id="conversation-paste-area" class="pickup-form-section"',
+            html=False,
+        )

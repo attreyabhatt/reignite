@@ -1,5 +1,36 @@
 (function () {
     const DEFAULT_CUSTOM_SCENARIO_LABEL = 'Custom Scenario';
+    const PICKUP_UPLOAD_HINTS = {
+        stuck_after_reply: 'Upload the latest chat screenshot so the next reply picks up her exact tone.',
+        spark_interest: 'Upload your recent messages so the opener adds playful tension without sounding forced.',
+        dry_reply: 'Upload the dry part of the chat so the response can restart momentum naturally.',
+        she_asked_question: 'Upload the question and surrounding messages so the reply sounds witty and on-theme.',
+        feels_like_interview: 'Upload the recent back-and-forth so the reply can break the Q&A pattern smoothly.',
+        sassy_challenge: 'Upload the banter thread so the comeback stays confident and playful.',
+        spark_deeper_conversation: 'Upload your recent exchange so the message can shift into sincere depth without awkwardness.',
+        pivot_conversation: 'Upload the current thread so the topic change feels seamless and natural.',
+        left_on_read: 'Upload your last sent message and recent context so the follow-up feels casual, not needy.',
+        reviving_old_chat: 'Upload your old conversation so the re-opener references real context and lands naturally.',
+        recovering_after_cringe: 'Upload what you sent so the recovery line can reset the vibe without over-apologizing.',
+        ask_her_out: 'Upload your recent chat so the invite feels timely, specific, and low-pressure.',
+        switching_platforms: 'Upload your latest exchange so the move to number or Instagram feels smooth and well-timed.',
+    };
+    const PICKUP_CONVERSATION_PLACEHOLDERS = {
+        just_matched: 'You: Your profile has elite book taste.\nHer: Haha that is a strong opener.',
+        stuck_after_reply: 'You: We should compare coffee spots sometime.\nHer: Haha yeah maybe.',
+        dry_reply: 'You: That rooftop place looked fun, do you go often?\nHer: Lol.',
+        left_on_read: 'You: Mini golf rematch this weekend?\nHer: Seen 2 days ago.',
+        ask_her_out: 'You: You seem fun in real life too.\nHer: Haha maybe.\nYou: Coffee this Thursday?',
+        spark_interest: 'You: How is your week going?\nHer: Busy but good.',
+        she_asked_question: 'Her: What do you do for work?\nYou: I fix broken apps and survive on coffee.',
+        feels_like_interview: 'You: Where are you from?\nHer: Chicago.\nYou: What do you do?\nHer: Product design.',
+        sassy_challenge: 'Her: Oh so you think you are pretty smooth, huh?\nYou: Only on weekdays.',
+        spark_deeper_conversation: 'You: I joke a lot, but I actually like your perspective.\nHer: That is unexpectedly sweet.',
+        pivot_conversation: 'You: So how was your Monday?\nHer: Meetings all day.\nYou: Brutal.',
+        reviving_old_chat: 'You: Hey stranger.\nHer: Haha wow, it has been a while.',
+        recovering_after_cringe: 'You: That joke came out weird.\nHer: Lol it was a little random.',
+        switching_platforms: 'You: This app keeps glitching on my side.\nHer: Same here honestly.',
+    };
 
     function getCsrfToken() {
         return document.querySelector('input[name=csrfmiddlewaretoken]')?.value || '';
@@ -41,6 +72,52 @@
             .replace(/^\s*her\s*\[\s*\]\s*:/gim, 'Her:');
     }
 
+    function updateUploadHint() {
+        const replyForm = document.querySelector('form[data-web-reply-form]');
+        const situation = document.getElementById('situation');
+        if (!replyForm || !situation) {
+            return;
+        }
+
+        const toolRoot = replyForm.closest('[data-reply-tool-shared]');
+        if (!toolRoot || toolRoot.getAttribute('data-tool-variant') !== 'pickup') {
+            return;
+        }
+
+        const hintNode = toolRoot.querySelector('[data-upload-hint-text]');
+        if (!hintNode) {
+            return;
+        }
+
+        if (!hintNode.dataset.baseHint) {
+            hintNode.dataset.baseHint = hintNode.textContent.trim();
+        }
+
+        const nextHint = PICKUP_UPLOAD_HINTS[situation.value] || hintNode.dataset.baseHint;
+        hintNode.textContent = nextHint;
+    }
+
+    function updateConversationPlaceholder() {
+        const replyForm = document.querySelector('form[data-web-reply-form]');
+        const situation = document.getElementById('situation');
+        const textarea = document.getElementById('last-reply');
+        if (!replyForm || !situation || !textarea) {
+            return;
+        }
+
+        const toolRoot = replyForm.closest('[data-reply-tool-shared]');
+        if (!toolRoot || toolRoot.getAttribute('data-tool-variant') !== 'pickup') {
+            return;
+        }
+
+        if (!textarea.dataset.basePlaceholder) {
+            textarea.dataset.basePlaceholder = textarea.getAttribute('placeholder') || '';
+        }
+
+        const nextPlaceholder = PICKUP_CONVERSATION_PLACEHOLDERS[situation.value] || textarea.dataset.basePlaceholder;
+        textarea.setAttribute('placeholder', nextPlaceholder);
+    }
+
     function toggleInputVisibility() {
         const situation = document.getElementById('situation');
         const screenshotUpload = document.getElementById('screenshot-upload');
@@ -56,7 +133,7 @@
         const showConversationInputs = value !== 'just_matched';
         const forceShowUpload = replyForm?.getAttribute('data-force-show-upload') === '1';
         const showScreenshotUpload = showConversationInputs || (forceShowUpload && value === 'just_matched');
-        const showHerInfo = value === 'just_matched' || value === 'spark_interest';
+        const showHerInfo = value === 'just_matched';
 
         if (screenshotUpload) {
             screenshotUpload.classList.toggle('hidden', !showScreenshotUpload);
@@ -67,6 +144,9 @@
         if (herInfoDiv) {
             herInfoDiv.classList.toggle('hidden', !showHerInfo);
         }
+
+        updateUploadHint();
+        updateConversationPlaceholder();
     }
 
     function getSituationLabel(value) {

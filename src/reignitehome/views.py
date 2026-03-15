@@ -18,6 +18,7 @@ from conversation.models import GuestWebConversationAttempt, WebAppConfig
 from conversation.utils.web_guest_logging import log_guest_web_attempt
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
+from reignitehome.pickup_pages import get_pickup_topic, list_pickup_topics
 from reignitehome.situation_pages import (
     SITUATION_PAGE_ORDER,
     get_situation_page,
@@ -85,6 +86,9 @@ BOT_UA_SUBSTRINGS = (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_TOOL_CONVERSATION_PLACEHOLDER = "you: hey, free thursday?\nher: (seen, no reply)"
+DEFAULT_TOOL_UPLOAD_HINT = "Drag & drop a chat screenshot, or paste your convo below."
+
 
 def _get_web_config():
     return WebAppConfig.load()
@@ -103,6 +107,69 @@ def _build_guest_chat_context(request):
 
     return {
         "chat_credits": current_chat_credits,
+    }
+
+
+def _build_tool_config(**overrides):
+    config = {
+        "ui_variant": "default",
+        "selected_situation": "stuck_after_reply",
+        "prefill_text": "",
+        "upload_hint": DEFAULT_TOOL_UPLOAD_HINT,
+        "force_show_upload": False,
+        "conversation_placeholder": DEFAULT_TOOL_CONVERSATION_PLACEHOLDER,
+        "situation_label": "What's the situation?",
+        "her_info_label": "Her Information (optional)",
+        "upload_label": "Upload Screenshot",
+        "submit_label": "Generate Replies",
+        "show_credits": True,
+        "credits_label": "Free Uses Today",
+        "credits_note_class": "matte-credit-note mt-3 text-center",
+        "her_info_placeholder": "Add anything that might help - her bio, hobbies, vibe, or her style.",
+        "her_info_prefill": "",
+        "wrapper_class": "grid grid-cols-1 lg:grid-cols-3 gap-6",
+        "form_col_class": "lg:col-span-2",
+        "aside_class": "",
+        "suggestions_card_class": "matte-card-tight p-4 h-full",
+        "response_heading": "Send-Ready Replies",
+        "response_empty_template": "conversation/partials/response_empty.html",
+        "sidebar_heading": "Browse All Situations",
+        "sidebar_links": [],
+    }
+    for key, value in overrides.items():
+        if value is None:
+            continue
+        config[key] = value
+    return config
+
+
+def _build_situation_sidebar_links(active_slug):
+    links = []
+    for page in list_situation_pages():
+        links.append(
+            {
+                "href": reverse("situation_landing", kwargs={"slug": page["slug"]}),
+                "label": page["sidebar_label"],
+                "is_active": page["slug"] == active_slug,
+            }
+        )
+    return links
+
+
+def _split_pickup_heading(heading):
+    value = str(heading or "").strip()
+    if not value:
+        return {"lead": "", "accent": "", "tail": ""}
+
+    start = value.find("(")
+    end = value.find(")", start + 1) if start != -1 else -1
+    if start == -1 or end == -1:
+        return {"lead": value, "accent": "", "tail": ""}
+
+    return {
+        "lead": value[:start].strip(),
+        "accent": value[start + 1:end].strip(),
+        "tail": value[end + 1:].strip(),
     }
 
 
@@ -237,7 +304,14 @@ def ratelimited_error(request, exception=None):
 
 def home(request):
     context = _build_guest_chat_context(request)
-    context["situation_pages"] = list_situation_pages()
+    context["tool_config"] = _build_tool_config(
+        ui_variant="pickup",
+        wrapper_class="",
+        form_col_class="",
+        suggestions_card_class="",
+        response_empty_template="conversation/partials/response_empty_pickup.html",
+        credits_note_class="mt-3 text-center text-[#D4AF37] text-sm font-semibold",
+    )
 
     if request.user.is_authenticated:
         return redirect('conversation_home')
@@ -280,15 +354,96 @@ def situation_landing(request, slug):
         {
             "situation_page": situation_page,
             "related_pages": list_related_pages(situation_page),
-            "situation_pages": list_situation_pages(),
             "meta_description": situation_page["meta_description"],
             "canonical_url": canonical_url,
             "og_title": situation_page["title"],
             "og_description": situation_page["meta_description"],
             "og_url": canonical_url,
+            "tool_config": _build_tool_config(
+                ui_variant="pickup",
+                selected_situation=situation_page["situation"],
+                prefill_text="",
+                upload_hint=situation_page["upload_hint"],
+                force_show_upload=bool(situation_page["force_show_upload"]),
+                response_empty_template="conversation/partials/response_empty_pickup.html",
+                wrapper_class="",
+                form_col_class="",
+                suggestions_card_class="",
+                credits_note_class="mt-3 text-center text-[#D4AF37] text-sm font-semibold",
+                sidebar_links=_build_situation_sidebar_links(situation_page["slug"]),
+            ),
         }
     )
     return render(request, "situation_layout.html", context)
+
+
+@require_http_methods(["GET"])
+def pickup_lines_index(request):
+    canonical_url = request.build_absolute_uri(reverse("pickup_lines_index"))
+    context = _build_guest_chat_context(request)
+    context.update(
+        {
+            "pickup_topics": list_pickup_topics(),
+            "meta_description": (
+                "Explore ultra-niche pickup line guides and open one tailored to your exact match context."
+            ),
+            "canonical_url": canonical_url,
+            "og_title": "Pickup Lines Directory | TryAgainText",
+            "og_description": (
+                "Browse topic-specific pickup line pages and generate context-aware openers with AI."
+            ),
+            "og_url": canonical_url,
+        }
+    )
+    return render(request, "pickup_lines_index.html", context)
+
+
+@require_http_methods(["GET"])
+def pickup_line_detail(request, category_slug, topic_slug):
+    pickup_topic = get_pickup_topic(category_slug, topic_slug)
+    if not pickup_topic:
+        raise Http404("Pickup line page not found.")
+
+    canonical_url = request.build_absolute_uri(
+        reverse(
+            "pickup_line_detail",
+            kwargs={
+                "category_slug": pickup_topic["category_slug"],
+                "topic_slug": pickup_topic["topic_slug"],
+            },
+        )
+    )
+    context = _build_guest_chat_context(request)
+    context.update(
+        {
+            "pickup_topic": pickup_topic,
+            "canonical_url": canonical_url,
+            "meta_description": pickup_topic["meta_description"],
+            "og_title": pickup_topic["title"],
+            "og_description": pickup_topic["meta_description"],
+            "og_url": canonical_url,
+            "pickup_heading": _split_pickup_heading(pickup_topic.get("h1")),
+            "tool_config": _build_tool_config(
+                ui_variant="pickup",
+                selected_situation="just_matched",
+                prefill_text="",
+                upload_hint=pickup_topic["upload_hint"],
+                force_show_upload=True,
+                response_empty_template="conversation/partials/response_empty_pickup.html",
+                wrapper_class="",
+                form_col_class="",
+                suggestions_card_class="",
+                credits_note_class="mt-3 text-center text-[#8F9BB3] text-xs font-semibold uppercase tracking-wide",
+                her_info_prefill=pickup_topic.get("her_info_prefill", ""),
+                situation_label="WHAT'S THE SITUATION?",
+                her_info_label="HER INFORMATION (optional)",
+                upload_label="UPLOAD CONVERSATION",
+                submit_label="GENERATE REPLIES",
+                response_heading="SEND-READY REPLIES",
+            ),
+        }
+    )
+    return render(request, "pickup_line_detail.html", context)
 
 
 @require_http_methods(["GET"])

@@ -1,0 +1,325 @@
+{% if tool_config.ui_variant == "pickup" %}
+<div
+    id="playground"
+    data-reply-tool-shared="1"
+    data-tool-variant="{{ tool_config.ui_variant|default:'default' }}"
+    class="pickup-playground {{ tool_config.wrapper_class|default:'' }}"
+>
+    <form
+        id="chatForm"
+        data-web-reply-form
+        data-force-show-upload="{% if tool_config.force_show_upload %}1{% else %}0{% endif %}"
+        hx-post="{% url 'ajax_reply' %}"
+        hx-target="#responsePanel"
+        hx-swap="innerHTML"
+        class="pickup-tool-form"
+    >
+        {% csrf_token %}
+        <input type="hidden" id="conversation-id" name="conversation_id" value="">
+
+        <div class="pickup-tool-inputs">
+            <div class="pickup-form-section">
+                <label for="situation-more" class="pickup-tool-label">
+                    <i class="fa fa-bullseye"></i> {{ tool_config.situation_label|default:"What's the situation?" }}
+                </label>
+
+                <div class="pickup-situation-grid" data-situation-tags>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'stuck_after_reply' %} is-active{% endif %}" data-situation-tag="stuck_after_reply">Stuck After Reply</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'just_matched' %} is-active{% endif %}" data-situation-tag="just_matched">Just Matched</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'dry_reply' %} is-active{% endif %}" data-situation-tag="dry_reply">Dry Reply</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'left_on_read' %} is-active{% endif %}" data-situation-tag="left_on_read">Left On Read</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'ask_her_out' %} is-active{% endif %}" data-situation-tag="ask_her_out">Asking Her Out</button>
+
+                    <div class="pickup-situation-more">
+                        <label for="situation-more" class="sr-only">More scenarios</label>
+                        <select id="situation-more" class="pickup-more-select more-scenarios-select matte-select" data-situation-more>
+                            <option value="">More scenarios...</option>
+                            <option value="spark_interest"{% if tool_config.selected_situation == 'spark_interest' %} selected{% endif %}>I want to spark her interest</option>
+                            <option value="she_asked_question"{% if tool_config.selected_situation == 'she_asked_question' %} selected{% endif %}>She asked me a question</option>
+                            <option value="feels_like_interview"{% if tool_config.selected_situation == 'feels_like_interview' %} selected{% endif %}>Conversation feels like an interview</option>
+                            <option value="sassy_challenge"{% if tool_config.selected_situation == 'sassy_challenge' %} selected{% endif %}>She is being Sassy / Challenging</option>
+                            <option value="spark_deeper_conversation"{% if tool_config.selected_situation == 'spark_deeper_conversation' %} selected{% endif %}>I want to be sincere / vulnerable</option>
+                            <option value="pivot_conversation"{% if tool_config.selected_situation == 'pivot_conversation' %} selected{% endif %}>Change the topic</option>
+                            <option value="reviving_old_chat"{% if tool_config.selected_situation == 'reviving_old_chat' %} selected{% endif %}>I haven't talked to her in a while</option>
+                            <option value="recovering_after_cringe"{% if tool_config.selected_situation == 'recovering_after_cringe' %} selected{% endif %}>I think I said something off</option>
+                            <option value="switching_platforms"{% if tool_config.selected_situation == 'switching_platforms' %} selected{% endif %}>Trying to move to another platform</option>
+                        </select>
+                    </div>
+                </div>
+
+                <select id="situation" name="situation" required class="hidden">
+                    <option value="stuck_after_reply"{% if tool_config.selected_situation == 'stuck_after_reply' %} selected{% endif %}>She replied, but I don't know what to say</option>
+                    <option value="just_matched"{% if tool_config.selected_situation == 'just_matched' %} selected{% endif %}>We just matched</option>
+                    <option value="spark_interest"{% if tool_config.selected_situation == 'spark_interest' %} selected{% endif %}>I want to spark her interest</option>
+                    <option value="dry_reply"{% if tool_config.selected_situation == 'dry_reply' %} selected{% endif %}>She gave a dry or one-word reply</option>
+                    <option value="she_asked_question"{% if tool_config.selected_situation == 'she_asked_question' %} selected{% endif %}>She asked me a question</option>
+                    <option value="feels_like_interview"{% if tool_config.selected_situation == 'feels_like_interview' %} selected{% endif %}>Conversation feels like an interview</option>
+                    <option value="sassy_challenge"{% if tool_config.selected_situation == 'sassy_challenge' %} selected{% endif %}>She is being Sassy / Challenging</option>
+                    <option value="spark_deeper_conversation"{% if tool_config.selected_situation == 'spark_deeper_conversation' %} selected{% endif %}>I want to be sincere / vulnerable</option>
+                    <option value="pivot_conversation"{% if tool_config.selected_situation == 'pivot_conversation' %} selected{% endif %}>Change the topic</option>
+                    <option value="left_on_read"{% if tool_config.selected_situation == 'left_on_read' %} selected{% endif %}>She left me on read</option>
+                    <option value="reviving_old_chat"{% if tool_config.selected_situation == 'reviving_old_chat' %} selected{% endif %}>I haven't talked to her in a while</option>
+                    <option value="recovering_after_cringe"{% if tool_config.selected_situation == 'recovering_after_cringe' %} selected{% endif %}>I think I said something off</option>
+                    <option value="ask_her_out"{% if tool_config.selected_situation == 'ask_her_out' %} selected{% endif %}>Ask her out</option>
+                    <option value="switching_platforms"{% if tool_config.selected_situation == 'switching_platforms' %} selected{% endif %}>Trying to move to another platform</option>
+                </select>
+            </div>
+
+            <div id="her-info-div" class="pickup-form-section{% if tool_config.selected_situation != 'just_matched' %} hidden{% endif %}">
+                <label for="her_info" class="pickup-tool-label">
+                    <i class="fa-solid fa-user-secret"></i> {{ tool_config.her_info_label|default:"Her Information (optional)" }}
+                </label>
+                <textarea
+                    name="her_info"
+                    id="her_info"
+                    rows="3"
+                    class="matte-textarea pickup-her-info-input"
+                    placeholder="{{ tool_config.her_info_placeholder|default:'Add anything that might help - her bio, hobbies, vibe, or her style.' }}"
+                >{{ tool_config.her_info_prefill }}</textarea>
+                <p class="pickup-help-copy">{{ tool_config.her_info_help_text|default:'Adding context significantly improves the wit and relevance of the output.' }}</p>
+            </div>
+
+            <div id="screenshot-upload" class="pickup-form-section pickup-upload-shell{% if tool_config.selected_situation == 'just_matched' and not tool_config.force_show_upload %} hidden{% endif %}{% if tool_config.force_show_upload %} is-emphasis{% endif %}">
+                <label for="formFile" class="pickup-tool-label">
+                    <i class="fa-regular fa-images"></i> {{ tool_config.upload_label|default:'Upload Conversation' }}
+                </label>
+                <input type="file" id="formFile" class="pickup-upload-input">
+                <label for="formFile" class="pickup-upload-target">
+                    <span class="pickup-upload-icon"><i class="fa-regular fa-file-image"></i></span>
+                    <span class="pickup-upload-main">Drop screenshot here or <em>browse</em></span>
+                    <span class="pickup-upload-sub">We'll extract the text automatically</span>
+                </label>
+                <p class="pickup-upload-hint{% if tool_config.force_show_upload %} is-emphasis{% endif %}" data-upload-hint-text>{{ tool_config.upload_hint }}</p>
+                <div id="ocr-status" class="pickup-ocr-status hidden">
+                    <span class="inline-block w-4 h-4 border-2 border-[#FF2D6D] border-t-transparent rounded-full animate-spin align-middle"></span>
+                    <span class="ml-2">Analyzing screenshot...</span>
+                </div>
+            </div>
+
+            <div id="conversation-paste-area" class="pickup-form-section{% if tool_config.selected_situation == 'just_matched' %} hidden{% endif %}">
+                <label for="last-reply" class="pickup-tool-label">{{ tool_config.conversation_label|default:'Conversation' }}</label>
+                <textarea
+                    name="last_text"
+                    id="last-reply"
+                    rows="5"
+                    class="matte-textarea pickup-conversation-input"
+                    placeholder="{{ tool_config.conversation_placeholder }}"
+                >{{ tool_config.prefill_text }}</textarea>
+                <p class="pickup-char-counter"><span id="charCount">0</span> characters</p>
+            </div>
+
+            <div class="pickup-submit-wrap">
+                <button
+                    type="submit"
+                    id="generate-btn"
+                    data-generate-btn
+                    class="matte-btn-primary w-full pickup-generate-btn"
+                >
+                    <i class="fa fa-bolt mr-2"></i>{{ tool_config.submit_label|default:'Generate Replies' }}
+                </button>
+                {% if tool_config.show_credits %}
+                <p class="pickup-credits-note {{ tool_config.credits_note_class|default:'' }}">
+                    <i class="fa fa-circle text-[0.45rem] text-[#28D07A] mr-1"></i><span id="chatCredits">{{ chat_credits }}</span> {{ tool_config.credits_label|default:'Free Uses Today' }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <aside class="pickup-tool-output">
+            <div id="suggestions" class="pickup-response-card {{ tool_config.suggestions_card_class|default:'' }}">
+                <div class="pickup-response-heading">
+                    <i class="fa-solid fa-sparkles"></i>{{ tool_config.response_heading|default:'Send-Ready Replies' }}
+                </div>
+                <div id="responsePanel">
+                    {% include tool_config.response_empty_template|default:'conversation/partials/response_empty.html' %}
+                </div>
+            </div>
+        </aside>
+    </form>
+</div>
+{% else %}
+<div
+    data-reply-tool-shared="1"
+    data-tool-variant="{{ tool_config.ui_variant|default:'default' }}"
+    class="{{ tool_config.wrapper_class|default:'grid grid-cols-1 lg:grid-cols-3 gap-6' }}"
+>
+    <div class="{{ tool_config.form_col_class|default:'lg:col-span-2' }}">
+        <form
+            id="chatForm"
+            data-web-reply-form
+            data-force-show-upload="{% if tool_config.force_show_upload %}1{% else %}0{% endif %}"
+            hx-post="{% url 'ajax_reply' %}"
+            hx-target="#responsePanel"
+            hx-swap="innerHTML"
+            class="{% if tool_config.ui_variant == 'pickup' %}pickup-tool-form{% endif %}"
+        >
+            {% csrf_token %}
+            <input type="hidden" id="conversation-id" name="conversation_id" value="">
+
+            <div class="{% if tool_config.ui_variant == 'pickup' %}pickup-tool-block{% else %}mb-4{% endif %}">
+                <label for="situation-more" class="block text-sm font-semibold mb-2 {% if tool_config.ui_variant == 'pickup' %}pickup-tool-label{% endif %}">
+                    <i class="fa fa-bullseye mr-1 text-[#FF2D6D]"></i> {{ tool_config.situation_label|default:"What's the situation?" }}
+                </label>
+
+                {% if tool_config.ui_variant == 'pickup' %}
+                <div class="situation-tag-grid pickup-situation-grid" data-situation-tags>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'stuck_after_reply' %} is-active{% endif %}" data-situation-tag="stuck_after_reply">Stuck After Reply</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'just_matched' %} is-active{% endif %}" data-situation-tag="just_matched">Just Matched</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'dry_reply' %} is-active{% endif %}" data-situation-tag="dry_reply">Dry Reply</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'left_on_read' %} is-active{% endif %}" data-situation-tag="left_on_read">Left On Read</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'ask_her_out' %} is-active{% endif %}" data-situation-tag="ask_her_out">Asking Her Out</button>
+                    <div class="pickup-situation-more">
+                        <label for="situation-more" class="sr-only">More scenarios</label>
+                        <select id="situation-more" class="matte-select pickup-more-select more-scenarios-select" data-situation-more>
+                            <option value="">More scenarios...</option>
+                            <option value="spark_interest"{% if tool_config.selected_situation == 'spark_interest' %} selected{% endif %}>I want to spark her interest</option>
+                            <option value="she_asked_question"{% if tool_config.selected_situation == 'she_asked_question' %} selected{% endif %}>She asked me a question</option>
+                            <option value="feels_like_interview"{% if tool_config.selected_situation == 'feels_like_interview' %} selected{% endif %}>Conversation feels like an interview</option>
+                            <option value="sassy_challenge"{% if tool_config.selected_situation == 'sassy_challenge' %} selected{% endif %}>She is being Sassy / Challenging</option>
+                            <option value="spark_deeper_conversation"{% if tool_config.selected_situation == 'spark_deeper_conversation' %} selected{% endif %}>I want to be sincere / vulnerable</option>
+                            <option value="pivot_conversation"{% if tool_config.selected_situation == 'pivot_conversation' %} selected{% endif %}>Change the topic</option>
+                            <option value="reviving_old_chat"{% if tool_config.selected_situation == 'reviving_old_chat' %} selected{% endif %}>I haven't talked to her in a while</option>
+                            <option value="recovering_after_cringe"{% if tool_config.selected_situation == 'recovering_after_cringe' %} selected{% endif %}>I think I said something off</option>
+                            <option value="switching_platforms"{% if tool_config.selected_situation == 'switching_platforms' %} selected{% endif %}>Trying to move to another platform</option>
+                        </select>
+                    </div>
+                </div>
+                {% else %}
+                <div class="situation-tag-grid" data-situation-tags>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'stuck_after_reply' %} is-active{% endif %}" data-situation-tag="stuck_after_reply">Stuck After Reply</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'just_matched' %} is-active{% endif %}" data-situation-tag="just_matched">Just Matched</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'dry_reply' %} is-active{% endif %}" data-situation-tag="dry_reply">Dry Reply</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'left_on_read' %} is-active{% endif %}" data-situation-tag="left_on_read">Left On Read</button>
+                    <button type="button" class="situation-tag{% if tool_config.selected_situation == 'ask_her_out' %} is-active{% endif %}" data-situation-tag="ask_her_out">Asking Her Out</button>
+                </div>
+
+                <div class="mt-3">
+                    <label for="situation-more" class="block text-xs matte-copy mb-1">More scenarios</label>
+                    <select id="situation-more" class="matte-select more-scenarios-select" data-situation-more>
+                        <option value="">More scenarios...</option>
+                        <option value="spark_interest"{% if tool_config.selected_situation == 'spark_interest' %} selected{% endif %}>I want to spark her interest</option>
+                        <option value="she_asked_question"{% if tool_config.selected_situation == 'she_asked_question' %} selected{% endif %}>She asked me a question</option>
+                        <option value="feels_like_interview"{% if tool_config.selected_situation == 'feels_like_interview' %} selected{% endif %}>Conversation feels like an interview</option>
+                        <option value="sassy_challenge"{% if tool_config.selected_situation == 'sassy_challenge' %} selected{% endif %}>She is being Sassy / Challenging</option>
+                        <option value="spark_deeper_conversation"{% if tool_config.selected_situation == 'spark_deeper_conversation' %} selected{% endif %}>I want to be sincere / vulnerable</option>
+                        <option value="pivot_conversation"{% if tool_config.selected_situation == 'pivot_conversation' %} selected{% endif %}>Change the topic</option>
+                        <option value="reviving_old_chat"{% if tool_config.selected_situation == 'reviving_old_chat' %} selected{% endif %}>I haven't talked to her in a while</option>
+                        <option value="recovering_after_cringe"{% if tool_config.selected_situation == 'recovering_after_cringe' %} selected{% endif %}>I think I said something off</option>
+                        <option value="switching_platforms"{% if tool_config.selected_situation == 'switching_platforms' %} selected{% endif %}>Trying to move to another platform</option>
+                    </select>
+                </div>
+                {% endif %}
+
+                <select id="situation" name="situation" required class="hidden">
+                    <option value="stuck_after_reply"{% if tool_config.selected_situation == 'stuck_after_reply' %} selected{% endif %}>She replied, but I don't know what to say</option>
+                    <option value="just_matched"{% if tool_config.selected_situation == 'just_matched' %} selected{% endif %}>We just matched</option>
+                    <option value="spark_interest"{% if tool_config.selected_situation == 'spark_interest' %} selected{% endif %}>I want to spark her interest</option>
+                    <option value="dry_reply"{% if tool_config.selected_situation == 'dry_reply' %} selected{% endif %}>She gave a dry or one-word reply</option>
+                    <option value="she_asked_question"{% if tool_config.selected_situation == 'she_asked_question' %} selected{% endif %}>She asked me a question</option>
+                    <option value="feels_like_interview"{% if tool_config.selected_situation == 'feels_like_interview' %} selected{% endif %}>Conversation feels like an interview</option>
+                    <option value="sassy_challenge"{% if tool_config.selected_situation == 'sassy_challenge' %} selected{% endif %}>She is being Sassy / Challenging</option>
+                    <option value="spark_deeper_conversation"{% if tool_config.selected_situation == 'spark_deeper_conversation' %} selected{% endif %}>I want to be sincere / vulnerable</option>
+                    <option value="pivot_conversation"{% if tool_config.selected_situation == 'pivot_conversation' %} selected{% endif %}>Change the topic</option>
+                    <option value="left_on_read"{% if tool_config.selected_situation == 'left_on_read' %} selected{% endif %}>She left me on read</option>
+                    <option value="reviving_old_chat"{% if tool_config.selected_situation == 'reviving_old_chat' %} selected{% endif %}>I haven't talked to her in a while</option>
+                    <option value="recovering_after_cringe"{% if tool_config.selected_situation == 'recovering_after_cringe' %} selected{% endif %}>I think I said something off</option>
+                    <option value="ask_her_out"{% if tool_config.selected_situation == 'ask_her_out' %} selected{% endif %}>Ask her out</option>
+                    <option value="switching_platforms"{% if tool_config.selected_situation == 'switching_platforms' %} selected{% endif %}>Trying to move to another platform</option>
+                </select>
+            </div>
+
+            <div id="her-info-div" class="{% if tool_config.ui_variant == 'pickup' %}pickup-tool-block hidden{% else %}mb-4 hidden{% endif %}">
+                <label for="her_info" class="block text-sm font-semibold mb-1.5 {% if tool_config.ui_variant == 'pickup' %}pickup-tool-label{% endif %}">
+                    <i class="fa-solid fa-user-secret mr-1 text-[#D4AF37]"></i> {{ tool_config.her_info_label|default:"Her Information (optional)" }}
+                </label>
+                <textarea
+                    name="her_info"
+                    id="her_info"
+                    rows="3"
+                    class="matte-textarea resize-y {% if tool_config.ui_variant == 'pickup' %}pickup-her-info-input{% endif %}"
+                    placeholder="{{ tool_config.her_info_placeholder|default:'Add anything that might help - her bio, hobbies, vibe, or her style.' }}"
+                >{{ tool_config.her_info_prefill }}</textarea>
+                <p class="text-xs matte-copy mt-1">{{ tool_config.her_info_help_text|default:'Adding context significantly improves the wit and relevance of the output.' }}</p>
+            </div>
+
+            <div id="screenshot-upload" class="{% if tool_config.ui_variant == 'pickup' %}pickup-tool-block mb-4 matte-upload-zone{% else %}mb-4 matte-upload-zone{% endif %}{% if tool_config.force_show_upload %} is-emphasis{% endif %}">
+                {% if tool_config.ui_variant == 'pickup' %}
+                <p class="block text-sm font-semibold mb-1.5 pickup-tool-label">
+                    <i class="fa-regular fa-images mr-1 text-[#FF2D6D]"></i> {{ tool_config.upload_label|default:'Upload Conversation' }}
+                </p>
+                <input type="file" id="formFile" class="pickup-upload-input">
+                <label for="formFile" class="pickup-upload-target">
+                    <span class="pickup-upload-icon"><i class="fa-regular fa-file-image"></i></span>
+                    <span class="pickup-upload-main">Drop screenshot here or <em>browse</em></span>
+                    <span class="pickup-upload-sub">We'll extract the text automatically</span>
+                </label>
+                <p class="pickup-upload-hint {% if tool_config.force_show_upload %}is-emphasis{% endif %}">{{ tool_config.upload_hint }}</p>
+                {% else %}
+                <label for="formFile" class="block text-sm font-semibold mb-1.5">
+                    Upload Screenshot
+                    <span class="text-xs matte-copy font-normal">(optional - we'll extract the messages)</span>
+                </label>
+                <input type="file" id="formFile">
+                <p class="text-xs mt-1.5 {% if tool_config.force_show_upload %}text-[#FF2D6D] font-semibold{% else %}matte-copy{% endif %}">
+                    {{ tool_config.upload_hint }}
+                </p>
+                {% endif %}
+                <div id="ocr-status" class="mt-2 hidden">
+                    <span class="inline-block w-4 h-4 border-2 border-[#FF2D6D] border-t-transparent rounded-full animate-spin align-middle"></span>
+                    <span class="ml-2 text-sm matte-copy">Analyzing screenshot...</span>
+                </div>
+            </div>
+
+            <div id="conversation-paste-area" class="{% if tool_config.ui_variant == 'pickup' %}pickup-tool-block mb-4{% else %}mb-4{% endif %}">
+                <label for="last-reply" class="block text-sm font-semibold mb-1.5 {% if tool_config.ui_variant == 'pickup' %}pickup-tool-label{% endif %}">{{ tool_config.conversation_label|default:'Conversation' }}</label>
+                <textarea name="last_text" id="last-reply" rows="5" class="matte-textarea resize-y"
+                    placeholder="{{ tool_config.conversation_placeholder }}">{{ tool_config.prefill_text }}</textarea>
+                <p class="text-xs matte-copy mt-1 text-right"><span id="charCount">0</span> characters</p>
+            </div>
+
+            <div>
+                <button
+                    type="submit"
+                    id="generate-btn"
+                    data-generate-btn
+                    class="matte-btn-primary w-full px-6 py-3 text-sm {% if tool_config.ui_variant == 'pickup' %}pickup-generate-btn{% endif %}"
+                >
+                    <i class="fa fa-bolt mr-2"></i>{{ tool_config.submit_label|default:'Generate Replies' }}
+                </button>
+                {% if tool_config.show_credits %}
+                <p class="{{ tool_config.credits_note_class|default:'matte-credit-note mt-3 text-center' }}">
+                    <i class="fa fa-circle text-[0.45rem] text-[#28D07A] mr-1"></i><span id="chatCredits">{{ chat_credits }}</span> {{ tool_config.credits_label|default:'Free Uses Today' }}
+                </p>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <aside class="{{ tool_config.aside_class|default:'' }}{% if tool_config.ui_variant == 'pickup' %} pickup-response-wrap{% endif %}">
+        <div id="suggestions" class="{{ tool_config.suggestions_card_class|default:'matte-card-tight p-4 h-full' }}">
+            <div class="text-xs font-semibold matte-copy uppercase tracking-wide mb-3 {% if tool_config.ui_variant == 'pickup' %}pickup-response-heading{% endif %}">
+                <i class="fa-solid fa-sparkles mr-1 text-[#FF2D6D]"></i>{{ tool_config.response_heading|default:'Send-Ready Replies' }}
+            </div>
+            <div id="responsePanel">
+                {% include tool_config.response_empty_template|default:'conversation/partials/response_empty.html' %}
+            </div>
+        </div>
+        {% if tool_config.sidebar_links %}
+        <div class="matte-card-tight p-4">
+            <p class="text-xs font-semibold matte-copy uppercase tracking-wide mb-3">{{ tool_config.sidebar_heading|default:'Browse All Situations' }}</p>
+            <div class="space-y-2">
+                {% for link in tool_config.sidebar_links %}
+                <a href="{{ link.href }}" class="block text-sm no-underline {% if link.is_active %}text-[#FF2D6D] font-semibold{% else %}matte-copy hover:text-[#FF2D6D]{% endif %}">
+                    {{ link.label }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </aside>
+</div>
+{% endif %}
+
+<template id="response-empty-template">
+    {% include tool_config.response_empty_template|default:'conversation/partials/response_empty.html' %}
+</template>

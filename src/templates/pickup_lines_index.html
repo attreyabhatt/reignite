@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block head_title %}Pickup Lines Directory | TryAgainText{% endblock head_title %}
+{% block meta_description %}Explore ultra-niche pickup line guides and open one tailored to your exact match context.{% endblock meta_description %}
+{% block canonical_url %}{{ canonical_url }}{% endblock canonical_url %}
+{% block og_title %}Pickup Lines Directory | TryAgainText{% endblock og_title %}
+{% block og_description %}Browse topic-specific pickup line pages and generate context-aware openers with AI.{% endblock og_description %}
+{% block og_url %}{{ canonical_url }}{% endblock og_url %}
+
+{% block extra_head %}
+<style>
+    .pickup-index-stage {
+        background:
+            radial-gradient(circle at 16% 0%, rgba(255, 45, 109, .08), transparent 35%),
+            radial-gradient(circle at 86% 20%, rgba(212, 175, 55, .06), transparent 38%),
+            var(--matte-bg);
+    }
+
+    .pickup-index-hero {
+        border: 1px solid var(--matte-border);
+        border-radius: 16px;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, .02), transparent 45%),
+            var(--matte-surface);
+        padding: 2rem;
+    }
+
+    .pickup-index-kicker {
+        color: var(--matte-gold);
+        letter-spacing: .12em;
+        font-size: .72rem;
+        text-transform: uppercase;
+        margin-bottom: .65rem;
+    }
+
+    .pickup-index-headline {
+        font-size: clamp(2rem, 4.1vw, 3.35rem);
+        line-height: 1.08;
+        margin-bottom: .95rem;
+    }
+
+    .pickup-index-copy {
+        color: var(--matte-muted);
+        max-width: 52rem;
+        line-height: 1.68;
+        font-size: 1.04rem;
+    }
+
+    .pickup-index-grid {
+        display: grid;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .pickup-topic-card {
+        border: 1px solid var(--matte-border-soft);
+        border-radius: 14px;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, .012), transparent 40%),
+            var(--matte-surface);
+        padding: 1.15rem 1.2rem;
+        text-decoration: none;
+        transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+    }
+
+    .pickup-topic-card:hover {
+        border-color: var(--matte-pink);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, .28);
+    }
+
+    .pickup-topic-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: .65rem;
+    }
+
+    .pickup-topic-pill {
+        color: var(--matte-muted);
+        border: 1px solid var(--matte-border);
+        border-radius: 999px;
+        padding: .25rem .62rem;
+        font-size: .7rem;
+        text-transform: uppercase;
+        letter-spacing: .09em;
+    }
+
+    .pickup-topic-cta {
+        color: var(--matte-pink);
+        font-size: .73rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    .pickup-topic-title {
+        color: var(--matte-text);
+        font-size: 1.35rem;
+        margin-bottom: .45rem;
+    }
+
+    .pickup-topic-copy {
+        color: var(--matte-muted);
+        font-size: .95rem;
+        line-height: 1.64;
+    }
+
+    @media (min-width: 768px) {
+        .pickup-index-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+</style>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="pickup-index-stage py-12 sm:py-14">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section class="pickup-index-hero mb-8">
+            <p class="pickup-index-kicker">Pickup Lines</p>
+            <h1 class="pickup-index-headline matte-headline font-bold">Ultra-Niche Pickup Line Guides</h1>
+            <p class="pickup-index-copy">
+                Open a focused topic page, skim proven lines quickly, and then generate a personalized opener from her exact context.
+                Designed to keep your first message sharp without sounding generic.
+            </p>
+        </section>
+
+        <section class="pickup-index-grid">
+            {% for topic in pickup_topics %}
+            <a href="{% url 'pickup_line_detail' topic.category_slug topic.topic_slug %}" class="pickup-topic-card">
+                <div class="pickup-topic-meta">
+                    <span class="pickup-topic-pill">{{ topic.category_name }}</span>
+                    <span class="pickup-topic-cta">Open guide</span>
+                </div>
+                <h2 class="pickup-topic-title matte-headline font-semibold">{{ topic.keyword }}</h2>
+                <p class="pickup-topic-copy">{{ topic.meta_description }}</p>
+            </a>
+            {% endfor %}
+        </section>
+    </div>
+</div>
+{% endblock %}
