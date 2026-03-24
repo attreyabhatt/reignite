@@ -1,0 +1,66 @@
+﻿{% extends "base.html" %}
+{% load static %}
+
+{% block head_title %}Community | TryAgainText{% endblock head_title %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/community.css' %}">
+{% endblock extra_head %}
+
+{% block content %}
+<div class="community-stage matte-shell">
+    <div class="community-shell">
+        <section class="community-hero">
+            <div>
+                <h1 class="community-title matte-headline font-bold">Community</h1>
+                <p class="community-copy">Get live feedback on replies, profile questions, and real texting scenarios from other TryAgainText users.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{% url 'community_create' %}" class="community-primary-btn no-underline">Create Post</a>
+            </div>
+        </section>
+
+        <section id="communityFeedRoot"
+                 data-community-feed-root="1"
+                 data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}"
+                 data-current-user-id="{{ user.id|default:'' }}"
+                 data-current-username="{{ user.username|default:'' }}"
+                 data-login-url="{{ community_login_url }}"
+                 data-community-page="feed"
+                 data-posts-url="{% url 'community_post_list' %}">
+            <div class="community-controls">
+                <div class="community-chips" role="tablist" aria-label="Community category filters">
+                    <button type="button" class="community-chip is-active" data-community-category="">All</button>
+                    <button type="button" class="community-chip" data-community-category="help_me_reply">Help Me Reply</button>
+                    <button type="button" class="community-chip" data-community-category="dating_advice">Dating Advice</button>
+                    <button type="button" class="community-chip" data-community-category="rate_my_profile">Rate My Profile</button>
+                    <button type="button" class="community-chip" data-community-category="wins">Wins</button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="communitySort" class="matte-muted text-xs uppercase tracking-wide">Sort</label>
+                    <select id="communitySort" class="community-select" aria-label="Sort community posts">
+                        <option value="hot">Hot</option>
+                        <option value="new">New</option>
+                        <option value="top">Top</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="communityFeedLoading" class="community-loading">Loading community posts...</div>
+            <div id="communityFeedError" class="community-error community-hidden" role="alert"></div>
+            <div id="communityFeedEmpty" class="community-empty community-hidden">No posts yet. Be the first to share something.</div>
+            <div id="communityFeedList" class="community-list"></div>
+            <div id="communityFeedLoadMoreWrap" class="community-load-more-wrap community-hidden">
+                <button id="communityFeedLoadMore" type="button" class="community-ghost-btn">Load More</button>
+            </div>
+        </section>
+    </div>
+</div>
+
+{% include "community/partials/modals.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/community.js' %}"></script>
+{% endblock %}
+

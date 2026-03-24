@@ -290,6 +290,9 @@ GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_CONTENT = config(
     default="",
 )
 
+# Google OAuth (mobile sign-in)
+GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
+
 # Redirect URLs
 LOGIN_REDIRECT_URL = '/conversations'
 LOGOUT_REDIRECT_URL = '/'

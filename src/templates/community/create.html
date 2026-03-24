@@ -1,0 +1,90 @@
+﻿{% extends "base.html" %}
+{% load static %}
+
+{% block head_title %}Create Community Post | TryAgainText{% endblock head_title %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/community.css' %}">
+{% endblock extra_head %}
+
+{% block content %}
+<div class="community-stage matte-shell">
+    <div class="community-shell">
+        <div class="flex items-center justify-between gap-2 flex-wrap mb-3">
+            <a href="{% url 'community_home' %}" class="community-ghost-btn no-underline">Back to Community</a>
+        </div>
+
+        <section id="communityCreateRoot"
+                 data-community-page="create"
+                 data-community-create-root="1"
+                 data-login-url="{{ community_login_url }}"
+                 data-posts-url="{% url 'community_post_list' %}">
+            <div class="community-card">
+                <h1 class="community-title matte-headline font-bold">Create Post</h1>
+                <p class="community-copy">Share your scenario, ask for feedback, or post a win. Keep personal details private before sharing screenshots.</p>
+
+                <form id="communityCreateForm" class="community-form-grid mt-4" data-community-create-form="1" novalidate>
+                    {% csrf_token %}
+                    <div id="communityCreateError" class="community-form-error community-hidden" role="alert"></div>
+                    <div id="communityCreateSuccess" class="community-form-success community-hidden" role="status"></div>
+
+                    <div>
+                        <label class="matte-muted text-xs uppercase tracking-wide">Category</label>
+                        <input type="hidden" id="communityCreateCategory" name="category">
+                        <div class="community-chips mt-2" id="communityCreateCategories" role="radiogroup" aria-label="Choose post category">
+                            <button type="button" class="community-chip" data-community-create-category="help_me_reply">Help Me Reply</button>
+                            <button type="button" class="community-chip" data-community-create-category="dating_advice">Dating Advice</button>
+                            <button type="button" class="community-chip" data-community-create-category="rate_my_profile">Rate My Profile</button>
+                            <button type="button" class="community-chip" data-community-create-category="wins">Wins</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="communityCreateTitle" class="matte-muted text-xs uppercase tracking-wide">Title</label>
+                        <input id="communityCreateTitle" name="title" type="text" maxlength="200" class="community-input mt-2" placeholder="Summarize your post in one line">
+                        <p class="matte-muted text-xs mt-1"><span id="communityCreateTitleCount">0</span>/200</p>
+                    </div>
+
+                    <div>
+                        <label for="communityCreateBody" class="matte-muted text-xs uppercase tracking-wide">Details</label>
+                        <textarea id="communityCreateBody" name="body" class="community-textarea mt-2" rows="8" placeholder="Share enough context so people can help."></textarea>
+                    </div>
+
+                    <div>
+                        <label for="communityCreateImage" class="matte-muted text-xs uppercase tracking-wide">Optional Image</label>
+                        <input id="communityCreateImage" name="image" type="file" accept="image/png,image/jpeg,image/webp" class="community-file-input mt-2">
+                        <p id="communityCreateImageName" class="matte-muted text-xs mt-1">No file selected</p>
+                    </div>
+
+                    <div class="community-switch-row">
+                        <label class="community-switch">
+                            <input id="communityCreateAnonymous" type="checkbox" class="community-checkbox">
+                            <span>
+                                <span class="text-sm font-semibold text-[#F4F2EE]">Post anonymously</span>
+                                <span class="community-switch-copy block">Your username is hidden from other users unless you are staff.</span>
+                            </span>
+                        </label>
+
+                        <label class="community-switch">
+                            <input id="communityCreatePoll" type="checkbox" class="community-checkbox">
+                            <span>
+                                <span class="text-sm font-semibold text-[#F4F2EE]">Add poll (Send it / Don't send it)</span>
+                                <span class="community-switch-copy block">Include a quick poll so the community can vote.</span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-2">
+                        <button id="communityCreateSubmit" type="submit" class="community-primary-btn">Publish Post</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/community.js' %}"></script>
+{% endblock %}
+

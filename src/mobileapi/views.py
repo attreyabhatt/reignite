@@ -1289,6 +1289,85 @@ def login(request):
         logger.error(f"Login error: {str(e)}", exc_info=True)
         return Response({"success": False, "error": "Login failed"})
 
+
+@ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_REGISTER_IP"), block=True)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def google_signin(request):
+    """Authenticate or register a user via Google ID token."""
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+    from django.conf import settings
+
+    token = (request.data.get("id_token") or "").strip()
+    if not token:
+        return Response(
+            {"success": False, "error": "id_token is required"}, status=400
+        )
+
+    client_id = settings.GOOGLE_OAUTH_CLIENT_ID
+    if not client_id:
+        logger.error("GOOGLE_OAUTH_CLIENT_ID not configured")
+        return Response(
+            {"success": False, "error": "Google sign-in is not configured"},
+            status=500,
+        )
+
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            token, google_requests.Request(), client_id
+        )
+    except ValueError:
+        return Response(
+            {"success": False, "error": "Invalid Google token"}, status=400
+        )
+
+    email = idinfo.get("email")
+    if not email:
+        return Response(
+            {"success": False, "error": "Google account has no email"}, status=400
+        )
+
+    # Find or create user by email
+    user = User.objects.filter(email=email).first()
+    created = False
+    if user is None:
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=None,  # sets unusable password
+        )
+        created = True
+        logger.info(f"Google sign-in created new user: {email}")
+    else:
+        logger.info(f"Google sign-in for existing user: {email}")
+
+    token_obj = _rotate_user_token(user)
+
+    chat_credit, _ = ChatCredit.objects.get_or_create(
+        user=user,
+        defaults={
+            "balance": 3 if created else 10,
+            "signup_bonus_given": created,
+            "total_earned": 3 if created else 10,
+        },
+    )
+
+    subscription_info = _subscription_payload(chat_credit, request=request)
+
+    return Response({
+        "success": True,
+        "token": token_obj.key,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+        },
+        "chat_credits": chat_credit.balance,
+        **subscription_info,
+    })
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def google_play_purchase(request):
@@ -1669,22 +1748,28 @@ def change_password(request):
 @permission_classes([IsAuthenticated])
 def delete_account(request):
     """Delete user account and all associated data (Phase 2)."""
-    password = request.data.get("password")
-
-    if not password:
-        return Response(
-            {"success": False, "error": "Password is required"},
-            status=400,
-        )
-
     user = request.user
 
-    # Verify password
-    if not user.check_password(password):
-        return Response(
-            {"success": False, "error": "Invalid password"},
-            status=400,
-        )
+    if user.has_usable_password():
+        # Standard email/password user: require password confirmation
+        password = request.data.get("password")
+        if not password:
+            return Response(
+                {"success": False, "error": "Password is required"},
+                status=400,
+            )
+        if not user.check_password(password):
+            return Response(
+                {"success": False, "error": "Invalid password"},
+                status=400,
+            )
+    else:
+        # Social-login user (no password): require explicit confirmation
+        if not request.data.get("confirm"):
+            return Response(
+                {"success": False, "error": "Confirmation is required"},
+                status=400,
+            )
 
     username = user.username
     user_id = user.id

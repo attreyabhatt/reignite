@@ -4,6 +4,9 @@ from django.views.generic import TemplateView
 
 from reignitehome.views import (
     ajax_reply_home,
+    community_create,
+    community_home,
+    community_post_page,
     contact_view,
     delete_account_request,
     flirtfix_redirect,
@@ -23,6 +26,13 @@ from reignitehome.views import (
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
+    path("community/", community_home, name="community_home"),
+    path("community/new/", community_create, name="community_create"),
+    path(
+        "community/posts/<int:post_id>/",
+        community_post_page,
+        name="community_post_page",
+    ),
     path("pickup-lines/", pickup_lines_index, name="pickup_lines_index"),
     path(
         "pickup-lines/<slug:category_slug>/<slug:topic_slug>/",

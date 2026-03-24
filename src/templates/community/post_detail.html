@@ -1,0 +1,63 @@
+﻿{% extends "base.html" %}
+{% load static %}
+
+{% block head_title %}Community Post | TryAgainText{% endblock head_title %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/community.css' %}">
+{% endblock extra_head %}
+
+{% block content %}
+<div class="community-stage matte-shell">
+    <div class="community-shell">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+            <a href="{% url 'community_home' %}" class="community-ghost-btn no-underline">Back to Community</a>
+            <a href="{% url 'community_create' %}" class="community-primary-btn no-underline">Create Post</a>
+        </div>
+
+        <section id="communityDetailRoot"
+                 class="community-detail-shell"
+                 data-community-detail-root="1"
+                 data-community-page="detail"
+                 data-post-id="{{ post_id }}"
+                 data-current-user-id="{{ user.id|default:'' }}"
+                 data-current-username="{{ user.username|default:'' }}"
+                 data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}"
+                 data-login-url="{{ community_login_url }}"
+                 data-posts-url="{% url 'community_post_list' %}">
+            <div id="communityDetailLoading" class="community-loading">Loading post...</div>
+            <div id="communityDetailError" class="community-error community-hidden" role="alert"></div>
+            <article id="communityDetailPost" class="community-card community-hidden"></article>
+
+            <section id="communityCommentsPanel" class="community-comment-panel community-hidden">
+                <div class="community-comment-header">
+                    <h2 class="matte-headline text-xl font-semibold">Comments</h2>
+                    <span id="communityCommentsCount" class="community-count"></span>
+                </div>
+                <div id="communityCommentsEmpty" class="community-empty community-hidden">No comments yet. Start the conversation.</div>
+                <div id="communityCommentsList" class="community-comment-list"></div>
+
+                <form id="communityCommentForm" class="community-comment-form" data-community-comment-form="1">
+                    {% csrf_token %}
+                    <textarea id="communityCommentBody" class="community-textarea" rows="4" placeholder="Add a comment..." {% if not user.is_authenticated %}disabled{% endif %}></textarea>
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        {% if not user.is_authenticated %}
+                        <p class="matte-muted text-sm">Sign in to comment.</p>
+                        {% else %}
+                        <p class="matte-muted text-sm">Be respectful and keep feedback constructive.</p>
+                        {% endif %}
+                        <button type="submit" id="communityCommentSubmit" class="community-primary-btn" {% if not user.is_authenticated %}disabled{% endif %}>Post Comment</button>
+                    </div>
+                </form>
+            </section>
+        </section>
+    </div>
+</div>
+
+{% include "community/partials/modals.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/community.js' %}"></script>
+{% endblock %}
+

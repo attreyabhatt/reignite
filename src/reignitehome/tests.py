@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.html import escape
 from unittest.mock import patch
 
+from community.models import CommunityPost
 from conversation.models import ChatCredit, GuestWebConversationAttempt, WebAppConfig
 from reignitehome.models import MarketingClickEvent
 from reignitehome.pickup_pages import list_pickup_topics
@@ -619,5 +620,93 @@ class SituationSeoPagesTests(TestCase):
         self.assertContains(
             response,
             'id="conversation-paste-area" class="pickup-form-section"',
+            html=False,
+        )
+
+
+class CommunityWebPagesTests(TestCase):
+    def setUp(self):
+        self.password = "StrongPass123!"
+        self.user = User.objects.create_user(
+            username="communitywebuser",
+            email="communityweb@example.com",
+            password=self.password,
+        )
+        self.post = CommunityPost.objects.create(
+            author=self.user,
+            title="Web Community Test Post",
+            body="This is a test post body.",
+            category="wins",
+        )
+
+    def test_guest_can_open_community_feed_and_detail(self):
+        feed_response = self.client.get(reverse("community_home"))
+        self.assertEqual(feed_response.status_code, 200)
+        self.assertContains(feed_response, 'data-community-feed-root="1"', html=False)
+
+        detail_response = self.client.get(
+            reverse("community_post_page", kwargs={"post_id": self.post.id})
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, 'data-community-detail-root="1"', html=False)
+
+    def test_navbar_contains_community_for_guest_and_authenticated(self):
+        guest_response = self.client.get(reverse("home"))
+        self.assertEqual(guest_response.status_code, 200)
+        self.assertContains(guest_response, 'href="/community/"', html=False)
+        self.assertContains(guest_response, ">Community<", html=False)
+
+        self.client.login(username=self.user.username, password=self.password)
+        auth_response = self.client.get(reverse("conversation_home"))
+        self.assertEqual(auth_response.status_code, 200)
+        self.assertContains(auth_response, 'href="/community/"', html=False)
+        self.assertContains(auth_response, ">Community<", html=False)
+
+    def test_community_new_requires_login_and_renders_form_with_csrf(self):
+        guest_response = self.client.get(reverse("community_create"))
+        self.assertEqual(guest_response.status_code, 302)
+        self.assertIn("/accounts/login/", guest_response["Location"])
+        self.assertIn("next=%2Fcommunity%2Fnew%2F", guest_response["Location"])
+
+        self.client.login(username=self.user.username, password=self.password)
+        auth_response = self.client.get(reverse("community_create"))
+        self.assertEqual(auth_response.status_code, 200)
+        self.assertContains(
+            auth_response,
+            'data-community-create-form="1"',
+            html=False,
+        )
+        self.assertContains(
+            auth_response,
+            'name="csrfmiddlewaretoken"',
+            html=False,
+        )
+
+    def test_template_smoke_markers_exist_for_js_bootstrap(self):
+        feed_response = self.client.get(reverse("community_home"))
+        self.assertEqual(feed_response.status_code, 200)
+        self.assertContains(
+            feed_response,
+            'data-community-page="feed"',
+            html=False,
+        )
+
+        detail_response = self.client.get(
+            reverse("community_post_page", kwargs={"post_id": self.post.id})
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(
+            detail_response,
+            'data-community-page="detail"',
+            html=False,
+        )
+        self.assertContains(
+            detail_response,
+            'data-community-comment-form="1"',
+            html=False,
+        )
+        self.assertContains(
+            detail_response,
+            'name="csrfmiddlewaretoken"',
             html=False,
         )

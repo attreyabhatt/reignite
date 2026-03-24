@@ -319,6 +319,73 @@ def home(request):
 
 
 @require_http_methods(["GET"])
+def community_home(request):
+    canonical_url = request.build_absolute_uri(reverse("community_home"))
+    context = _build_guest_chat_context(request)
+    context.update(
+        {
+            "meta_description": (
+                "Explore dating advice, profile reviews, and real-texting wins from the TryAgainText community."
+            ),
+            "canonical_url": canonical_url,
+            "og_title": "Community | TryAgainText",
+            "og_description": (
+                "Read and share real dating chat strategies with the TryAgainText community."
+            ),
+            "og_url": canonical_url,
+            "community_login_url": reverse("account_login"),
+        }
+    )
+    return render(request, "community/feed.html", context)
+
+
+@require_http_methods(["GET"])
+def community_post_page(request, post_id):
+    canonical_url = request.build_absolute_uri(
+        reverse("community_post_page", kwargs={"post_id": post_id})
+    )
+    context = _build_guest_chat_context(request)
+    context.update(
+        {
+            "post_id": post_id,
+            "meta_description": (
+                "Community post discussion on TryAgainText, including votes, comments, and live feedback."
+            ),
+            "canonical_url": canonical_url,
+            "og_title": "Community Post | TryAgainText",
+            "og_description": (
+                "Join the conversation with comments, votes, and practical dating advice from the community."
+            ),
+            "og_url": canonical_url,
+            "community_login_url": reverse("account_login"),
+        }
+    )
+    return render(request, "community/post_detail.html", context)
+
+
+@require_http_methods(["GET"])
+def community_create(request):
+    if not request.user.is_authenticated:
+        login_url = reverse("account_login")
+        return redirect(f"{login_url}?{urlencode({'next': request.get_full_path()})}")
+
+    canonical_url = request.build_absolute_uri(reverse("community_create"))
+    context = {
+        "meta_description": (
+            "Create a new community post on TryAgainText with your question, advice, or win."
+        ),
+        "canonical_url": canonical_url,
+        "og_title": "Create Community Post | TryAgainText",
+        "og_description": (
+            "Share your dating conversation context and get feedback from the community."
+        ),
+        "og_url": canonical_url,
+        "community_login_url": reverse("account_login"),
+    }
+    return render(request, "community/create.html", context)
+
+
+@require_http_methods(["GET"])
 def situation_index(request):
     canonical_url = request.build_absolute_uri(reverse("situation_index"))
     context = _build_guest_chat_context(request)
