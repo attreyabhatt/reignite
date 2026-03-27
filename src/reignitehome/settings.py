@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     'allauth.account',
     
     'reignitehome',
+    'seoapp',
     'conversation',
     'mobileapi',
     'pricing',

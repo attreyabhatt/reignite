@@ -8,7 +8,7 @@ from urllib.parse import urlencode, urlparse
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.http import Http404, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
@@ -18,14 +18,8 @@ from conversation.models import GuestWebConversationAttempt, WebAppConfig
 from conversation.utils.web_guest_logging import log_guest_web_attempt
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
-from reignitehome.pickup_pages import get_pickup_topic, list_pickup_topics
-from reignitehome.situation_pages import (
-    SITUATION_PAGE_ORDER,
-    get_situation_page,
-    list_related_pages,
-    list_situation_pages,
-)
 from reignitehome.utils.ip_check import get_client_ip
+from seoapp.situation_pages import SITUATION_PAGE_ORDER
 
 # Whitelists (match your <select> values in home.html)
 PLATFORM_ALLOWED = {
@@ -141,36 +135,6 @@ def _build_tool_config(**overrides):
             continue
         config[key] = value
     return config
-
-
-def _build_situation_sidebar_links(active_slug):
-    links = []
-    for page in list_situation_pages():
-        links.append(
-            {
-                "href": reverse("situation_landing", kwargs={"slug": page["slug"]}),
-                "label": page["sidebar_label"],
-                "is_active": page["slug"] == active_slug,
-            }
-        )
-    return links
-
-
-def _split_pickup_heading(heading):
-    value = str(heading or "").strip()
-    if not value:
-        return {"lead": "", "accent": "", "tail": ""}
-
-    start = value.find("(")
-    end = value.find(")", start + 1) if start != -1 else -1
-    if start == -1 or end == -1:
-        return {"lead": value, "accent": "", "tail": ""}
-
-    return {
-        "lead": value[:start].strip(),
-        "accent": value[start + 1:end].strip(),
-        "tail": value[end + 1:].strip(),
-    }
 
 
 def _sanitize_utm_value(raw_value, default="", max_len=160):
@@ -383,134 +347,6 @@ def community_create(request):
         "community_login_url": reverse("account_login"),
     }
     return render(request, "community/create.html", context)
-
-
-@require_http_methods(["GET"])
-def situation_index(request):
-    canonical_url = request.build_absolute_uri(reverse("situation_index"))
-    context = _build_guest_chat_context(request)
-    context.update(
-        {
-            "situation_pages": list_situation_pages(),
-            "meta_description": (
-                "Explore texting guides for every dating app scenario, from dry replies to asking for dates. "
-                "Open the exact guide and generate send-ready responses."
-            ),
-            "canonical_url": canonical_url,
-            "og_title": "Texting Guides | TryAgainText",
-            "og_description": (
-                "Browse all TryAgainText scenario guides and jump into the exact texting situation you need help with."
-            ),
-            "og_url": canonical_url,
-        }
-    )
-    return render(request, "situations_index.html", context)
-
-
-@require_http_methods(["GET"])
-def situation_landing(request, slug):
-    situation_page = get_situation_page(slug)
-    if not situation_page:
-        raise Http404("Situation page not found.")
-
-    canonical_url = request.build_absolute_uri(
-        reverse("situation_landing", kwargs={"slug": situation_page["slug"]})
-    )
-    context = _build_guest_chat_context(request)
-    context.update(
-        {
-            "situation_page": situation_page,
-            "related_pages": list_related_pages(situation_page),
-            "meta_description": situation_page["meta_description"],
-            "canonical_url": canonical_url,
-            "og_title": situation_page["title"],
-            "og_description": situation_page["meta_description"],
-            "og_url": canonical_url,
-            "tool_config": _build_tool_config(
-                ui_variant="pickup",
-                selected_situation=situation_page["situation"],
-                prefill_text="",
-                upload_hint=situation_page["upload_hint"],
-                force_show_upload=bool(situation_page["force_show_upload"]),
-                response_empty_template="conversation/partials/response_empty_pickup.html",
-                wrapper_class="",
-                form_col_class="",
-                suggestions_card_class="",
-                credits_note_class="mt-3 text-center text-[#D4AF37] text-sm font-semibold",
-                sidebar_links=_build_situation_sidebar_links(situation_page["slug"]),
-            ),
-        }
-    )
-    return render(request, "situation_layout.html", context)
-
-
-@require_http_methods(["GET"])
-def pickup_lines_index(request):
-    canonical_url = request.build_absolute_uri(reverse("pickup_lines_index"))
-    context = _build_guest_chat_context(request)
-    context.update(
-        {
-            "pickup_topics": list_pickup_topics(),
-            "meta_description": (
-                "Explore ultra-niche pickup line guides and open one tailored to your exact match context."
-            ),
-            "canonical_url": canonical_url,
-            "og_title": "Pickup Lines Directory | TryAgainText",
-            "og_description": (
-                "Browse topic-specific pickup line pages and generate context-aware openers with AI."
-            ),
-            "og_url": canonical_url,
-        }
-    )
-    return render(request, "pickup_lines_index.html", context)
-
-
-@require_http_methods(["GET"])
-def pickup_line_detail(request, category_slug, topic_slug):
-    pickup_topic = get_pickup_topic(category_slug, topic_slug)
-    if not pickup_topic:
-        raise Http404("Pickup line page not found.")
-
-    canonical_url = request.build_absolute_uri(
-        reverse(
-            "pickup_line_detail",
-            kwargs={
-                "category_slug": pickup_topic["category_slug"],
-                "topic_slug": pickup_topic["topic_slug"],
-            },
-        )
-    )
-    context = _build_guest_chat_context(request)
-    context.update(
-        {
-            "pickup_topic": pickup_topic,
-            "canonical_url": canonical_url,
-            "meta_description": pickup_topic["meta_description"],
-            "og_title": pickup_topic["title"],
-            "og_description": pickup_topic["meta_description"],
-            "og_url": canonical_url,
-            "pickup_heading": _split_pickup_heading(pickup_topic.get("h1")),
-            "tool_config": _build_tool_config(
-                ui_variant="pickup",
-                selected_situation="just_matched",
-                prefill_text="",
-                upload_hint=pickup_topic["upload_hint"],
-                force_show_upload=True,
-                response_empty_template="conversation/partials/response_empty_pickup.html",
-                wrapper_class="",
-                form_col_class="",
-                suggestions_card_class="",
-                credits_note_class="mt-3 text-center text-[#8F9BB3] text-xs font-semibold uppercase tracking-wide",
-                her_info_prefill=pickup_topic.get("her_info_prefill", ""),
-                situation_label="WHAT'S THE SITUATION?",
-                her_info_label="HER INFORMATION (optional)",
-                upload_label="UPLOAD CONVERSATION",
-                submit_label="GENERATE REPLIES",
-                response_heading="SEND-READY REPLIES",
-            ),
-        }
-    )
-    return render(request, "pickup_line_detail.html", context)
 
 
 @require_http_methods(["GET"])
