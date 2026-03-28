@@ -7,10 +7,22 @@ from django.urls import reverse
 from django.utils.html import escape
 
 from reignitehome.views import DEFAULT_TOOL_CONVERSATION_PLACEHOLDER
-from seoapp.pickup_pages import list_pickup_topics
+from seoapp.models import PickupCategory, PickupTopic
 from seoapp.situation_pages import SITUATION_PAGE_ORDER, list_situation_pages
 
+def _list_pickup_topics():
+    """Return pickup topics as dicts, same shape as the old pickup_pages helper."""
+    return [
+        t.to_dict()
+        for t in PickupTopic.objects.filter(is_active=True).select_related("category")
+    ]
+
+
 class SituationSeoPagesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+        call_command("seed_pickup_data", verbosity=0)
     def test_situations_directory_returns_200_and_links_to_all_situations(self):
         response = self.client.get(reverse("situation_index"))
         self.assertEqual(response.status_code, 200)
@@ -235,7 +247,7 @@ class SituationSeoPagesTests(TestCase):
         self.assertEqual(index_response.status_code, 200)
         self.assertContains(index_response, "Ultra-Niche Pickup Line Guides")
 
-        topic = list_pickup_topics()[0]
+        topic = _list_pickup_topics()[0]
         detail_response = self.client.get(
             reverse(
                 "pickup_line_detail",
@@ -295,8 +307,84 @@ class SituationSeoPagesTests(TestCase):
             html=False,
         )
 
+    def test_pickup_topics_expand_to_expected_count(self):
+        self.assertGreaterEqual(len(_list_pickup_topics()), 123)
+
+    def test_pickup_index_contains_links_for_all_categories(self):
+        response = self.client.get(reverse("pickup_lines_index"))
+        self.assertEqual(response.status_code, 200)
+
+        for cat in PickupCategory.objects.all():
+            cat_url = reverse(
+                "pickup_category_detail",
+                kwargs={"category_slug": cat.slug},
+            )
+            self.assertContains(response, f'href="{cat_url}"', html=False)
+
+    def test_pickup_category_page_returns_200_and_links_to_topics(self):
+        category = PickupCategory.objects.first()
+        response = self.client.get(
+            reverse("pickup_category_detail", kwargs={"category_slug": category.slug})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, escape(category.name))
+
+        for topic in PickupTopic.objects.filter(category=category, is_active=True):
+            detail_url = reverse(
+                "pickup_line_detail",
+                kwargs={
+                    "category_slug": category.slug,
+                    "topic_slug": topic.slug,
+                },
+            )
+            self.assertContains(response, f'href="{detail_url}"', html=False)
+
+    def test_all_new_literature_author_pages_render_with_shared_pickup_marker(self):
+        new_author_slugs = [
+            "william-shakespeare",
+            "jane-austen",
+            "leo-tolstoy",
+            "franz-kafka",
+            "albert-camus",
+            "gabriel-garcia-marquez",
+            "virginia-woolf",
+            "oscar-wilde",
+            "ernest-hemingway",
+            "f-scott-fitzgerald",
+            "george-orwell",
+            "charles-dickens",
+            "mark-twain",
+            "emily-bronte",
+            "victor-hugo",
+            "marcel-proust",
+            "james-joyce",
+            "homer",
+            "dante-alighieri",
+            "miguel-de-cervantes",
+        ]
+
+        topics_by_slug = {topic["topic_slug"]: topic for topic in _list_pickup_topics()}
+
+        for slug in new_author_slugs:
+            with self.subTest(slug=slug):
+                self.assertIn(slug, topics_by_slug)
+                topic = topics_by_slug[slug]
+                response = self.client.get(
+                    reverse(
+                        "pickup_line_detail",
+                        kwargs={
+                            "category_slug": topic["category_slug"],
+                            "topic_slug": topic["topic_slug"],
+                        },
+                    )
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, escape(topic["keyword"]))
+                self.assertContains(response, 'data-tool-variant="pickup"', html=False)
+                self.assertContains(response, 'href="/pickup-lines/"', html=False)
+
     def test_pickup_detail_uses_shared_pickup_playground_css_with_chip_rules(self):
-        topic = list_pickup_topics()[0]
+        topic = _list_pickup_topics()[0]
         response = self.client.get(
             reverse(
                 "pickup_line_detail",

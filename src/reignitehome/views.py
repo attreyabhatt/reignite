@@ -19,6 +19,7 @@ from conversation.utils.web_guest_logging import log_guest_web_attempt
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
 from reignitehome.utils.ip_check import get_client_ip
+from seoapp.models import PickupCategory, PickupTopic
 from seoapp.situation_pages import SITUATION_PAGE_ORDER
 
 # Whitelists (match your <select> values in home.html)
@@ -367,6 +368,26 @@ def sitemap_xml(request):
         absolute_urls.append(
             request.build_absolute_uri(
                 reverse("situation_landing", kwargs={"slug": slug})
+            )
+        )
+
+    for cat in PickupCategory.objects.order_by("sort_order"):
+        absolute_urls.append(
+            request.build_absolute_uri(
+                reverse("pickup_category_detail", kwargs={"category_slug": cat.slug})
+            )
+        )
+
+    for topic in PickupTopic.objects.filter(is_active=True).select_related("category"):
+        absolute_urls.append(
+            request.build_absolute_uri(
+                reverse(
+                    "pickup_line_detail",
+                    kwargs={
+                        "category_slug": topic.category.slug,
+                        "topic_slug": topic.slug,
+                    },
+                )
             )
         )
 

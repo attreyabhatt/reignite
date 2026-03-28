@@ -131,7 +131,7 @@
                 <span class="sep">&gt;</span>
                 <a href="{% url 'pickup_lines_index' %}">Pickup Lines</a>
                 <span class="sep">&gt;</span>
-                <span>{{ pickup_topic.category_name }}</span>
+                <a href="{% url 'pickup_category_detail' pickup_topic.category_slug %}">{{ pickup_topic.category_name }}</a>
                 <span class="sep">&gt;</span>
                 <span>{{ pickup_topic.keyword }}</span>
             </p>

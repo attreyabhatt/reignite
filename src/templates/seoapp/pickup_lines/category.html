@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 
-{% block head_title %}Pickup Lines Directory | TryAgainText{% endblock head_title %}
-{% block meta_description %}Explore ultra-niche pickup line guides and open one tailored to your exact match context.{% endblock meta_description %}
+{% block head_title %}Best {{ category.name }} Pickup Lines | TryAgainText{% endblock head_title %}
+{% block meta_description %}{{ meta_description }}{% endblock meta_description %}
 {% block canonical_url %}{{ canonical_url }}{% endblock canonical_url %}
-{% block og_title %}Pickup Lines Directory | TryAgainText{% endblock og_title %}
-{% block og_description %}Browse topic-specific pickup line pages and generate context-aware openers with AI.{% endblock og_description %}
+{% block og_title %}Best {{ category.name }} Pickup Lines | TryAgainText{% endblock og_title %}
+{% block og_description %}{{ og_description }}{% endblock og_description %}
 {% block og_url %}{{ canonical_url }}{% endblock og_url %}
 
 {% block extra_head %}
 <style>
-    .pickup-index-stage {
+    .pickup-cat-stage {
         background:
             radial-gradient(circle at 16% 0%, rgba(255, 45, 109, .08), transparent 35%),
             radial-gradient(circle at 86% 20%, rgba(212, 175, 55, .06), transparent 38%),
             var(--matte-bg);
     }
 
-    .pickup-index-hero {
+    .pickup-cat-hero {
         border: 1px solid var(--matte-border);
         border-radius: 16px;
         background:
@@ -25,7 +25,27 @@
         padding: 2rem;
     }
 
-    .pickup-index-kicker {
+    .pickup-cat-breadcrumb {
+        color: var(--matte-muted);
+        font-size: .82rem;
+        margin-bottom: 1rem;
+    }
+
+    .pickup-cat-breadcrumb a {
+        color: var(--matte-muted);
+        text-decoration: none;
+    }
+
+    .pickup-cat-breadcrumb a:hover {
+        color: var(--matte-pink);
+    }
+
+    .pickup-cat-breadcrumb .sep {
+        margin: 0 .45rem;
+        opacity: .45;
+    }
+
+    .pickup-cat-kicker {
         color: var(--matte-gold);
         letter-spacing: .12em;
         font-size: .72rem;
@@ -33,20 +53,20 @@
         margin-bottom: .65rem;
     }
 
-    .pickup-index-headline {
+    .pickup-cat-headline {
         font-size: clamp(2rem, 4.1vw, 3.35rem);
         line-height: 1.08;
         margin-bottom: .95rem;
     }
 
-    .pickup-index-copy {
+    .pickup-cat-copy {
         color: var(--matte-muted);
         max-width: 52rem;
         line-height: 1.68;
         font-size: 1.04rem;
     }
 
-    .pickup-index-grid {
+    .pickup-cat-grid {
         display: grid;
         grid-template-columns: repeat(1, minmax(0, 1fr));
         gap: 1rem;
@@ -107,7 +127,7 @@
     }
 
     @media (min-width: 768px) {
-        .pickup-index-grid {
+        .pickup-cat-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
@@ -115,26 +135,33 @@
 {% endblock extra_head %}
 
 {% block content %}
-<div class="pickup-index-stage py-12 sm:py-14">
+<div class="pickup-cat-stage py-12 sm:py-14">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <section class="pickup-index-hero mb-8">
-            <p class="pickup-index-kicker">Pickup Lines</p>
-            <h1 class="pickup-index-headline matte-headline font-bold">Ultra-Niche Pickup Line Guides</h1>
-            <p class="pickup-index-copy">
-                Open a focused topic page, skim proven lines quickly, and then generate a personalized opener from her exact context.
-                Designed to keep your first message sharp without sounding generic.
+        <section class="pickup-cat-hero mb-8">
+            <p class="pickup-cat-breadcrumb">
+                <a href="{% url 'home' %}">Home</a>
+                <span class="sep">&gt;</span>
+                <a href="{% url 'pickup_lines_index' %}">Pickup Lines</a>
+                <span class="sep">&gt;</span>
+                <span>{{ category.name }}</span>
+            </p>
+            <p class="pickup-cat-kicker">{{ category.name }}</p>
+            <h1 class="pickup-cat-headline matte-headline font-bold">Best {{ category.name }} Pickup Lines</h1>
+            <p class="pickup-cat-copy">
+                Browse {{ pickup_topics|length }} ultra-niche {{ category.name }} pickup line guides.
+                Pick a topic, skim proven lines, and then generate a personalized opener from her exact profile vibe.
             </p>
         </section>
 
-        <section class="pickup-index-grid">
-            {% for cat in categories %}
-            <a href="{% url 'pickup_category_detail' cat.slug %}" class="pickup-topic-card">
+        <section class="pickup-cat-grid">
+            {% for topic in pickup_topics %}
+            <a href="{% url 'pickup_line_detail' topic.category_slug topic.topic_slug %}" class="pickup-topic-card">
                 <div class="pickup-topic-meta">
-                    <span class="pickup-topic-pill">{{ cat.topic_count }} guide{{ cat.topic_count|pluralize }}</span>
-                    <span class="pickup-topic-cta">Browse &rarr;</span>
+                    <span class="pickup-topic-pill">{{ topic.category_name }}</span>
+                    <span class="pickup-topic-cta">Open guide</span>
                 </div>
-                <h2 class="pickup-topic-title matte-headline font-semibold">{{ cat.name }}</h2>
-                <p class="pickup-topic-copy">Explore {{ cat.topic_count }} ultra-niche {{ cat.name }} pickup line guides.</p>
+                <h2 class="pickup-topic-title matte-headline font-semibold">{{ topic.keyword }}</h2>
+                <p class="pickup-topic-copy">{{ topic.meta_description }}</p>
             </a>
             {% endfor %}
         </section>

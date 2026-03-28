@@ -6,7 +6,9 @@ from django.views.decorators.http import require_http_methods
 from conversation.models import WebAppConfig
 from reignitehome.models import TrialIP
 from reignitehome.utils.ip_check import get_client_ip
-from seoapp.pickup_pages import get_pickup_topic, list_pickup_topics
+from django.db.models import Count, Q
+
+from seoapp.models import PickupCategory, PickupTopic
 from seoapp.situation_pages import (
     get_situation_page,
     list_related_pages,
@@ -163,10 +165,16 @@ def situation_landing(request, slug):
 @require_http_methods(["GET"])
 def pickup_lines_index(request):
     canonical_url = request.build_absolute_uri(reverse("pickup_lines_index"))
+    categories = (
+        PickupCategory.objects
+        .annotate(topic_count=Count("topics", filter=Q(topics__is_active=True)))
+        .filter(topic_count__gt=0)
+        .order_by("sort_order")
+    )
     context = _build_guest_chat_context(request)
     context.update(
         {
-            "pickup_topics": list_pickup_topics(),
+            "categories": categories,
             "meta_description": (
                 "Explore ultra-niche pickup line guides and open one tailored to your exact match context."
             ),
@@ -182,10 +190,48 @@ def pickup_lines_index(request):
 
 
 @require_http_methods(["GET"])
+def pickup_category_detail(request, category_slug):
+    try:
+        category = PickupCategory.objects.get(slug=category_slug)
+    except PickupCategory.DoesNotExist:
+        raise Http404("Category not found.")
+    topics = [
+        t.to_dict()
+        for t in PickupTopic.objects.filter(
+            category=category, is_active=True
+        ).select_related("category").order_by("sort_order", "keyword")
+    ]
+    if not topics:
+        raise Http404("Category not found.")
+    canonical_url = request.build_absolute_uri(
+        reverse("pickup_category_detail", kwargs={"category_slug": category.slug})
+    )
+    context = _build_guest_chat_context(request)
+    context.update(
+        {
+            "category": category,
+            "pickup_topics": topics,
+            "meta_description": f"Browse {len(topics)} {category.name} pickup line guides. Pick a topic and generate a custom opener from her exact profile vibe.",
+            "canonical_url": canonical_url,
+            "og_title": f"Best {category.name} Pickup Lines | TryAgainText",
+            "og_description": f"Browse {len(topics)} ultra-niche {category.name} pickup line guides and generate context-aware openers with AI.",
+            "og_url": canonical_url,
+        }
+    )
+    return render(request, "seoapp/pickup_lines/category.html", context)
+
+
+@require_http_methods(["GET"])
 def pickup_line_detail(request, category_slug, topic_slug):
-    pickup_topic = get_pickup_topic(category_slug, topic_slug)
-    if not pickup_topic:
+    try:
+        topic_obj = (
+            PickupTopic.objects
+            .select_related("category")
+            .get(category__slug=category_slug, slug=topic_slug, is_active=True)
+        )
+    except PickupTopic.DoesNotExist:
         raise Http404("Pickup line page not found.")
+    pickup_topic = topic_obj.to_dict()
 
     canonical_url = request.build_absolute_uri(
         reverse(

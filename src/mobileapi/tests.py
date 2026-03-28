@@ -27,6 +27,7 @@ from mobileapi.models import (
     MobileCopyEvent,
     MobileGenerationEvent,
     MobileInstallAttributionEvent,
+    MobileReplyThread,
 )
 from mobileapi.push_notifications import send_post_comment_notification
 
@@ -2367,3 +2368,127 @@ class MobileSignupAdminTests(TestCase):
 
         self.assertIn(active_user, queryset)
         self.assertNotIn(inactive_user, queryset)
+
+
+class MobileReplyThreadApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="archiver",
+            email="archiver@example.com",
+            password="StrongPass123!",
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _create_thread(self, suffix: int) -> MobileReplyThread:
+        return MobileReplyThread.objects.create(
+            user=self.user,
+            title=f"Thread {suffix}",
+            stitched_transcript=f"line {suffix}",
+            latest_replies=[{"message": f"reply {suffix}"}],
+        )
+
+    def test_list_marks_only_newest_three_as_unlocked_for_free_users(self):
+        for i in range(5):
+            self._create_thread(i)
+
+        response = self.client.get(reverse("mobile_reply_threads"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        threads = response.data["threads"]
+        self.assertEqual(len(threads), 5)
+        self.assertEqual([item["is_locked"] for item in threads], [False, False, False, True, True])
+        self.assertEqual(response.data["free_unlocked_count"], 3)
+
+    def test_locked_thread_detail_requires_subscription_for_free_user(self):
+        created = [self._create_thread(i) for i in range(4)]
+        oldest = created[0]
+
+        response = self.client.get(reverse("mobile_reply_thread_detail", args=[oldest.id]))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["error"], "subscription_required")
+        self.assertTrue(response.data["is_locked"])
+
+    def test_locked_thread_detail_allowed_for_subscribed_user(self):
+        created = [self._create_thread(i) for i in range(4)]
+        oldest = created[0]
+
+        chat_credit = self.user.chat_credit
+        chat_credit.is_subscribed = True
+        chat_credit.subscription_expiry = timezone.now() + timedelta(days=7)
+        chat_credit.save(update_fields=["is_subscribed", "subscription_expiry"])
+
+        response = self.client.get(reverse("mobile_reply_thread_detail", args=[oldest.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["thread"]["id"], oldest.id)
+        self.assertFalse(response.data["thread"]["is_locked"])
+
+    def test_create_and_update_thread_stitches_latest_ocr_and_replaces_latest_replies(self):
+        generation_event = MobileGenerationEvent.objects.create(
+            user=self.user,
+            user_type=MobileGenerationEvent.UserType.AUTHENTICATED_NON_SUBSCRIBED,
+            action_type=MobileGenerationEvent.ActionType.REPLY,
+            source_type=MobileGenerationEvent.SourceType.AI,
+            model_used="gemini-3-flash-preview",
+            thinking_used="low",
+            generated_json='[{"message":"hello"}]',
+        )
+
+        create_response = self.client.post(
+            reverse("mobile_reply_threads"),
+            {
+                "conversation_text": "hi there",
+                "latest_ocr_text": "you: hey\nher: hello",
+                "latest_replies": [
+                    {"message": "reply one", "confidence_score": 0.91},
+                    {"message": "reply two", "confidence_score": 0.88},
+                    {"message": "reply three", "confidence_score": 0.84},
+                ],
+                "generation_event_id": generation_event.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 200)
+        self.assertTrue(create_response.data["success"])
+        thread_id = create_response.data["thread"]["id"]
+
+        update_response = self.client.post(
+            reverse("mobile_reply_threads"),
+            {
+                "thread_id": thread_id,
+                "latest_ocr_text": "her: hello\nyou: what are you up to?",
+                "latest_replies": [
+                    {"message": "updated one"},
+                    {"message": "updated two"},
+                    {"message": "updated three"},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(update_response.status_code, 200)
+        thread = MobileReplyThread.objects.get(id=thread_id)
+        self.assertEqual(
+            thread.stitched_transcript,
+            "you: hey\nher: hello\nyou: what are you up to?",
+        )
+        self.assertEqual(
+            [item["message"] for item in thread.latest_replies],
+            ["updated one", "updated two", "updated three"],
+        )
+
+    def test_delete_thread_removes_resource(self):
+        thread = self._create_thread(1)
+
+        delete_response = self.client.delete(
+            reverse("mobile_reply_thread_detail", args=[thread.id])
+        )
+
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertFalse(MobileReplyThread.objects.filter(id=thread.id).exists())

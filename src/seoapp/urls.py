@@ -1,6 +1,7 @@
 ﻿from django.urls import path
 
 from seoapp.views import (
+    pickup_category_detail,
     pickup_line_detail,
     pickup_lines_index,
     situation_index,
@@ -10,6 +11,11 @@ from seoapp.views import (
 
 urlpatterns = [
     path('pickup-lines/', pickup_lines_index, name='pickup_lines_index'),
+    path(
+        'pickup-lines/<slug:category_slug>/',
+        pickup_category_detail,
+        name='pickup_category_detail',
+    ),
     path(
         'pickup-lines/<slug:category_slug>/<slug:topic_slug>/',
         pickup_line_detail,

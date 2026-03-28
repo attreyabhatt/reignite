@@ -59,6 +59,40 @@ class MobileGenerationEvent(models.Model):
         return f"{self.action_type} ({self.user_type}) by {actor}"
 
 
+class MobileReplyThread(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mobile_reply_threads",
+        db_index=True,
+    )
+    title = models.CharField(max_length=140)
+    stitched_transcript = models.TextField()
+    latest_replies = models.JSONField(default=list, blank=True)
+    thumbnail_url = models.TextField(blank=True, default="")
+    latest_generation_event = models.ForeignKey(
+        MobileGenerationEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reply_threads",
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "Mobile Reply Thread"
+        verbose_name_plural = "Mobile Reply Threads"
+        ordering = ["-updated_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "updated_at"]),
+        ]
+
+    def __str__(self):
+        return f"reply_thread {self.id} user={self.user_id}"
+
+
 class MobileCopyEvent(models.Model):
     class UserType(models.TextChoices):
         FREE = "free", "Free"

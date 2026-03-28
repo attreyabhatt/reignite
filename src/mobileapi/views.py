@@ -17,7 +17,7 @@ import logging
 import hmac
 import hashlib
 import uuid
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
 from datetime import datetime, timedelta, timezone as dt_timezone
 from urllib.parse import parse_qs
@@ -29,7 +29,12 @@ from conversation.utils.image_gpt import extract_conversation_from_image, stream
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
 from .auth import normalize_authorization_header
 from .renderers import EventStreamRenderer
-from .models import MobileCopyEvent, MobileGenerationEvent, MobileInstallAttributionEvent
+from .models import (
+    MobileCopyEvent,
+    MobileGenerationEvent,
+    MobileInstallAttributionEvent,
+    MobileReplyThread,
+)
 from conversation.models import (
     ChatCredit,
     TrialIP,
@@ -54,6 +59,7 @@ logger = logging.getLogger(__name__)
 
 _VAULT_MODE = "vault"
 _VAULT_DAILY_DROP_COUNT = 3
+_ARCHIVES_FREE_UNLOCKED_COUNT = 3
 
 def _log_ai_action(action_type: str, model: str, is_subscribed: bool, is_signed_up: bool, username: str = None):
     """
@@ -1098,6 +1104,129 @@ def _build_vault_meta(*, tier, archive_total, daily_drop_date, display_count):
         "display_count": display_count,
         "cta": cta,
         "can_refresh": False,
+    }
+
+
+def _normalize_reply_preview_item(item: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(item, dict):
+        return None
+
+    message = str(item.get("message") or "").strip()
+    if not message:
+        return None
+
+    normalized: Dict[str, Any] = {"message": message}
+    confidence = item.get("confidence_score")
+    if confidence is not None:
+        try:
+            normalized["confidence_score"] = float(confidence)
+        except (TypeError, ValueError):
+            pass
+
+    why_it_works = str(item.get("why_it_works") or "").strip()
+    if why_it_works:
+        normalized["why_it_works"] = why_it_works
+
+    return normalized
+
+
+def _parse_latest_replies(raw_value: Any) -> List[Dict[str, Any]]:
+    value = raw_value
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError("latest_replies must be valid JSON.") from exc
+
+    if not isinstance(value, list):
+        raise ValueError("latest_replies must be a list.")
+
+    normalized = []
+    for item in value:
+        parsed = _normalize_reply_preview_item(item)
+        if parsed is not None:
+            normalized.append(parsed)
+        if len(normalized) >= 3:
+            break
+
+    if not normalized:
+        raise ValueError("latest_replies must include at least one reply.")
+
+    return normalized
+
+
+def _normalize_line_for_stitch(line: str) -> str:
+    return " ".join((line or "").strip().split())
+
+
+def _stitch_transcript(existing_text: str, incoming_text: str) -> str:
+    seen = set()
+    stitched = []
+
+    for block in [existing_text or "", incoming_text or ""]:
+        for raw_line in block.splitlines():
+            clean_line = _normalize_line_for_stitch(raw_line)
+            if not clean_line:
+                continue
+            if clean_line in seen:
+                continue
+            seen.add(clean_line)
+            stitched.append(clean_line)
+
+    return "\n".join(stitched)
+
+
+def _build_archive_title(transcript: str) -> str:
+    lines = [line.strip() for line in (transcript or "").splitlines() if line.strip()]
+    if not lines:
+        return "Archived Conversation"
+
+    first = lines[0]
+    if len(first) <= 56:
+        return first
+    return f"{first[:56].rstrip()}..."
+
+
+def _get_archive_unlocked_ids(user: User, unlocked_count: int = _ARCHIVES_FREE_UNLOCKED_COUNT) -> set:
+    ids = MobileReplyThread.objects.filter(user=user).order_by("-updated_at", "-id").values_list("id", flat=True)[
+        :unlocked_count
+    ]
+    return set(ids)
+
+
+def _serialize_reply_thread_summary(thread: MobileReplyThread, is_locked: bool) -> Dict[str, Any]:
+    snippet = ""
+    latest_replies = thread.latest_replies if isinstance(thread.latest_replies, list) else []
+    if latest_replies:
+        first = latest_replies[0] if isinstance(latest_replies[0], dict) else {}
+        snippet = str(first.get("message") or "").strip()
+    if not snippet:
+        snippet = (thread.stitched_transcript or "").splitlines()[0].strip() if thread.stitched_transcript else ""
+
+    return {
+        "id": thread.id,
+        "title": thread.title,
+        "snippet": snippet[:180],
+        "updated_at": thread.updated_at.isoformat(),
+        "created_at": thread.created_at.isoformat(),
+        "reply_count": len(latest_replies),
+        "thumbnail_url": thread.thumbnail_url or None,
+        "is_locked": is_locked,
+    }
+
+
+def _serialize_reply_thread_detail(thread: MobileReplyThread, is_locked: bool) -> Dict[str, Any]:
+    latest_replies = thread.latest_replies if isinstance(thread.latest_replies, list) else []
+    return {
+        "id": thread.id,
+        "title": thread.title,
+        "stitched_transcript": thread.stitched_transcript,
+        "latest_replies": latest_replies,
+        "thumbnail_url": thread.thumbnail_url or None,
+        "latest_generation_event_id": thread.latest_generation_event_id,
+        "updated_at": thread.updated_at.isoformat(),
+        "created_at": thread.created_at.isoformat(),
+        "is_locked": is_locked,
     }
 
 
@@ -3275,6 +3404,208 @@ def recommended_openers(request):
         return Response({"success": False, "error": "generation_failed"}, status=500)
 
 
+def _chat_credit_or_none(user: User) -> Optional[ChatCredit]:
+    try:
+        return ChatCredit.objects.get(user=user)
+    except ChatCredit.DoesNotExist:
+        return None
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def reply_threads(request):
+    chat_credit = _chat_credit_or_none(request.user)
+    is_subscribed = bool(chat_credit and _is_subscription_active(chat_credit))
+    subscription_payload = _subscription_payload(chat_credit, request=request) if chat_credit else {}
+
+    if request.method == "GET":
+        threads = list(
+            MobileReplyThread.objects.filter(user=request.user).order_by("-updated_at", "-id")
+        )
+        unlocked_ids = set() if is_subscribed else _get_archive_unlocked_ids(request.user)
+        serialized = [
+            _serialize_reply_thread_summary(
+                thread,
+                is_locked=(not is_subscribed and thread.id not in unlocked_ids),
+            )
+            for thread in threads
+        ]
+        return Response(
+            {
+                "success": True,
+                "threads": serialized,
+                "free_unlocked_count": _ARCHIVES_FREE_UNLOCKED_COUNT,
+                **subscription_payload,
+            }
+        )
+
+    thread_id_raw = request.data.get("thread_id")
+    title_input = str(request.data.get("title") or "").strip()
+    conversation_text = str(request.data.get("conversation_text") or "").strip()
+    latest_ocr_text = str(request.data.get("latest_ocr_text") or "").strip()
+    thumbnail_url = str(request.data.get("thumbnail_url") or "").strip()
+    generation_event_id_raw = request.data.get("generation_event_id")
+
+    try:
+        latest_replies = _parse_latest_replies(request.data.get("latest_replies"))
+    except ValueError as exc:
+        return Response(
+            {
+                "success": False,
+                "error": "invalid_latest_replies",
+                "message": str(exc),
+            },
+            status=400,
+        )
+
+    thread = None
+    if thread_id_raw not in (None, ""):
+        try:
+            thread_id = int(thread_id_raw)
+        except (TypeError, ValueError):
+            return Response(
+                {
+                    "success": False,
+                    "error": "invalid_thread_id",
+                    "message": "thread_id must be an integer.",
+                },
+                status=400,
+            )
+        thread = MobileReplyThread.objects.filter(id=thread_id, user=request.user).first()
+        if thread is None:
+            return Response(
+                {
+                    "success": False,
+                    "error": "not_found",
+                    "message": "Reply thread not found.",
+                },
+                status=404,
+            )
+        if not is_subscribed:
+            unlocked_ids = _get_archive_unlocked_ids(request.user)
+            if thread.id not in unlocked_ids:
+                return Response(
+                    {
+                        "success": False,
+                        "error": "subscription_required",
+                        "message": "Subscribe to access older archived threads.",
+                        "free_unlocked_count": _ARCHIVES_FREE_UNLOCKED_COUNT,
+                        **subscription_payload,
+                    },
+                    status=403,
+                )
+
+    generation_event = None
+    if generation_event_id_raw not in (None, ""):
+        try:
+            generation_event_id = int(generation_event_id_raw)
+        except (TypeError, ValueError):
+            return Response(
+                {
+                    "success": False,
+                    "error": "invalid_generation_event_id",
+                    "message": "generation_event_id must be an integer.",
+                },
+                status=400,
+            )
+        generation_event = MobileGenerationEvent.objects.filter(
+            id=generation_event_id,
+            user=request.user,
+        ).first()
+        if generation_event is None:
+            return Response(
+                {
+                    "success": False,
+                    "error": "invalid_generation_event_id",
+                    "message": "generation_event_id is invalid for this user.",
+                },
+                status=400,
+            )
+
+    existing_transcript = thread.stitched_transcript if thread else ""
+    if latest_ocr_text:
+        stitched_transcript = _stitch_transcript(existing_transcript, latest_ocr_text)
+    else:
+        stitched_transcript = conversation_text or existing_transcript
+    stitched_transcript = (stitched_transcript or "").strip()
+    if not stitched_transcript:
+        return Response(
+            {
+                "success": False,
+                "error": "conversation_required",
+                "message": "conversation_text or latest_ocr_text is required.",
+            },
+            status=400,
+        )
+
+    if thread is None:
+        thread = MobileReplyThread(user=request.user)
+    thread.title = title_input or thread.title or _build_archive_title(stitched_transcript)
+    thread.stitched_transcript = stitched_transcript
+    thread.latest_replies = latest_replies
+    thread.thumbnail_url = thumbnail_url
+    thread.latest_generation_event = generation_event
+    thread.save()
+
+    unlocked_ids = set() if is_subscribed else _get_archive_unlocked_ids(request.user)
+    is_locked = (not is_subscribed) and (thread.id not in unlocked_ids)
+    return Response(
+        {
+            "success": True,
+            "thread": _serialize_reply_thread_detail(thread, is_locked=is_locked),
+            "free_unlocked_count": _ARCHIVES_FREE_UNLOCKED_COUNT,
+            **subscription_payload,
+        }
+    )
+
+
+@api_view(["GET", "DELETE"])
+@permission_classes([IsAuthenticated])
+def reply_thread_detail(request, thread_id):
+    chat_credit = _chat_credit_or_none(request.user)
+    is_subscribed = bool(chat_credit and _is_subscription_active(chat_credit))
+    subscription_payload = _subscription_payload(chat_credit, request=request) if chat_credit else {}
+
+    thread = MobileReplyThread.objects.filter(id=thread_id, user=request.user).first()
+    if thread is None:
+        return Response(
+            {
+                "success": False,
+                "error": "not_found",
+                "message": "Reply thread not found.",
+            },
+            status=404,
+        )
+
+    if request.method == "DELETE":
+        thread.delete()
+        return Response({"success": True})
+
+    unlocked_ids = set() if is_subscribed else _get_archive_unlocked_ids(request.user)
+    is_locked = (not is_subscribed) and (thread.id not in unlocked_ids)
+    if is_locked:
+        return Response(
+            {
+                "success": False,
+                "error": "subscription_required",
+                "message": "Subscribe to access older archived threads.",
+                "is_locked": True,
+                "free_unlocked_count": _ARCHIVES_FREE_UNLOCKED_COUNT,
+                **subscription_payload,
+            },
+            status=403,
+        )
+
+    return Response(
+        {
+            "success": True,
+            "thread": _serialize_reply_thread_detail(thread, is_locked=False),
+            "free_unlocked_count": _ARCHIVES_FREE_UNLOCKED_COUNT,
+            **subscription_payload,
+        }
+    )
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def copy_event(request):
@@ -3535,4 +3866,3 @@ def install_attribution(request):
             },
             status=500,
         )
-
