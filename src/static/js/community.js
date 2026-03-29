@@ -492,7 +492,7 @@
         const postAuthorId = Number(post.author?.id || 0);
         const isOwner = (currentUserId && commentAuthorId === currentUserId) || (currentUsername && currentUsername === comment.author?.username);
         const showOp = !post.is_anonymous && postAuthorId && commentAuthorId && postAuthorId === commentAuthorId;
-        const likeIcon = comment.user_liked ? 'fa-heart' : 'fa-heart-o';
+        const likeIcon = comment.user_liked ? 'fas fa-heart' : 'far fa-heart';
         const menuItems = isOwner
             ? [`<button type="button" class="community-more-item is-danger" data-action="delete-comment" data-comment-id="${comment.id}">Delete Comment</button>`]
             : [
@@ -515,7 +515,7 @@
             '  </div>',
             `  <p class="community-comment-body">${escapeHtml(comment.body || '')}</p>`,
             '  <div class="community-comment-actions">',
-            `    <button type="button" class="community-icon-btn" data-action="like-comment" data-comment-id="${comment.id}"><i class="fa ${likeIcon}"></i></button>`,
+            `    <button type="button" class="community-icon-btn" data-action="like-comment" data-comment-id="${comment.id}"><i class="${likeIcon}"></i></button>`,
             `    <span class="community-count">${Number(comment.like_count || 0)}</span>`,
             '  </div>',
             '</article>',
