@@ -200,6 +200,19 @@
     background: rgba(212, 175, 55, 0.11);
 }
 
+.community-badge-pinned {
+    color: #93c5fd;
+    border-color: rgba(147, 197, 253, 0.28);
+    background: rgba(147, 197, 253, 0.11);
+}
+
+.community-card.community-card-pinned {
+    border-color: rgba(147, 197, 253, 0.35);
+    background:
+        radial-gradient(circle at 90% 15%, rgba(147, 197, 253, 0.1), transparent 55%),
+        var(--matte-surface);
+}
+
 .community-badge-trending {
     color: var(--matte-pink);
     border-color: rgba(255, 45, 109, 0.32);

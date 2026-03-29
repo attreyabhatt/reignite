@@ -199,21 +199,24 @@
 
     function featuredFirst(posts) {
         const seen = new Set();
+        const pinned = [];
         const featured = [];
         const regular = [];
         for (const post of posts || []) {
             if (!post || seen.has(post.id)) continue;
             seen.add(post.id);
-            if (post.is_featured) featured.push(post);
+            if (post.is_pinned) pinned.push(post);
+            else if (post.is_featured) featured.push(post);
             else regular.push(post);
         }
-        return [...featured, ...regular];
+        return [...pinned, ...featured, ...regular];
     }
 
     function badgesHtml(post) {
         const tags = [];
         if (post.author?.is_pro && !post.is_anonymous) tags.push('<span class="community-badge community-badge-pro">PRO</span>');
-        if (post.is_featured) tags.push('<span class="community-badge community-badge-featured">Featured</span>');
+        if (post.is_pinned) tags.push('<span class="community-badge community-badge-pinned">Pinned</span>');
+        if (post.is_featured && !post.is_pinned) tags.push('<span class="community-badge community-badge-featured">Featured</span>');
         if (post.is_trending) tags.push('<span class="community-badge community-badge-trending">Trending</span>');
         else if (post.is_new) tags.push('<span class="community-badge community-badge-new">New</span>');
         return tags.join('');
@@ -262,7 +265,7 @@
             ? `<div class="community-card-image-wrap"><img class="community-card-image" src="${escapeHtml(post.image_url)}" alt="Community post image"></div>`
             : '';
         return [
-            `<article class="community-card ${post.is_featured ? 'community-card-featured' : ''}" data-post-id="${post.id}">`,
+            `<article class="community-card ${post.is_pinned ? 'community-card-pinned' : post.is_featured ? 'community-card-featured' : ''}" data-post-id="${post.id}">`,
             '  <div class="community-card-head">',
             '    <div class="min-w-0">',
             '      <p class="community-card-meta">',

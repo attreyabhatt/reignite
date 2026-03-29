@@ -52,11 +52,12 @@ class CommunityPostAdmin(admin.ModelAdmin):
         'category',
         'vote_score_display',
         'comment_count_display',
+        'is_pinned',
         'is_featured',
         'is_deleted',
         'published_at',
     )
-    list_filter = ('category', 'is_featured', 'is_deleted', 'published_at')
+    list_filter = ('category', 'is_pinned', 'is_featured', 'is_deleted', 'published_at')
     search_fields = ('title', 'body', 'author__username', 'author_display_name')
     readonly_fields = ('created_at', 'updated_at', 'author_admin_link')
     fields = (
@@ -68,6 +69,7 @@ class CommunityPostAdmin(admin.ModelAdmin):
         'image_url',
         'category',
         'is_anonymous',
+        'is_pinned',
         'is_featured',
         'is_deleted',
         'published_at',
@@ -76,6 +78,8 @@ class CommunityPostAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ('author',)
     actions = [
+        'pin_posts',
+        'unpin_posts',
         'mark_featured',
         'unfeature',
         'remove_posts',
@@ -115,6 +119,14 @@ class CommunityPostAdmin(admin.ModelAdmin):
     def comment_count_display(self, obj):
         return obj.comments.filter(is_deleted=False).count()
     comment_count_display.short_description = 'Comments'
+
+    @admin.action(description='Pin selected posts to the top of the feed')
+    def pin_posts(self, request, queryset):
+        queryset.update(is_pinned=True)
+
+    @admin.action(description='Unpin selected posts')
+    def unpin_posts(self, request, queryset):
+        queryset.update(is_pinned=False)
 
     @admin.action(description='Mark selected posts as featured')
     def mark_featured(self, request, queryset):

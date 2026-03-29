@@ -23,6 +23,7 @@ class CommunityPost(models.Model):
     image_url = models.URLField(blank=True, default='')
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     is_anonymous = models.BooleanField(default=False)
+    is_pinned = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     published_at = models.DateTimeField(default=timezone.now, db_index=True)

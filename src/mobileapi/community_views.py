@@ -149,6 +149,7 @@ def _post_payload(post, user_vote=None, now=None, request_user=None):
         'comment_count': getattr(post, 'comment_count', 0) or 0,
         'image_url': post.image_url or None,
         'is_featured': post.is_featured,
+        'is_pinned': post.is_pinned,
         'is_anonymous': is_anon,
         'is_trending': (
             hours_old <= TRENDING_HOURS and vote_score >= TRENDING_SCORE_THRESHOLD
@@ -199,13 +200,14 @@ def _annotated_posts_qs(base_qs):
 
 
 def _ordered_posts_qs(qs, sort):
-    # Featured posts always float to the top within each sort bucket.
+    # Pinned posts always appear first, regardless of sort mode.
+    # Featured posts float to the top within the non-pinned bucket.
     if sort == 'new':
-        return qs.order_by('-is_featured', '-published_at', '-vote_score', '-id')
+        return qs.order_by('-is_pinned', '-is_featured', '-published_at', '-vote_score', '-id')
     if sort == 'top':
-        return qs.order_by('-is_featured', '-vote_score', '-published_at', '-id')
+        return qs.order_by('-is_pinned', '-is_featured', '-vote_score', '-published_at', '-id')
     # hot (default): recency first, then score.
-    return qs.order_by('-is_featured', '-published_at', '-vote_score', '-id')
+    return qs.order_by('-is_pinned', '-is_featured', '-published_at', '-vote_score', '-id')
 
 
 def _default_feed_sort():
