@@ -33,13 +33,31 @@ EMOJI_COMMENTS = [
     "\U0001f4aa\U0001f4af",             # 💪💯
 ]
 
-DUMMY_USERNAMES = [
-    "seed_u01", "seed_u02", "seed_u03", "seed_u04", "seed_u05",
-    "seed_u06", "seed_u07", "seed_u08", "seed_u09", "seed_u10",
-    "seed_u11", "seed_u12", "seed_u13", "seed_u14", "seed_u15",
-    "seed_u16", "seed_u17", "seed_u18", "seed_u19", "seed_u20",
-    "seed_u21", "seed_u22", "seed_u23",
-]
+DUMMY_USERS = {
+    "seed_u01": "jakehm",
+    "seed_u02": "tyler_dates",
+    "seed_u03": "remi_w",
+    "seed_u04": "quietguy_wins",
+    "seed_u05": "marcus_f",
+    "seed_u06": "dom_texts",
+    "seed_u07": "callum_r99",
+    "seed_u08": "n8_dating",
+    "seed_u09": "alex_t",
+    "seed_u10": "gymrat_hoping",
+    "seed_u11": "textingcrisis",
+    "seed_u12": "overthinking_obv",
+    "seed_u13": "second_chance_sam",
+    "seed_u14": "tired_of_lol",
+    "seed_u15": "week_of_silence",
+    "seed_u16": "plan_b_needed",
+    "seed_u17": "no_more_games",
+    "seed_u18": "convo_coach",
+    "seed_u19": "flag_checker",
+    "seed_u20": "anti_games",
+    "seed_u21": "bumble_respond",
+    "seed_u22": "confused_in_DMs",
+    "seed_u23": "bio_writer_v3",
+}
 
 
 class Command(BaseCommand):
@@ -55,7 +73,7 @@ class Command(BaseCommand):
             post = CommunityPost.objects.filter(is_pinned=True).order_by('id').first()
 
         # Remove existing seed-user comments on this post
-        seed_users = User.objects.filter(username__in=DUMMY_USERNAMES)
+        seed_users = User.objects.filter(username__in=DUMMY_USERS.keys())
         deleted, _ = CommunityComment.objects.filter(
             post=post, author__in=seed_users
         ).delete()
@@ -68,7 +86,7 @@ class Command(BaseCommand):
             CommunityComment.objects.create(
                 post=post,
                 author=user,
-                author_display_name=user.username.lstrip("seed_u").lstrip("0") or user.username,
+                author_display_name=DUMMY_USERS.get(user.username, user.username),
                 body=emoji,
             )
             created += 1

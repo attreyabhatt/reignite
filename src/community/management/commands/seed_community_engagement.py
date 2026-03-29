@@ -192,6 +192,7 @@ class Command(BaseCommand):
         rng = random.Random(42)  # Fixed seed for reproducibility
 
         # ── 1. Create dummy users ──────────────────────────────────────────
+        display_map = {}  # username → display name
         users = []
         for username, display in DUMMY_USERS:
             user, _ = User.objects.get_or_create(
@@ -202,7 +203,17 @@ class Command(BaseCommand):
                 },
             )
             users.append(user)
+            display_map[username] = display
         self.stdout.write(f"  Users ready: {len(users)}")
+
+        # ── Fix display names on existing seed comments ────────────────────
+        fixed = 0
+        for username, display in display_map.items():
+            fixed += CommunityComment.objects.filter(
+                author__username=username,
+            ).exclude(author_display_name=display).update(author_display_name=display)
+        if fixed:
+            self.stdout.write(f"  Fixed {fixed} existing comment display names.")
 
         # ── 2. Seed per post ───────────────────────────────────────────────
         total_comments = 0
@@ -236,7 +247,7 @@ class Command(BaseCommand):
                     post=post,
                     author=user,
                     defaults={
-                        "author_display_name": user.username.replace("seed_u", "").lstrip("0") or user.username,
+                        "author_display_name": display_map.get(user.username, user.username),
                         "body": line,
                     },
                 )
