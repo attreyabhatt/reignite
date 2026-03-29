@@ -3,6 +3,7 @@ from datetime import timedelta
 import requests
 
 from django.contrib import admin
+from django.db import connection
 from conversation.models import (
     RecommendedOpener,
     MobileAppConfig,
@@ -14,12 +15,20 @@ from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from reignitehome.models import MarketingClickEvent, TrialIP as HomeTrialIP
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
-from community.models import CommunityPost, PostVote, UserBlock
+from community.models import (
+    CommunityComment,
+    CommunityPost,
+    PollVote,
+    PostPoll,
+    PostVote,
+    UserBlock,
+)
 
 from mobileapi import admin as mobile_admin
 from mobileapi import views
@@ -1598,6 +1607,8 @@ class CommunityApiTests(TestCase):
 
         self.assertEqual(page_1.status_code, 200)
         self.assertEqual(page_2.status_code, 200)
+        self.assertNotIn("total", page_1.data)
+        self.assertNotIn("total", page_2.data)
         self.assertEqual(len(page_1.data["posts"]), 20)
         self.assertEqual(len(page_2.data["posts"]), 3)
         self.assertTrue(page_1.data["has_more"])
@@ -1916,6 +1927,59 @@ class CommunityApiTests(TestCase):
             self.other_user.username,
         )
 
+    def test_post_detail_include_comments_zero_skips_comment_hydration(self):
+        post = CommunityPost.objects.create(
+            author=self.author,
+            title="No comments hydration",
+            body="Body",
+            category="wins",
+            published_at=timezone.now() - timedelta(minutes=1),
+        )
+        CommunityComment.objects.create(post=post, author=self.other_user, body="c1")
+        CommunityComment.objects.create(post=post, author=self.reporter, body="c2")
+
+        self._as_guest()
+        response = self.client.get(
+            reverse("community_post_detail", args=[post.id]),
+            {"include_comments": "0"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], post.id)
+        self.assertEqual(response.data["comment_count"], 2)
+        self.assertEqual(response.data["comments"], [])
+
+    def test_get_comments_endpoint_paginates(self):
+        post = CommunityPost.objects.create(
+            author=self.author,
+            title="Comment pagination",
+            body="Body",
+            category="wins",
+            published_at=timezone.now() - timedelta(minutes=1),
+        )
+        for i in range(23):
+            CommunityComment.objects.create(
+                post=post,
+                author=self.other_user,
+                body=f"Comment {i}",
+            )
+
+        self._as_guest()
+        page_1 = self.client.get(reverse("community_post_comment", args=[post.id]), {"page": 1})
+        page_2 = self.client.get(reverse("community_post_comment", args=[post.id]), {"page": 2})
+
+        self.assertEqual(page_1.status_code, 200)
+        self.assertEqual(page_2.status_code, 200)
+        self.assertEqual(page_1.data["page"], 1)
+        self.assertEqual(page_2.data["page"], 2)
+        self.assertTrue(page_1.data["has_more"])
+        self.assertFalse(page_2.data["has_more"])
+        self.assertEqual(len(page_1.data["comments"]), 20)
+        self.assertEqual(len(page_2.data["comments"]), 3)
+        page_1_ids = {item["id"] for item in page_1.data["comments"]}
+        page_2_ids = {item["id"] for item in page_2.data["comments"]}
+        self.assertEqual(len(page_1_ids.intersection(page_2_ids)), 0)
+
     def test_create_vote_comment_poll_report_and_delete_flow(self):
         self._auth(self.author_token)
         create_resp = self.client.post(
@@ -2076,6 +2140,74 @@ class CommunityApiTests(TestCase):
             reverse("community_post_detail", args=[post_id])
         )
         self.assertEqual(deleted_post_detail.status_code, 404)
+
+    def test_feed_query_budget_stays_constant_with_polls(self):
+        now = timezone.now()
+        for i in range(25):
+            post = CommunityPost.objects.create(
+                author=self.author,
+                title=f"Perf post {i}",
+                body="Body",
+                category="wins",
+                published_at=now - timedelta(minutes=i),
+            )
+            if i % 2 == 0:
+                poll = PostPoll.objects.create(post=post)
+                PollVote.objects.create(
+                    poll=poll,
+                    user=self.other_user if i % 4 == 0 else self.reporter,
+                    choice="send_it" if i % 4 == 0 else "dont_send_it",
+                )
+            if i % 3 == 0:
+                CommunityComment.objects.create(
+                    post=post,
+                    author=self.other_user,
+                    body="Comment",
+                )
+
+        self._as_guest()
+        with CaptureQueriesContext(connection) as query_ctx:
+            response = self.client.get(
+                reverse("community_post_list"),
+                {"sort": "hot", "page": 1},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLessEqual(
+            len(query_ctx),
+            8,
+            msg=f"Expected <=8 queries for feed page 1, got {len(query_ctx)}",
+        )
+
+    def test_detail_query_budget_stays_constant_with_many_comments(self):
+        post = CommunityPost.objects.create(
+            author=self.author,
+            title="Perf detail post",
+            body="Body",
+            category="wins",
+            published_at=timezone.now() - timedelta(minutes=1),
+        )
+        poll = PostPoll.objects.create(post=post)
+        PollVote.objects.create(poll=poll, user=self.other_user, choice="send_it")
+        PollVote.objects.create(poll=poll, user=self.reporter, choice="dont_send_it")
+        for i in range(30):
+            CommunityComment.objects.create(
+                post=post,
+                author=self.other_user if i % 2 == 0 else self.reporter,
+                body=f"Comment {i}",
+            )
+
+        self._as_guest()
+        with CaptureQueriesContext(connection) as query_ctx:
+            response = self.client.get(reverse("community_post_detail", args=[post.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["comments"]), 30)
+        self.assertLessEqual(
+            len(query_ctx),
+            8,
+            msg=f"Expected <=8 queries for detail with comments, got {len(query_ctx)}",
+        )
 
     def test_comment_create_triggers_notification_with_expected_payload_inputs(self):
         post = CommunityPost.objects.create(

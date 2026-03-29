@@ -36,6 +36,9 @@
                 </div>
                 <div id="communityCommentsEmpty" class="community-empty community-hidden">No comments yet. Start the conversation.</div>
                 <div id="communityCommentsList" class="community-comment-list"></div>
+                <div id="communityCommentsLoadMoreWrap" class="community-load-more-wrap community-hidden">
+                    <button id="communityCommentsLoadMore" type="button" class="community-ghost-btn">Load More Comments</button>
+                </div>
 
                 <form id="communityCommentForm" class="community-comment-form" data-community-comment-form="1">
                     {% csrf_token %}

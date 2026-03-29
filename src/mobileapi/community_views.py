@@ -33,6 +33,7 @@ from .push_notifications import send_post_comment_notification
 logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 20
+COMMENT_PAGE_SIZE = 20
 # New post = published within this many hours
 NEW_HOURS = 6
 # Trending = published within 24 h and score >= threshold
@@ -59,27 +60,41 @@ def _parse_bool(value):
     return str(value).strip().lower() in ('true', '1', 'yes', 'on')
 
 
-def _is_pro(user):
-    """Return True if the user has an active subscription."""
+def _parse_page(raw_value, default=1):
     try:
-        cc = ChatCredit.objects.get(user=user)
-        if not cc.is_subscribed:
-            return False
-        if cc.subscription_expiry and cc.subscription_expiry < datetime.now(tz=timezone.utc):
-            return False
-        return True
-    except ChatCredit.DoesNotExist:
-        return False
+        return max(1, int(raw_value))
+    except (TypeError, ValueError):
+        return default
 
 
-def _author_payload(user):
+def _build_pro_user_ids(user_ids, now=None):
+    if not user_ids:
+        return set()
+    if now is None:
+        now = datetime.now(tz=timezone.utc)
+    credits = ChatCredit.objects.filter(
+        user_id__in=user_ids,
+        is_subscribed=True,
+    ).values('user_id', 'subscription_expiry')
+    pro_ids = set()
+    for credit in credits:
+        expiry = credit['subscription_expiry']
+        if expiry is None or expiry >= now:
+            pro_ids.add(credit['user_id'])
+    return pro_ids
+
+
+def _author_payload(user, pro_user_ids=None):
     """Serialise the post/comment author into a dict."""
     if user is None:
         return {'id': None, 'username': '[deleted]', 'is_pro': False}
+    is_pro = False
+    if pro_user_ids is not None:
+        is_pro = user.pk in pro_user_ids
     return {
         'id': user.pk,
         'username': user.username,
-        'is_pro': _is_pro(user),
+        'is_pro': is_pro,
     }
 
 
@@ -87,7 +102,57 @@ def _post_published_at(post):
     return getattr(post, 'published_at', post.created_at)
 
 
-def _post_payload(post, user_vote=None, now=None, request_user=None):
+def _build_poll_payload_map(posts, request_user=None):
+    post_ids = [post.id for post in posts if getattr(post, 'id', None) is not None]
+    if not post_ids:
+        return {}
+
+    polls = list(
+        PostPoll.objects.filter(post_id__in=post_ids).values('id', 'post_id')
+    )
+    if not polls:
+        return {}
+
+    poll_ids = [poll['id'] for poll in polls]
+    counts_by_poll = {
+        row['poll_id']: row
+        for row in PollVote.objects.filter(poll_id__in=poll_ids)
+        .values('poll_id')
+        .annotate(
+            send_it_count=Count('id', filter=Q(choice='send_it')),
+            dont_send_it_count=Count('id', filter=Q(choice='dont_send_it')),
+        )
+    }
+
+    user_vote_by_poll = {}
+    if request_user and request_user.is_authenticated:
+        user_vote_by_poll = {
+            row['poll_id']: row['choice']
+            for row in PollVote.objects.filter(
+                poll_id__in=poll_ids, user=request_user
+            ).values('poll_id', 'choice')
+        }
+
+    payload_by_post_id = {}
+    for poll in polls:
+        poll_id = poll['id']
+        counts = counts_by_poll.get(poll_id) or {}
+        payload_by_post_id[poll['post_id']] = {
+            'send_it_count': counts.get('send_it_count', 0),
+            'dont_send_it_count': counts.get('dont_send_it_count', 0),
+            'user_vote': user_vote_by_poll.get(poll_id),
+        }
+    return payload_by_post_id
+
+
+def _post_payload(
+    post,
+    user_vote=None,
+    now=None,
+    request_user=None,
+    pro_user_ids=None,
+    poll_payload=None,
+):
     """Serialise a CommunityPost.
 
     `post` must have been annotated with `upvotes`, `downvotes`,
@@ -113,29 +178,10 @@ def _post_payload(post, user_vote=None, now=None, request_user=None):
     if is_anon and not is_own_post:
         author = {'id': None, 'username': 'Anonymous', 'is_pro': False}
     else:
-        author = _author_payload(post.author)
+        author = _author_payload(post.author, pro_user_ids=pro_user_ids)
         custom_author_name = (getattr(post, 'author_display_name', '') or '').strip()
         if custom_author_name:
             author['username'] = custom_author_name
-
-    # Poll data
-    poll_data = None
-    try:
-        poll = post.poll
-        send_it = poll.votes.filter(choice='send_it').count()
-        dont_send_it = poll.votes.filter(choice='dont_send_it').count()
-        user_poll_vote = None
-        if request_user and request_user.is_authenticated:
-            pv = poll.votes.filter(user=request_user).first()
-            if pv:
-                user_poll_vote = pv.choice
-        poll_data = {
-            'send_it_count': send_it,
-            'dont_send_it_count': dont_send_it,
-            'user_vote': user_poll_vote,
-        }
-    except PostPoll.DoesNotExist:
-        pass
 
     return {
         'id': post.id,
@@ -156,18 +202,16 @@ def _post_payload(post, user_vote=None, now=None, request_user=None):
         ),
         'is_new': hours_old <= NEW_HOURS,
         'user_vote': user_vote,
-        'poll': poll_data,
+        'poll': poll_payload,
         # Keep created_at for backward compatibility with clients.
         'created_at': published_at.isoformat(),
         'published_at': published_at.isoformat(),
     }
 
 
-def _comment_payload(comment, user_liked=False):
-    like_count = getattr(comment, 'like_count', None)
-    if like_count is None:
-        like_count = comment.likes.count()
-    author = _author_payload(comment.author)
+def _comment_payload(comment, user_liked=False, pro_user_ids=None):
+    like_count = getattr(comment, 'like_count', 0) or 0
+    author = _author_payload(comment.author, pro_user_ids=pro_user_ids)
     custom_author_name = (getattr(comment, 'author_display_name', '') or '').strip()
     if custom_author_name:
         author['username'] = custom_author_name
@@ -230,6 +274,29 @@ def _resolve_feed_sort(raw_sort):
     return 'hot'
 
 
+def _visible_posts_qs(request):
+    now = datetime.now(tz=timezone.utc)
+    qs = CommunityPost.objects.filter(is_deleted=False)
+    if not (request.user.is_authenticated and request.user.is_staff):
+        qs = qs.filter(published_at__lte=now)
+    return qs
+
+
+def _visible_post_qs(request, post_id):
+    return _visible_posts_qs(request).filter(pk=post_id)
+
+
+def _comments_qs_for_request(post_id, request_user):
+    comments_qs = CommunityComment.objects.filter(post_id=post_id, is_deleted=False)
+    if request_user.is_authenticated:
+        blocked_ids = set(
+            UserBlock.objects.filter(blocker=request_user).values_list('blocked_user_id', flat=True)
+        )
+        if blocked_ids:
+            comments_qs = comments_qs.exclude(author_id__in=blocked_ids)
+    return comments_qs
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -248,15 +315,10 @@ def community_post_list(request):
 def _list_posts(request):
     category = request.GET.get('category', '').strip()
     sort = _resolve_feed_sort(request.GET.get('sort'))
-    try:
-        page = max(1, int(request.GET.get('page', 1)))
-    except (ValueError, TypeError):
-        page = 1
+    page = _parse_page(request.GET.get('page', 1))
 
     now = datetime.now(tz=timezone.utc)
-    qs = CommunityPost.objects.filter(is_deleted=False)
-    if not (request.user.is_authenticated and request.user.is_staff):
-        qs = qs.filter(published_at__lte=now)
+    qs = _visible_posts_qs(request)
     if category:
         qs = qs.filter(category=category)
     # Exclude posts from blocked users
@@ -266,13 +328,19 @@ def _list_posts(request):
         )
         if blocked_ids:
             qs = qs.exclude(author_id__in=blocked_ids)
-    total_posts = qs.count()
+
     qs = _annotated_posts_qs(qs)
     ordered_qs = _ordered_posts_qs(qs, sort)
 
-    # Pagination
+    # Pagination using page-size+1 to avoid COUNT(*)
     start = (page - 1) * PAGE_SIZE
-    page_posts = list(ordered_qs[start: start + PAGE_SIZE])
+    page_posts = list(ordered_qs[start: start + PAGE_SIZE + 1])
+    has_more = len(page_posts) > PAGE_SIZE
+    page_posts = page_posts[:PAGE_SIZE]
+
+    author_ids = {p.author_id for p in page_posts if p.author_id}
+    pro_user_ids = _build_pro_user_ids(author_ids, now=now)
+    poll_payload_by_post = _build_poll_payload_map(page_posts, request_user=request.user)
 
     # Resolve user votes in one query
     user_votes = {}
@@ -284,11 +352,20 @@ def _list_posts(request):
         }
 
     return Response({
-        'posts': [_post_payload(p, user_votes.get(p.id), now, request_user=request.user) for p in page_posts],
+        'posts': [
+            _post_payload(
+                p,
+                user_votes.get(p.id),
+                now,
+                request_user=request.user,
+                pro_user_ids=pro_user_ids,
+                poll_payload=poll_payload_by_post.get(p.id),
+            )
+            for p in page_posts
+        ],
         'page': page,
         'sort': sort,
-        'has_more': total_posts > start + PAGE_SIZE,
-        'total': total_posts,
+        'has_more': has_more,
     })
 
 
@@ -372,17 +449,28 @@ def _create_post(request):
 
     # Return annotated post
     annotated = _annotated_posts_qs(CommunityPost.objects.filter(pk=post.pk)).first()
-    return Response(_post_payload(annotated, request_user=request.user), status=201)
+    now = datetime.now(tz=timezone.utc)
+    pro_user_ids = _build_pro_user_ids([annotated.author_id], now=now)
+    poll_payload_by_post = _build_poll_payload_map([annotated], request_user=request.user)
+    return Response(
+        _post_payload(
+            annotated,
+            request_user=request.user,
+            now=now,
+            pro_user_ids=pro_user_ids,
+            poll_payload=poll_payload_by_post.get(annotated.id),
+        ),
+        status=201,
+    )
 
 
 @api_view(['GET', 'DELETE'])
 @permission_classes([AllowAny])
 def community_post_detail(request, post_id):
-    qs = CommunityPost.objects.filter(pk=post_id, is_deleted=False)
-    if request.method == 'GET' and not (
-        request.user.is_authenticated and request.user.is_staff
-    ):
-        qs = qs.filter(published_at__lte=datetime.now(tz=timezone.utc))
+    if request.method == 'GET':
+        qs = _visible_post_qs(request, post_id)
+    else:
+        qs = CommunityPost.objects.filter(pk=post_id, is_deleted=False)
 
     post = _annotated_posts_qs(qs).select_related('author').first()
 
@@ -401,39 +489,50 @@ def community_post_detail(request, post_id):
     # GET — post detail + comments
     user_vote = None
     if request.user.is_authenticated:
-        try:
-            pv = PostVote.objects.get(user=request.user, post_id=post_id)
-            user_vote = pv.vote_type
-        except PostVote.DoesNotExist:
-            pass
+        user_vote = (
+            PostVote.objects.filter(user=request.user, post_id=post_id)
+            .values_list('vote_type', flat=True)
+            .first()
+        )
+
+    include_comments_raw = request.GET.get('include_comments')
+    include_comments = True if include_comments_raw is None else _parse_bool(include_comments_raw)
+
+    comments = []
+    liked_ids = set()
+    if include_comments:
+        comments = list(
+            _comments_qs_for_request(post_id, request.user)
+            .select_related('author')
+            .annotate(like_count=Count('likes'))
+            .order_by('created_at', 'id')
+        )
+        if request.user.is_authenticated and comments:
+            liked_ids = set(
+                CommentLike.objects.filter(
+                    user=request.user, comment_id__in=[c.id for c in comments]
+                ).values_list('comment_id', flat=True)
+            )
 
     now = datetime.now(tz=timezone.utc)
-    payload = _post_payload(post, user_vote, now, request_user=request.user)
-    payload['body'] = post.body or ''  # include full body in detail
+    author_ids = {post.author_id}
+    author_ids.update(c.author_id for c in comments if c.author_id)
+    pro_user_ids = _build_pro_user_ids(author_ids, now=now)
+    poll_payload_by_post = _build_poll_payload_map([post], request_user=request.user)
 
-    # Comments (exclude blocked users)
-    comments_qs = CommunityComment.objects.filter(post_id=post_id, is_deleted=False)
-    if request.user.is_authenticated:
-        blocked_ids = set(
-            UserBlock.objects.filter(blocker=request.user).values_list('blocked_user_id', flat=True)
-        )
-        if blocked_ids:
-            comments_qs = comments_qs.exclude(author_id__in=blocked_ids)
-    comments = list(
-        comments_qs.select_related('author')
-        .annotate(like_count=Count('likes'))
+    payload = _post_payload(
+        post,
+        user_vote,
+        now,
+        request_user=request.user,
+        pro_user_ids=pro_user_ids,
+        poll_payload=poll_payload_by_post.get(post.id),
     )
-    liked_ids = set()
-    if request.user.is_authenticated and comments:
-        liked_ids = set(
-            CommentLike.objects.filter(
-                user=request.user, comment_id__in=[c.id for c in comments]
-            ).values_list('comment_id', flat=True)
-        )
-
+    payload['body'] = post.body or ''  # include full body in detail
     payload['comments'] = [
-        _comment_payload(c, user_liked=(c.id in liked_ids)) for c in comments
-    ]
+        _comment_payload(c, user_liked=(c.id in liked_ids), pro_user_ids=pro_user_ids)
+        for c in comments
+    ] if include_comments else []
     return Response(payload)
 
 
@@ -482,10 +581,58 @@ def community_post_vote(request, post_id):
     })
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@ratelimit(key='user_or_ip', rate=_rate('COMMUNITY_RATELIMIT_COMMENT_CREATE'), block=True)
+def _list_post_comments(request, post_id):
+    if not _visible_post_qs(request, post_id).exists():
+        return Response({'error': 'Post not found.'}, status=404)
+
+    page = _parse_page(request.GET.get('page', 1))
+    start = (page - 1) * COMMENT_PAGE_SIZE
+    comments = list(
+        _comments_qs_for_request(post_id, request.user)
+        .select_related('author')
+        .annotate(like_count=Count('likes'))
+        .order_by('created_at', 'id')[start: start + COMMENT_PAGE_SIZE + 1]
+    )
+    has_more = len(comments) > COMMENT_PAGE_SIZE
+    comments = comments[:COMMENT_PAGE_SIZE]
+
+    liked_ids = set()
+    if request.user.is_authenticated and comments:
+        liked_ids = set(
+            CommentLike.objects.filter(
+                user=request.user, comment_id__in=[c.id for c in comments]
+            ).values_list('comment_id', flat=True)
+        )
+
+    author_ids = {comment.author_id for comment in comments if comment.author_id}
+    pro_user_ids = _build_pro_user_ids(author_ids)
+
+    return Response({
+        'comments': [
+            _comment_payload(
+                comment,
+                user_liked=(comment.id in liked_ids),
+                pro_user_ids=pro_user_ids,
+            )
+            for comment in comments
+        ],
+        'page': page,
+        'has_more': has_more,
+    })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
 def community_post_comment(request, post_id):
+    if request.method == 'GET':
+        return _list_post_comments(request, post_id)
+    if not request.user.is_authenticated:
+        return Response({'error': 'Authentication required.'}, status=401)
+    return _create_comment(request, post_id)
+
+
+@ratelimit(key='user_or_ip', rate=_rate('COMMUNITY_RATELIMIT_COMMENT_CREATE'), block=True)
+def _create_comment(request, post_id):
     body = (request.data.get('body') or '').strip()
     if not body:
         return Response({'error': 'body is required.'}, status=400)
@@ -508,7 +655,9 @@ def community_post_comment(request, post_id):
             comment_id=comment.id,
         )
     )
-    return Response(_comment_payload(comment), status=201)
+    now = datetime.now(tz=timezone.utc)
+    pro_user_ids = _build_pro_user_ids([comment.author_id], now=now)
+    return Response(_comment_payload(comment, pro_user_ids=pro_user_ids), status=201)
 
 
 @api_view(['DELETE'])
@@ -710,4 +859,3 @@ def community_poll_vote(request, post_id):
         'dont_send_it_count': dont_send_it,
         'user_vote': user_vote,
     })
-

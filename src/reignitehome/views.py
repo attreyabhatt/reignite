@@ -286,21 +286,18 @@ def home(request):
 @require_http_methods(["GET"])
 def community_home(request):
     canonical_url = request.build_absolute_uri(reverse("community_home"))
-    context = _build_guest_chat_context(request)
-    context.update(
-        {
-            "meta_description": (
-                "Explore dating advice, profile reviews, and real-texting wins from the TryAgainText community."
-            ),
-            "canonical_url": canonical_url,
-            "og_title": "Community | TryAgainText",
-            "og_description": (
-                "Read and share real dating chat strategies with the TryAgainText community."
-            ),
-            "og_url": canonical_url,
-            "community_login_url": reverse("account_login"),
-        }
-    )
+    context = {
+        "meta_description": (
+            "Explore dating advice, profile reviews, and real-texting wins from the TryAgainText community."
+        ),
+        "canonical_url": canonical_url,
+        "og_title": "Community | TryAgainText",
+        "og_description": (
+            "Read and share real dating chat strategies with the TryAgainText community."
+        ),
+        "og_url": canonical_url,
+        "community_login_url": reverse("account_login"),
+    }
     return render(request, "community/feed.html", context)
 
 
@@ -309,22 +306,19 @@ def community_post_page(request, post_id):
     canonical_url = request.build_absolute_uri(
         reverse("community_post_page", kwargs={"post_id": post_id})
     )
-    context = _build_guest_chat_context(request)
-    context.update(
-        {
-            "post_id": post_id,
-            "meta_description": (
-                "Community post discussion on TryAgainText, including votes, comments, and live feedback."
-            ),
-            "canonical_url": canonical_url,
-            "og_title": "Community Post | TryAgainText",
-            "og_description": (
-                "Join the conversation with comments, votes, and practical dating advice from the community."
-            ),
-            "og_url": canonical_url,
-            "community_login_url": reverse("account_login"),
-        }
-    )
+    context = {
+        "post_id": post_id,
+        "meta_description": (
+            "Community post discussion on TryAgainText, including votes, comments, and live feedback."
+        ),
+        "canonical_url": canonical_url,
+        "og_title": "Community Post | TryAgainText",
+        "og_description": (
+            "Join the conversation with comments, votes, and practical dating advice from the community."
+        ),
+        "og_url": canonical_url,
+        "community_login_url": reverse("account_login"),
+    }
     return render(request, "community/post_detail.html", context)
 
 

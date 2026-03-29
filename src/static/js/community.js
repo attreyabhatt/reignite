@@ -536,10 +536,28 @@
             list: root.querySelector('#communityCommentsList'),
             empty: root.querySelector('#communityCommentsEmpty'),
             count: root.querySelector('#communityCommentsCount'),
+            loadWrap: root.querySelector('#communityCommentsLoadMoreWrap'),
+            loadBtn: root.querySelector('#communityCommentsLoadMore'),
             form: root.querySelector('#communityCommentForm'),
             commentBody: root.querySelector('#communityCommentBody'),
             commentSubmit: root.querySelector('#communityCommentSubmit'),
+            commentsPage: 0,
+            commentsHasMore: false,
+            commentsBusy: false,
         };
+
+        function mergeComments(existing, incoming) {
+            const byId = new Map();
+            (existing || []).forEach((comment) => {
+                if (!comment || !comment.id) return;
+                byId.set(comment.id, comment);
+            });
+            (incoming || []).forEach((comment) => {
+                if (!comment || !comment.id) return;
+                byId.set(comment.id, comment);
+            });
+            return Array.from(byId.values());
+        }
 
         function render() {
             if (!state.post) return;
@@ -547,9 +565,11 @@
             state.postEl.classList.remove('community-hidden');
             state.panel.classList.remove('community-hidden');
             const comments = state.post.comments || [];
-            state.count.textContent = String(comments.length);
-            state.empty.classList.toggle('community-hidden', comments.length > 0);
+            const totalComments = Number(state.post.comment_count || 0);
+            state.count.textContent = String(totalComments);
+            state.empty.classList.toggle('community-hidden', totalComments > 0);
             state.list.innerHTML = comments.map((comment) => commentHtml(comment, state.post, state.currentUsername, state.currentUserId)).join('');
+            state.loadWrap?.classList.toggle('community-hidden', !state.commentsHasMore);
         }
 
         function setError(message) {
@@ -557,23 +577,60 @@
             state.error.classList.remove('community-hidden');
         }
 
+        function updatePost(updater) {
+            if (!state.post) return;
+            state.post = updater(state.post);
+            render();
+        }
+
+        async function fetchComments(refresh) {
+            if (!state.post || state.commentsBusy) return;
+            state.commentsBusy = true;
+            if (state.loadBtn) {
+                state.loadBtn.disabled = true;
+                state.loadBtn.textContent = 'Loading...';
+            }
+
+            const nextPage = refresh ? 1 : state.commentsPage + 1;
+            const params = new URLSearchParams({ page: String(nextPage) });
+            try {
+                const { data, unauthorized } = await apiRequest(root, `${state.postsBaseUrl}${state.post.id}/comments/?${params.toString()}`);
+                if (unauthorized) return;
+                const incoming = Array.isArray(data.comments) ? data.comments : [];
+                state.commentsPage = Number(data.page || nextPage);
+                state.commentsHasMore = Boolean(data.has_more);
+                updatePost((post) => {
+                    const existing = refresh ? [] : (post.comments || []);
+                    const comments = mergeComments(existing, incoming);
+                    return { ...post, comments };
+                });
+            } catch (error) {
+                showToast(error.message || 'Could not load comments.', true);
+            } finally {
+                state.commentsBusy = false;
+                if (state.loadBtn) {
+                    state.loadBtn.disabled = false;
+                    state.loadBtn.textContent = 'Load More Comments';
+                }
+            }
+        }
+
         async function loadPost() {
             if (!state.postId) return setError('Invalid post id.');
             try {
-                const { data } = await apiRequest(root, `${state.postsBaseUrl}${state.postId}/`);
-                state.post = data;
+                const { data } = await apiRequest(root, `${state.postsBaseUrl}${state.postId}/?include_comments=0`);
+                state.post = { ...data, comments: [] };
+                state.commentsPage = 0;
+                state.commentsHasMore = Number(data.comment_count || 0) > 0;
                 render();
+                if (state.commentsHasMore) {
+                    await fetchComments(true);
+                }
             } catch (error) {
                 setError(error.message || 'Could not load this post.');
             } finally {
                 state.loading.classList.add('community-hidden');
             }
-        }
-
-        function updatePost(updater) {
-            if (!state.post) return;
-            state.post = updater(state.post);
-            render();
         }
 
         async function votePost(voteType) {
@@ -624,7 +681,9 @@
                 }
                 updatePost((post) => {
                     const comments = (post.comments || []).filter((comment) => Number(comment.author?.id || 0) !== userId);
-                    return { ...post, comments, comment_count: comments.length };
+                    const removed = (post.comments || []).length - comments.length;
+                    const nextCount = Math.max(0, Number(post.comment_count || 0) - Math.max(0, removed));
+                    return { ...post, comments, comment_count: nextCount };
                 });
                 showToast('User blocked.');
             } else {
@@ -652,8 +711,11 @@
             const { unauthorized } = await apiRequest(root, `/api/community/comments/${commentId}/delete/`, { method: 'DELETE' });
             if (unauthorized) return;
             updatePost((post) => {
-                const comments = (post.comments || []).filter((comment) => comment.id !== commentId);
-                return { ...post, comments, comment_count: comments.length };
+                const before = post.comments || [];
+                const comments = before.filter((comment) => comment.id !== commentId);
+                const removed = before.length - comments.length;
+                const nextCount = Math.max(0, Number(post.comment_count || 0) - Math.max(0, removed));
+                return { ...post, comments, comment_count: nextCount };
             });
             showToast('Comment deleted.');
         }
@@ -669,6 +731,8 @@
                 });
             });
         }
+
+        state.loadBtn?.addEventListener('click', () => fetchComments(false));
 
         state.postEl.addEventListener('click', async (event) => {
             const button = event.target.closest('button');
@@ -737,7 +801,11 @@
                 if (unauthorized) return;
                 updatePost((post) => {
                     const comments = [...(post.comments || []), data];
-                    return { ...post, comments, comment_count: comments.length };
+                    return {
+                        ...post,
+                        comments,
+                        comment_count: Number(post.comment_count || 0) + 1,
+                    };
                 });
                 state.commentBody.value = '';
             } catch (error) {
@@ -890,4 +958,3 @@
 
     document.addEventListener('DOMContentLoaded', initialize);
 })();
-
