@@ -1,10 +1,18 @@
 from django.core.management.base import BaseCommand
 
 from seoapp.models import PickupCategory, PickupTopic
-from seoapp.seed_data import literature, zodiac, mbti, enneagram, hobbies, professions, dog_breeds, fandoms, music_genres
+from seoapp.seed_data import (
+    literature, zodiac, mbti, enneagram, hobbies, professions, dog_breeds, fandoms, music_genres,
+    attachment_styles, love_languages, astrology_placements, book_genres, gaming_niches, wellness,
+    relationship_archetypes, us_cities
+)
 
 
-SEED_MODULES = [literature, zodiac, mbti, enneagram, hobbies, professions, dog_breeds, fandoms, music_genres]
+SEED_MODULES = [
+    literature, zodiac, mbti, enneagram, hobbies, professions, dog_breeds, fandoms, music_genres,
+    attachment_styles, love_languages, astrology_placements, book_genres, gaming_niches, wellness,
+    relationship_archetypes, us_cities
+]
 
 
 class Command(BaseCommand):
