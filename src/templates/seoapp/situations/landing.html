@@ -100,8 +100,8 @@
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   "itemListElement": [
-    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ request.build_absolute_uri '/' }}"},
-    {"@type": "ListItem", "position": 2, "name": "Texting Guides", "item": "{{ request.build_absolute_uri '/situations/' }}"},
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ request.scheme }}://{{ request.get_host }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Texting Guides", "item": "{{ request.scheme }}://{{ request.get_host }}/situations/"},
     {"@type": "ListItem", "position": 3, "name": "{{ situation_page.h1 }}"}
   ]
 }
