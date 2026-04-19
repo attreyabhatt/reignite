@@ -349,6 +349,8 @@ def sitemap_xml(request):
     absolute_urls = [
         request.build_absolute_uri(reverse("home")),
         request.build_absolute_uri(reverse("situation_index")),
+        request.build_absolute_uri(reverse("pickup_lines_index")),
+        request.build_absolute_uri(reverse("glossary")),
         request.build_absolute_uri(reverse("pricing:pricing")),
         request.build_absolute_uri(reverse("privacy_policy")),
         request.build_absolute_uri(reverse("terms_and_conditions")),

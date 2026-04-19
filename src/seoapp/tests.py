@@ -308,7 +308,7 @@ class SituationSeoPagesTests(TestCase):
         )
 
     def test_pickup_topics_expand_to_expected_count(self):
-        self.assertGreaterEqual(len(_list_pickup_topics()), 288)
+        self.assertGreaterEqual(len(_list_pickup_topics()), 296)
 
     def test_pickup_index_contains_links_for_all_categories(self):
         response = self.client.get(reverse("pickup_lines_index"))

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block head_title %}Dating Terms Glossary | TryAgainText{% endblock head_title %}
+{% block meta_description %}{{ meta_description }}{% endblock meta_description %}
+{% block canonical_url %}{{ canonical_url }}{% endblock canonical_url %}
+{% block og_title %}Dating Terms Glossary | TryAgainText{% endblock og_title %}
+{% block og_description %}{{ og_description }}{% endblock og_description %}
+{% block og_url %}{{ canonical_url }}{% endblock og_url %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/pickup_playground.css' %}">
+<style>
+    .glossary-hero {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .glossary-hero h1 {
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.2;
+        margin-bottom: 0.75rem;
+    }
+
+    .glossary-hero p {
+        color: var(--matte-muted);
+        max-width: 42rem;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.65;
+    }
+
+    .glossary-section {
+        margin-bottom: 2.5rem;
+    }
+
+    .glossary-section-letter {
+        font-size: 1.6rem;
+        font-weight: bold;
+        margin-bottom: 1.2rem;
+        color: var(--matte-text);
+    }
+
+    .glossary-term {
+        margin-bottom: 1.8rem;
+        padding: 1.2rem;
+        background: rgba(255, 45, 109, 0.04);
+        border-left: 3px solid #FF2D6D;
+        border-radius: 6px;
+    }
+
+    .glossary-term-heading {
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: var(--matte-text);
+        margin-bottom: 0.5rem;
+    }
+
+    .glossary-term-definition {
+        color: var(--matte-muted);
+        line-height: 1.7;
+        font-size: 1rem;
+    }
+
+    .glossary-related-link {
+        display: inline-block;
+        margin-top: 0.5rem;
+        padding: 0.4rem 0.8rem;
+        background: rgba(212, 175, 55, 0.1);
+        border: 1px solid rgba(212, 175, 55, 0.3);
+        border-radius: 4px;
+        color: #D4AF37;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .glossary-related-link:hover {
+        background: rgba(212, 175, 55, 0.2);
+        border-color: rgba(212, 175, 55, 0.5);
+    }
+
+    @media (max-width: 768px) {
+        .glossary-hero h1 {
+            font-size: 1.75rem;
+        }
+
+        .glossary-term {
+            padding: 1rem;
+        }
+    }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for letter, terms in glossary_terms.items %}
+      {% for term in terms %}
+    {"@type": "Question", "name": "{{ term.term }}", "acceptedAnswer": {"@type": "Answer", "text": "{{ term.definition }}"}}{% if not forloop.last %},{% else %}{% if not forloop.parentloop.last %},{% endif %}{% endif %}
+      {% endfor %}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="matte-shell py-12 sm:py-14">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+        <div class="glossary-hero">
+            <h1 class="matte-headline font-bold">Dating Glossary: What Every Term Actually Means</h1>
+            <p>Learn the language of modern dating. From breadcrumbing to situationships, here's what all those terms mean—and how to handle them.</p>
+        </div>
+
+        <div class="glossary-content">
+            {% for letter, terms in glossary_terms.items %}
+            <section class="glossary-section">
+                <h2 class="glossary-section-letter">{{ letter }}</h2>
+                {% for term in terms %}
+                <article class="glossary-term">
+                    <div class="glossary-term-heading">{{ term.term }}</div>
+                    <p class="glossary-term-definition">{{ term.definition }}</p>
+                    {% if term.related_situation_slug %}
+                    <a href="{% url 'situation_landing' term.related_situation_slug %}" class="glossary-related-link">
+                        See Related Guide →
+                    </a>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </section>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

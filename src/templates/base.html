@@ -12,6 +12,13 @@
     <meta property="og:title" content="{% block og_title %}{% firstof og_title 'TryAgainText' %}{% endblock og_title %}">
     <meta property="og:description" content="{% block og_description %}{% firstof og_description 'Generate send-ready dating app replies with AI, tailored to your real conversation context.' %}{% endblock og_description %}">
     <meta property="og:url" content="{% block og_url %}{% firstof og_url canonical_url request.build_absolute_uri %}{% endblock og_url %}">
+    <meta property="og:image" content="{% block og_image %}https://tryagaintext.com/static/img/og-default.png{% endblock og_image %}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% firstof og_title 'TryAgainText' %}">
+    <meta name="twitter:description" content="{% firstof og_description 'Generate send-ready dating app replies with AI, tailored to your real conversation context.' %}">
+    <meta name="twitter:image" content="{% block twitter_image %}https://tryagaintext.com/static/img/og-default.png{% endblock twitter_image %}">
 
     <link rel="icon" href="{% static 'images/favicon.svg' %}" type="image/svg+xml">
     <link rel="alternate icon" href="{% static 'images/favicon.ico' %}" type="image/x-icon">

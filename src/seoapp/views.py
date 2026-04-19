@@ -9,6 +9,7 @@ from reignitehome.utils.ip_check import get_client_ip
 from django.db.models import Count, Q
 
 from seoapp.models import PickupCategory, PickupTopic
+from seoapp.glossary_terms import GLOSSARY_BY_ALPHA
 from seoapp.situation_pages import (
     get_situation_page,
     list_related_pages,
@@ -273,3 +274,16 @@ def pickup_line_detail(request, category_slug, topic_slug):
         }
     )
     return render(request, "seoapp/pickup_lines/detail.html", context)
+
+@require_http_methods(["GET"])
+def glossary_view(request):
+    canonical_url = request.build_absolute_uri()
+    context = {
+        "meta_description": "Straight definitions for every modern dating term — breadcrumbing, love bombing, situationship, orbiting, and more.",
+        "og_title": "Dating Terms Glossary | TryAgainText",
+        "og_description": "What does breadcrumbing mean? Orbiting? Situationship? Learn every dating term you need to know.",
+        "og_url": canonical_url,
+        "canonical_url": canonical_url,
+        "glossary_terms": GLOSSARY_BY_ALPHA,
+    }
+    return render(request, "seoapp/glossary.html", context)

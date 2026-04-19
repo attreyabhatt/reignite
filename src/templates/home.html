@@ -416,6 +416,23 @@
     }
 </style>
 <link rel="stylesheet" href="{% static 'css/pickup_playground.css' %}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "TryAgainText",
+  "url": "https://tryagaintext.com/",
+  "description": "Generate send-ready dating app replies with AI, tailored to your real conversation context.",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": {
+      "@type": "EntryPoint",
+      "urlTemplate": "https://tryagaintext.com/situations/{search_term_string}/"
+    },
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
 {% endblock extra_head %}
 
 {% block content %}

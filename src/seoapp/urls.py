@@ -1,6 +1,7 @@
 ﻿from django.urls import path
 
 from seoapp.views import (
+    glossary_view,
     pickup_category_detail,
     pickup_line_detail,
     pickup_lines_index,
@@ -23,4 +24,5 @@ urlpatterns = [
     ),
     path('situations/', situation_index, name='situation_index'),
     path('situations/<slug:slug>/', situation_landing, name='situation_landing'),
+    path('glossary/', glossary_view, name='glossary'),
 ]
