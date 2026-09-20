@@ -21,11 +21,9 @@
             <div class="hidden md:flex flex-1 items-center justify-center gap-3">
                 {% if user.is_authenticated %}
                 <a href="{% url 'conversation_home' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Conversations</a>
-                <a href="{% url 'community_home' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Community</a>
                 <a href="{% url 'pricing:pricing' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Pricing</a>
                 {% else %}
                 <a href="/#why-it-works" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">How it Works</a>
-                <a href="{% url 'community_home' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Community</a>
                 <a href="{% url 'pricing:pricing' %}" class="px-2 py-2 text-sm font-medium text-[#B5BED4] hover:text-[#F4F2EE] transition-colors no-underline">Pricing</a>
                 {% endif %}
             </div>
@@ -70,7 +68,6 @@
             <div class="flex flex-col gap-1 pt-3">
                 {% if user.is_authenticated %}
                 <a href="{% url 'conversation_home' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Conversations</a>
-                <a href="{% url 'community_home' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Community</a>
                 <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Pricing</a>
                 <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 no-underline">
                     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-[#3A3F4A] bg-[#16181F] text-[#F4F2EE]">
@@ -82,7 +79,6 @@
                 <a href="{% url 'account_logout' %}" class="px-3 py-2 text-sm text-brand-primary no-underline">Logout</a>
                 {% else %}
                 <a href="/#why-it-works" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">How it Works</a>
-                <a href="{% url 'community_home' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Community</a>
                 <a href="{% url 'pricing:pricing' %}" class="px-3 py-2 text-sm font-medium text-brand-muted hover:text-brand-text no-underline">Pricing</a>
                 <a href="{% url 'account_login' %}" class="mx-3 mt-2 px-5 py-2 text-sm font-semibold rounded-[10px] bg-[#FF2D6D] border border-[#FF2D6D] text-[#F4F2EE] text-center no-underline">
                     Login / Signup
