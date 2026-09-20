@@ -345,11 +345,15 @@
         }
     </style>
 
+    {% if android_app_promo %}
+    <link rel="stylesheet" href="{% static 'css/android_app_promo.css' %}">
+    <script src="{% static 'js/android_app_promo.js' %}" defer></script>
+    {% endif %}
     {% block extra_head %}
     {% endblock extra_head %}
 </head>
 
-<body class="flex flex-col min-h-screen bg-brand-bg text-brand-text font-body">
+<body class="flex flex-col min-h-screen bg-brand-bg text-brand-text font-body"{% if android_app_promo %} data-app-promo-page="{{ android_app_promo.page_group }}"{% endif %}>
     {% include "navbar.html" %}
     <main class="flex-grow pt-0 bg-brand-bg">
         {% block content %}
@@ -358,6 +362,10 @@
             {% include "footer.html" %}
         </footer>
     </main>
+
+    {% if android_app_promo %}
+    {% include "partials/android_app_bar.html" %}
+    {% endif %}
 
     <script>
         // Copy suggestion analytics

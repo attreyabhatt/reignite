@@ -448,13 +448,10 @@
                         Upload a screenshot of any conversation and our AI will generate 3 clever, personality-driven replies instantly.
                     </p>
                     <div class="home-hero-actions">
-                        <a href="#try" class="matte-btn-primary home-hero-btn no-underline">Try the Web App</a>
-                        <a href="/flirtfix?utm_source=website&utm_medium=home_cta&utm_campaign=flirtfix_web_home"
-                           class="matte-btn-secondary home-hero-btn no-underline"
-                           title="Download FlirtFix for Android on Google Play">
-                            Get the Android App
-                        </a>
+                        {% include "partials/android_app_link.html" with placement="hero" extra_class="home-hero-btn" %}
+                        <a href="#try" class="matte-btn-secondary home-hero-btn no-underline">Try the Web App</a>
                     </div>
+                    <p class="android-app-hero-note">FlirtFix is our Android app. Get it on Google Play and take the next reply with you.</p>
                 </div>
                 <div class="home-phone-column">
                     <div class="home-phone-glow"></div>
@@ -480,6 +477,9 @@
             </div>
             <div class="pickup-tool-shell home-playground-shell">
                 {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
+            </div>
+            <div class="mt-8">
+                {% include "partials/android_app_card.html" %}
             </div>
         </div>
     </section>

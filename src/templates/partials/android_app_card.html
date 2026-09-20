@@ -1,0 +1,17 @@
+{% if android_app_promo %}
+<aside class="android-app-card" aria-label="FlirtFix for Android">
+    <div class="android-app-card-copy">
+        <p class="android-app-eyebrow"><i class="fa-brands fa-android" aria-hidden="true"></i> FlirtFix &middot; Our Android app</p>
+        <h2>{{ android_app_promo.title }}</h2>
+        <p class="android-app-description">{{ android_app_promo.description }}</p>
+        <ul class="android-app-features" aria-label="App features">
+            <li><i class="fa-solid fa-camera" aria-hidden="true"></i> Screenshot replies</li>
+            <li><i class="fa-regular fa-comment-dots" aria-hidden="true"></i> Personalized openers</li>
+        </ul>
+    </div>
+    <div class="android-app-card-action">
+        {% include "partials/android_app_link.html" with placement="inline_card" %}
+        <p>Available on Google Play</p>
+    </div>
+</aside>
+{% endif %}

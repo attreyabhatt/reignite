@@ -126,6 +126,8 @@
             </p>
         </section>
 
+        {% include "partials/android_app_card.html" %}
+
         <section class="pickup-index-grid">
             {% for cat in categories %}
             <a href="{% url 'pickup_category_detail' cat.slug %}" class="pickup-topic-card">

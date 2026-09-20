@@ -192,6 +192,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'reignitehome.context_processors.web_marketing_limits',
+                'reignitehome.context_processors.android_app_promotion',
             ],
         },
     },
