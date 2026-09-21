@@ -1,0 +1,25 @@
+{% if featured_topics %}
+<section class="guide-discovery" aria-label="Featured pickup guides">
+    <h2>{{ discovery_heading|default:"Find an opener that fits your match" }}</h2>
+    <div class="guide-link-grid">
+        {% for topic in featured_topics %}
+        <a href="{% url 'pickup_line_detail' topic.category_slug topic.topic_slug %}">
+            <span>{{ topic.category_name }}</span>
+            <strong>{{ topic.keyword }}</strong>
+            <span>Read the guide &rarr;</span>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% if next_step_guides %}
+<section class="guide-discovery" aria-label="Next steps for your conversation">
+    <h2>They replied. What comes next?</h2>
+    <p>Follow the guide that fits the next moment in your conversation.</p>
+    <div class="guide-link-grid">
+        {% for page in next_step_guides %}
+        <a href="{% url 'situation_landing' page.slug %}"><strong>{{ page.sidebar_label }}</strong><span>{{ page.meta_description }}</span></a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}

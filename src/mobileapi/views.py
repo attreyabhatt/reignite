@@ -239,9 +239,7 @@ def _persist_mobile_generation_event(
     try:
         user_type = _resolve_mobile_user_type(request, chat_credit=chat_credit)
         user = request.user if request.user.is_authenticated else None
-        guest_hash = ""
-        if not user:
-            guest_hash = _get_guest_hash_for_mobile_analytics(request)
+        guest_hash = _get_guest_hash_for_mobile_analytics(request)
 
         usage = _normalize_usage_payload(usage)
         event = MobileGenerationEvent.objects.create(
@@ -285,9 +283,7 @@ def _persist_mobile_copy_event(
     try:
         user_type = _resolve_mobile_user_type(request, chat_credit=chat_credit)
         user = request.user if request.user.is_authenticated else None
-        guest_hash = ""
-        if not user:
-            guest_hash = _get_guest_hash_for_mobile_analytics(request)
+        guest_hash = _get_guest_hash_for_mobile_analytics(request)
 
         event = MobileCopyEvent.objects.create(
             user=user,
@@ -3791,12 +3787,8 @@ def install_attribution(request):
         if ffclid is not None:
             click_event = MarketingClickEvent.objects.filter(click_id=ffclid).first()
 
-        if request.user.is_authenticated:
-            user = request.user
-            guest_hash = ""
-        else:
-            user = None
-            guest_hash = _get_guest_hash_for_mobile_analytics(request)
+        user = request.user if request.user.is_authenticated else None
+        guest_hash = _get_guest_hash_for_mobile_analytics(request)
 
         actor_key = _install_attribution_actor_key(request, guest_hash)
         idempotency_key = _build_install_idempotency_key(

@@ -18,9 +18,11 @@ from conversation.models import GuestWebConversationAttempt, WebAppConfig
 from conversation.utils.web_guest_logging import log_guest_web_attempt
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
+from reignitehome.seo import public_url
 from reignitehome.utils.ip_check import get_client_ip
 from seoapp.models import PickupCategory, PickupTopic
 from seoapp.situation_pages import SITUATION_PAGE_ORDER
+from seoapp.discovery import featured_topics, next_step_guides
 
 # Whitelists (match your <select> values in home.html)
 PLATFORM_ALLOWED = {
@@ -280,6 +282,8 @@ def home(request):
 
     if request.user.is_authenticated:
         return redirect('conversation_home')
+    context["featured_topics"] = featured_topics()
+    context["next_step_guides"] = next_step_guides()
     return render(request, 'home.html',context)
 
 
@@ -347,36 +351,36 @@ def community_create(request):
 @require_http_methods(["GET"])
 def sitemap_xml(request):
     absolute_urls = [
-        request.build_absolute_uri(reverse("home")),
-        request.build_absolute_uri(reverse("situation_index")),
-        request.build_absolute_uri(reverse("pickup_lines_index")),
-        request.build_absolute_uri(reverse("glossary")),
-        request.build_absolute_uri(reverse("pricing:pricing")),
-        request.build_absolute_uri(reverse("privacy_policy")),
-        request.build_absolute_uri(reverse("terms_and_conditions")),
-        request.build_absolute_uri(reverse("refund_policy")),
-        request.build_absolute_uri(reverse("contact")),
-        request.build_absolute_uri(reverse("safety_standards")),
-        request.build_absolute_uri(reverse("screenclean_privacy_policy")),
+        public_url(reverse("home")),
+        public_url(reverse("situation_index")),
+        public_url(reverse("pickup_lines_index")),
+        public_url(reverse("glossary")),
+        public_url(reverse("pricing:pricing")),
+        public_url(reverse("privacy_policy")),
+        public_url(reverse("terms_and_conditions")),
+        public_url(reverse("refund_policy")),
+        public_url(reverse("contact")),
+        public_url(reverse("safety_standards")),
+        public_url(reverse("screenclean_privacy_policy")),
     ]
 
     for slug in SITUATION_PAGE_ORDER:
         absolute_urls.append(
-            request.build_absolute_uri(
+            public_url(
                 reverse("situation_landing", kwargs={"slug": slug})
             )
         )
 
     for cat in PickupCategory.objects.order_by("sort_order"):
         absolute_urls.append(
-            request.build_absolute_uri(
+            public_url(
                 reverse("pickup_category_detail", kwargs={"category_slug": cat.slug})
             )
         )
 
     for topic in PickupTopic.objects.filter(is_active=True).select_related("category"):
         absolute_urls.append(
-            request.build_absolute_uri(
+            public_url(
                 reverse(
                     "pickup_line_detail",
                     kwargs={

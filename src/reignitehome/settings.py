@@ -26,6 +26,7 @@ SECRET_KEY = config("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DJANGO_DEBUG",cast=bool, default=False)
+PUBLIC_SITE_URL = "https://www.tryagaintext.com"
 
 # Behind DO App Platform / proxies
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -164,6 +165,7 @@ REST_FRAMEWORK = {
 
 
 MIDDLEWARE = [
+    'reignitehome.middleware.PublicCanonicalHostMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -193,6 +195,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'reignitehome.context_processors.web_marketing_limits',
                 'reignitehome.context_processors.android_app_promotion',
+                'reignitehome.context_processors.public_site_metadata',
             ],
         },
     },

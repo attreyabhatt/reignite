@@ -1,13 +1,20 @@
+import re
 from urllib.parse import urlencode
 
 from django.db.utils import OperationalError, ProgrammingError
 from django.urls import reverse
 
 from conversation.models import WebAppConfig
+from reignitehome.seo import public_url
 
 
 DEFAULT_WEB_GUEST_REPLY_LIMIT = 5
 DEFAULT_WEB_SIGNUP_BONUS_CREDITS = 3
+
+
+def public_site_metadata(request):
+    return {"public_site_url": public_url("/").rstrip("/"),
+            "canonical_url": public_url(request.path)}
 
 
 def android_app_promotion(request):
@@ -41,17 +48,30 @@ def android_app_promotion(request):
         "Meet FlirtFix, the Android app from TryAgainText. Turn profile and chat "
         "screenshots into personalized openers and replies, right on your phone.",
     ))
-    query = urlencode({
+    attribution = {
         "utm_source": "website",
         "utm_medium": "home_cta" if page_group == "home" else "web_cta",
         "utm_campaign": f"flirtfix_web_{page_group}",
         "utm_term": request.path,
-    })
+    }
+    content_prefix = ""
+    # Carry this campaign's public video labels through the landing-page app CTA.
+    # Arbitrary query strings and conversation input never become attribution.
+    source = request.GET.get("utm_source", "")
+    video = request.GET.get("utm_content", "")
+    if (source in {"instagram", "youtube", "tiktok"}
+            and request.GET.get("utm_campaign") == "flirtfix_reach_2026_09"
+            and request.GET.get("utm_medium") == "organic_social"
+            and re.fullmatch(r"video(?:0[1-9]|1[0-2])", video)):
+        attribution.update(utm_source=source, utm_medium="organic_social", utm_campaign="flirtfix_reach_2026_09")
+        content_prefix = video + "_"
+    query = urlencode(attribution)
     return {"android_app_promo": {
         "page_group": page_group,
         "title": title,
         "description": description,
         "url": f"{reverse('flirtfix_redirect')}?{query}",
+        "content_prefix": content_prefix,
     }}
 
 

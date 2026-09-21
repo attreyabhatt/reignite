@@ -421,13 +421,13 @@
   "@context": "https://schema.org",
   "@type": "WebSite",
   "name": "TryAgainText",
-  "url": "https://tryagaintext.com/",
+  "url": "{{ public_site_url }}/",
   "description": "Generate send-ready dating app replies with AI, tailored to your real conversation context.",
   "potentialAction": {
     "@type": "SearchAction",
     "target": {
       "@type": "EntryPoint",
-      "urlTemplate": "https://tryagaintext.com/situations/{search_term_string}/"
+      "urlTemplate": "{{ public_site_url }}/situations/{search_term_string}/"
     },
     "query-input": "required name=search_term_string"
   }
@@ -483,6 +483,10 @@
             </div>
         </div>
     </section>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {% include "seoapp/partials/discovery_links.html" %}
+    </div>
 
     <section id="why-it-works" class="home-why">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

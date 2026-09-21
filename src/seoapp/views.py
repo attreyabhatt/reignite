@@ -9,6 +9,8 @@ from reignitehome.utils.ip_check import get_client_ip
 from django.db.models import Count, Q
 
 from seoapp.models import PickupCategory, PickupTopic
+from reignitehome.seo import breadcrumb_json, public_url
+from seoapp.discovery import featured_topics, next_step_guides
 from seoapp.glossary_terms import GLOSSARY_BY_ALPHA
 from seoapp.situation_pages import (
     get_situation_page,
@@ -106,7 +108,7 @@ def _split_pickup_heading(heading):
 
 @require_http_methods(["GET"])
 def situation_index(request):
-    canonical_url = request.build_absolute_uri(reverse("situation_index"))
+    canonical_url = public_url(reverse("situation_index"))
     context = _build_guest_chat_context(request)
     context.update(
         {
@@ -132,13 +134,17 @@ def situation_landing(request, slug):
     if not situation_page:
         raise Http404("Situation page not found.")
 
-    canonical_url = request.build_absolute_uri(
+    canonical_url = public_url(
         reverse("situation_landing", kwargs={"slug": situation_page["slug"]})
     )
     context = _build_guest_chat_context(request)
     context.update(
         {
             "situation_page": situation_page,
+            "breadcrumb_json": breadcrumb_json([
+                ("Home", "/"), ("Texting Guides", reverse("situation_index")),
+                (situation_page["h1"], reverse("situation_landing", args=[slug])),
+            ]),
             "related_pages": list_related_pages(situation_page),
             "meta_description": situation_page["meta_description"],
             "canonical_url": canonical_url,
@@ -165,7 +171,7 @@ def situation_landing(request, slug):
 
 @require_http_methods(["GET"])
 def pickup_lines_index(request):
-    canonical_url = request.build_absolute_uri(reverse("pickup_lines_index"))
+    canonical_url = public_url(reverse("pickup_lines_index"))
     categories = (
         PickupCategory.objects
         .annotate(topic_count=Count("topics", filter=Q(topics__is_active=True)))
@@ -176,6 +182,7 @@ def pickup_lines_index(request):
     context.update(
         {
             "categories": categories,
+            "featured_topics": featured_topics(),
             "meta_description": (
                 "Explore ultra-niche pickup line guides and open one tailored to your exact match context."
             ),
@@ -204,13 +211,15 @@ def pickup_category_detail(request, category_slug):
     ]
     if not topics:
         raise Http404("Category not found.")
-    canonical_url = request.build_absolute_uri(
+    canonical_url = public_url(
         reverse("pickup_category_detail", kwargs={"category_slug": category.slug})
     )
     context = _build_guest_chat_context(request)
     context.update(
         {
             "category": category,
+            "featured_topics": featured_topics(category.slug),
+            "next_step_guides": next_step_guides(),
             "pickup_topics": topics,
             "meta_description": f"Browse {len(topics)} {category.name} pickup line guides. Pick a topic and generate a custom opener from her exact profile vibe.",
             "canonical_url": canonical_url,
@@ -234,7 +243,7 @@ def pickup_line_detail(request, category_slug, topic_slug):
         raise Http404("Pickup line page not found.")
     pickup_topic = topic_obj.to_dict()
 
-    canonical_url = request.build_absolute_uri(
+    canonical_url = public_url(
         reverse(
             "pickup_line_detail",
             kwargs={
@@ -247,6 +256,15 @@ def pickup_line_detail(request, category_slug, topic_slug):
     context.update(
         {
             "pickup_topic": pickup_topic,
+            "featured_topics": [t.to_dict() for t in PickupTopic.objects.filter(
+                category=topic_obj.category, is_active=True,
+            ).exclude(pk=topic_obj.pk).select_related("category")[:4]],
+            "next_step_guides": next_step_guides(),
+            "breadcrumb_json": breadcrumb_json([
+                ("Home", "/"), ("Pickup Lines", reverse("pickup_lines_index")),
+                (topic_obj.category.name, reverse("pickup_category_detail", args=[category_slug])),
+                (topic_obj.keyword, reverse("pickup_line_detail", args=[category_slug, topic_slug])),
+            ]),
             "canonical_url": canonical_url,
             "meta_description": pickup_topic["meta_description"],
             "og_title": pickup_topic["title"],
@@ -277,7 +295,7 @@ def pickup_line_detail(request, category_slug, topic_slug):
 
 @require_http_methods(["GET"])
 def glossary_view(request):
-    canonical_url = request.build_absolute_uri()
+    canonical_url = public_url(request.path)
     context = {
         "meta_description": "Straight definitions for every modern dating term — breadcrumbing, love bombing, situationship, orbiting, and more.",
         "og_title": "Dating Terms Glossary | TryAgainText",

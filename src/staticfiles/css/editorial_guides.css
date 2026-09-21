@@ -1,0 +1,24 @@
+.editorial-guide { margin-bottom: 2rem; }
+.guide-quick-answer { border-left: 3px solid #FF2D6D; padding: 1.25rem 1.5rem; background: #1B1E25; border-radius: 0 12px 12px 0; margin: 0 0 1.5rem; }
+.guide-quick-answer p { color: #E0E4ED; line-height: 1.75; margin: 0; }
+.guide-quick-answer .guide-eyebrow { margin-bottom: .5rem; color: #F2B4C7; font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; }
+.guide-contents { display: flex; flex-wrap: wrap; gap: .6rem 1rem; padding-block: .5rem 1.5rem; }
+.guide-contents span { color: #B5BED4; font-weight: 600; }
+.guide-contents a, .guide-example-note a { color: #F2B4C7; text-decoration: underline; text-underline-offset: 3px; }
+.guide-example-note { color: #A7B1C7; font-size: .83rem; line-height: 1.6; }
+.guide-section { padding-top: 1.5rem; margin-top: 1.5rem; border-top: 1px solid #2E323B; scroll-margin-top: 1rem; }
+.guide-section h2, .guide-discovery h2 { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.25; margin-bottom: 1rem; }
+.guide-section > p, .guide-discovery > p { color: #B5BED4; line-height: 1.75; margin-bottom: 1rem; max-width: 75ch; }
+.guide-examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-block: 1rem; }
+.guide-example { border: 1px solid #3A3F4A; border-radius: 12px; padding: 1.25rem; background: #16181F; }
+.guide-example h3 { font-family: Inter, system-ui, sans-serif; font-size: .85rem; color: #D4AF37; margin-bottom: .75rem; }
+.guide-example blockquote { color: #F4F2EE; line-height: 1.7; margin: 0; }
+.guide-example p { margin: .9rem 0 0; color: #A7B1C7; font-size: .85rem; line-height: 1.65; }
+.guide-discovery { margin-block: 2.5rem; }
+.guide-link-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.guide-link-grid a { display: flex; flex-direction: column; gap: .5rem; padding: 1.25rem; border: 1px solid #3A3F4A; border-radius: 12px; background: #16181F; text-decoration: none; }
+.guide-link-grid a:hover { border-color: #FF2D6D; }
+.guide-link-grid a:focus-visible, .guide-contents a:focus-visible { outline: 2px solid #F2B4C7; outline-offset: 4px; }
+.guide-link-grid strong { color: #F4F2EE; font-size: 1rem; }
+.guide-link-grid span { color: #A7B1C7; font-size: .82rem; line-height: 1.6; }
+@media (max-width: 640px) { .guide-examples, .guide-link-grid { grid-template-columns: 1fr; } .guide-quick-answer { padding: 1rem; } }

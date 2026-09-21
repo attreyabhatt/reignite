@@ -1,6 +1,11 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
+from django.core.exceptions import PermissionDenied
+from django.template.response import TemplateResponse
+from django.urls import path
+
+from .growth import GROUPS, growth_funnel
 
 from .models import ContactMessage, MarketingClickEvent, TrialIP
 
@@ -17,6 +22,27 @@ class TrialIPAdmin(admin.ModelAdmin):
 
 @admin.register(MarketingClickEvent)
 class MarketingClickEventAdmin(admin.ModelAdmin):
+    change_list_template = "admin/reignitehome/marketingclickevent/change_list.html"
+
+    def get_urls(self):
+        return [path("funnel/", self.admin_site.admin_view(self.funnel_view),
+                     name="reignitehome_marketingclickevent_funnel")] + super().get_urls()
+
+    def funnel_view(self, request):
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        days = request.GET.get("days", "28")
+        group = request.GET.get("group", "campaign")
+        if days not in {"7", "28", "90"} or group not in GROUPS:
+            return TemplateResponse(request, "admin/reignitehome/marketingclickevent/funnel.html", {
+                **self.admin_site.each_context(request), "title": "Acquisition funnel",
+                "error": "Choose 7, 28 or 90 days and a valid grouping.",
+            }, status=400)
+        return TemplateResponse(request, "admin/reignitehome/marketingclickevent/funnel.html", {
+            **self.admin_site.each_context(request), "title": "Acquisition funnel",
+            **growth_funnel(days=int(days), group=group),
+        })
+
     list_display = (
         "created_at",
         "route_key",

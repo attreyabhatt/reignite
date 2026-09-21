@@ -1,0 +1,29 @@
+<article class="editorial-guide" aria-label="Examples and advice">
+    <div class="guide-quick-answer">
+        <p class="guide-eyebrow">Start here</p>
+        <p>{{ guide.answer }}</p>
+    </div>
+    <nav class="guide-contents" aria-label="On this page">
+        <span>In this guide</span>
+        {% for section in guide.sections %}
+        <a href="#guide-section-{{ forloop.counter }}">{{ section.heading }}</a>
+        {% endfor %}
+    </nav>
+    <p class="guide-example-note">Illustrative examples. Use details that are true for you and adapt the wording to your conversation.</p>
+    {% for section in guide.sections %}
+    <section id="guide-section-{{ forloop.counter }}" class="guide-section">
+        <h2>{{ section.heading }}</h2>
+        {% for paragraph in section.paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
+        <div class="guide-examples">
+            {% for example in section.examples %}
+            <div class="guide-example">
+                <h3>{{ example.label }}</h3>
+                <blockquote>{{ example.text|linebreaksbr }}</blockquote>
+                <p>{{ example.why }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+    {% if guide.source %}<p class="guide-example-note">Platform reference: <a href="{{ guide.source.url }}">{{ guide.source.label }}</a>.</p>{% endif %}
+</article>

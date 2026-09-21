@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from seoapp.models import PickupCategory, PickupTopic
+from seoapp.seed_data.search_refresh import PICKUP_REFRESH
 from seoapp.seed_data import (
     literature, zodiac, mbti, enneagram, hobbies, professions, dog_breeds, fandoms, music_genres,
     attachment_styles, love_languages, astrology_placements, book_genres, gaming_niches, wellness,
@@ -33,6 +34,7 @@ class Command(BaseCommand):
             )
 
             for i, topic in enumerate(data["topics"]):
+                topic = {**topic, **PICKUP_REFRESH.get((data["category_slug"], topic["slug"]), {})}
                 _, created = PickupTopic.objects.update_or_create(
                     category=category,
                     slug=topic["slug"],
@@ -48,6 +50,7 @@ class Command(BaseCommand):
                         "prefill_text": topic["prefill_text"],
                         "upload_hint": topic["upload_hint"],
                         "her_info_prefill": topic.get("her_info_prefill", ""),
+                        "guide_content": topic.get("guide_content", {}),
                         "sort_order": i,
                     },
                 )

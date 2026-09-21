@@ -32,6 +32,7 @@ class PickupTopicAdmin(admin.ModelAdmin):
         ("Pickup Lines", {
             "fields": ("witty_lines", "flirty_lines", "cheesy_lines"),
         }),
+        ("Detailed Guide", {"fields": ("guide_content",)}),
         ("AI Tool Config", {
             "fields": ("prefill_text", "upload_hint", "her_info_prefill"),
         }),

@@ -57,6 +57,14 @@ class SituationSeoPagesTests(TestCase):
                     reverse("situation_landing", kwargs={"slug": page["slug"]})
                 )
                 self.assertEqual(response.status_code, 200)
+                if page.get("guide_content"):
+                    self.assertContains(response, escape(page["guide_content"]["answer"]))
+                    for section in page["guide_content"]["sections"]:
+                        self.assertContains(response, escape(section["heading"]))
+                        for example in section["examples"]:
+                            self.assertContains(response, escape(example["why"]))
+                    self.assertNotContains(response, "Why This Situation Matters")
+                    continue
                 self.assertGreaterEqual(len(page["seo_sections"]), 4)
                 self.assertContains(response, escape(page["seo_sections"][0]["heading"]))
                 self.assertContains(response, escape(page["seo_sections"][1]["heading"]))
@@ -119,15 +127,15 @@ class SituationSeoPagesTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/xml")
 
         expected_core_urls = [
-            "http://testserver/",
-            "http://testserver/situations/",
-            "http://testserver/pricing/",
-            "http://testserver/privacy-policy/",
-            "http://testserver/terms/",
-            "http://testserver/refund-policy/",
-            "http://testserver/contact/",
-            "http://testserver/safety-standards/",
-            "http://testserver/policy/screenclean/",
+            "https://www.tryagaintext.com/",
+            "https://www.tryagaintext.com/situations/",
+            "https://www.tryagaintext.com/pricing/",
+            "https://www.tryagaintext.com/privacy-policy/",
+            "https://www.tryagaintext.com/terms/",
+            "https://www.tryagaintext.com/refund-policy/",
+            "https://www.tryagaintext.com/contact/",
+            "https://www.tryagaintext.com/safety-standards/",
+            "https://www.tryagaintext.com/policy/screenclean/",
         ]
 
         for absolute_url in expected_core_urls:
@@ -136,7 +144,7 @@ class SituationSeoPagesTests(TestCase):
         for slug in SITUATION_PAGE_ORDER:
             self.assertContains(
                 response,
-                f"<loc>http://testserver/situations/{slug}/</loc>",
+                f"<loc>https://www.tryagaintext.com/situations/{slug}/</loc>",
                 html=False,
             )
 
@@ -146,7 +154,7 @@ class SituationSeoPagesTests(TestCase):
         self.assertContains(response, "User-agent: *")
         self.assertContains(response, "Disallow: /admin/")
         self.assertContains(response, "Disallow: /accounts/")
-        self.assertContains(response, "Sitemap: https://tryagaintext.com/sitemap.xml")
+        self.assertContains(response, "Sitemap: https://www.tryagaintext.com/sitemap.xml")
 
     def test_situation_page_seo_head_includes_canonical_and_meta_description(self):
         page = list_situation_pages()[0]
@@ -156,12 +164,12 @@ class SituationSeoPagesTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            f'<link rel="canonical" href="http://testserver/situations/{page["slug"]}/">',
+            f'<link rel="canonical" href="https://www.tryagaintext.com/situations/{page["slug"]}/">',
             html=False,
         )
         self.assertContains(
             response,
-            f'<meta name="description" content="{page["meta_description"]}">',
+            f'<meta name="description" content="{escape(page["meta_description"])}">',
             html=False,
         )
 
@@ -170,7 +178,7 @@ class SituationSeoPagesTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            '<link rel="canonical" href="http://testserver/situations/">',
+            '<link rel="canonical" href="https://www.tryagaintext.com/situations/">',
             html=False,
         )
         self.assertContains(
@@ -203,18 +211,18 @@ class SituationSeoPagesTests(TestCase):
         self.assertContains(situation_response, 'href="/pickup-lines/"', html=False)
         self.assertContains(situation_response, "Pickup Lines")
 
-    def test_each_situation_seo_body_word_count_is_in_target_range(self):
+    def test_guides_offer_specific_answers_without_shared_padding(self):
+        answers = []
         for page in list_situation_pages():
-            with self.subTest(slug=page["slug"]):
-                text_parts = [page.get("screenshot_tip", "")]
-                for section in page.get("seo_sections", []):
-                    text_parts.extend(section.get("paragraphs", []))
-                    text_parts.extend(section.get("bullets", []))
-
-                text = re.sub(r"<[^>]+>", " ", " ".join(text_parts))
-                words = [word for word in re.split(r"\s+", text.strip()) if word]
-                self.assertGreaterEqual(len(words), 400)
-                self.assertLessEqual(len(words), 600)
+            response = self.client.get(reverse("situation_landing", args=[page["slug"]]))
+            answer = page.get("guide_content", {}).get("answer", page["quick_answer"])
+            answers.append(answer)
+            self.assertContains(response, escape(answer))
+            self.assertNotContains(response, "Most chats do not collapse because people are incompatible")
+            self.assertNotContains(response, "That is how this scenario approach compounds")
+            if not page.get("guide_content"):
+                self.assertContains(response, escape(page["sample_reply"]))
+        self.assertEqual(len(answers), len(set(answers)))
 
     def test_home_and_situation_pages_render_shared_reply_tool_marker(self):
         home_response = self.client.get(reverse("home"))

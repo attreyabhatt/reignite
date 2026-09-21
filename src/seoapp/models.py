@@ -33,6 +33,7 @@ class PickupTopic(models.Model):
     prefill_text = models.TextField()
     upload_hint = models.TextField()
     her_info_prefill = models.TextField(blank=True, default="")
+    guide_content = models.JSONField(default=dict, blank=True)
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -66,4 +67,5 @@ class PickupTopic(models.Model):
             "prefill_text": self.prefill_text,
             "upload_hint": self.upload_hint,
             "her_info_prefill": self.her_info_prefill,
+            "guide_content": self.guide_content,
         }

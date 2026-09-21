@@ -64,71 +64,14 @@ def _build_screenshot_tip(topic, upload_hint):
 
 
 def _build_seo_sections(topic, pain_point, framework, mistakes, tool_hook, close, claim_html=""):
-    claim_line = f" {claim_html}" if claim_html else ""
-    sections = [
-        {
-            "heading": f"Why {topic} Gets Stuck",
-            "paragraphs": [
-                (
-                    f"{topic} is usually a momentum problem, not a value problem. {pain_point} "
-                    "Most chats do not collapse because people are incompatible, they collapse because the next message "
-                    "has no direction. When the thread slows down, overthinking starts, timing gets worse, and every reply "
-                    "feels riskier than it really is."
-                ),
-                (
-                    f"A practical way to handle this moment is to use a repeatable framework. {_to_sentence(framework, 'Use a repeatable framework.')}"
-                    "The strongest texts usually do three things at once: they acknowledge current context, add emotional "
-                    "texture, and create a clear next beat. That structure keeps your message from sounding random or needy."
-                    f"{claim_line}"
-                ),
-            ],
-        },
-        {
-            "heading": "The 3 Rules for Better Replies",
-            "paragraphs": [
-                (
-                    "Most people lose ground by making predictable errors, especially when they react emotionally to a slow or awkward thread. "
-                    "Instead of improvising under pressure, follow a compact set of rules you can execute every time. "
-                    "These rules keep your message clear, socially calibrated, and easier to answer."
-                ),
-            ],
-            "bullets": _build_rule_bullets(framework, mistakes),
-        },
-        {
-            "heading": "How TryAgainText Finds the Right Reply",
-            "paragraphs": [
-                (
-                    f"This is exactly where the scenario tool helps. {_to_sentence(tool_hook, 'Use the tool to generate response options tailored to your chat.')}"
-                    "Instead of writing from emotion, you can compare multiple response angles and choose the one that "
-                    "matches both your style and her vibe. That turns a stressful texting moment into a clear decision with "
-                    "better odds of a positive reply."
-                ),
-                (
-                    "Because the response options are generated from your real context, they are faster to evaluate and easier to send without second-guessing. "
-                    "You still make the final choice, but you avoid the blank-page hesitation that usually kills timing in key moments."
-                ),
-            ],
-        },
-        {
-            "heading": "What to Do Next",
-            "paragraphs": [
-                (
-                    f"If this pattern keeps showing up in your chats, practice it deliberately. {_to_sentence(close, 'Keep refining your approach with consistent practice.')}"
-                    "The objective is not to sound scripted. The objective is to build a reliable texting process that "
-                    "creates better momentum, stronger connection, and cleaner paths toward real dates."
-                ),
-                (
-                    "A useful way to improve quickly is to treat every conversation like a feedback loop. Keep the parts "
-                    "that get warm responses, discard low-performing patterns, and refine your phrasing based on real outcomes. "
-                    "With enough repetition, you stop freezing in key moments because you already know what kind of message "
-                    "creates traction. That is how this scenario approach compounds: clearer decisions, better timing, and "
-                    "more consistent results without losing your own voice. Over time this becomes a practical texting system "
-                    "you can rely on under pressure, not just a one-off answer for one conversation."
-                ),
-            ],
-        },
+    # Keep each guide specific; do not pad it with shared prose to meet a word count.
+    return [
+        {"heading": f"Understanding {topic}", "paragraphs": [pain_point]},
+        {"heading": "Three Things to Keep in Mind", "paragraphs": [framework],
+         "bullets": _build_rule_bullets(framework, mistakes)},
+        {"heading": "Adapt the Reply to Your Conversation", "paragraphs": [tool_hook]},
+        {"heading": "What to Do Next", "paragraphs": [close] + ([claim_html] if claim_html else [])},
     ]
-    return sections
 
 
 def _page(
@@ -152,6 +95,7 @@ def _page(
     return {
         "slug": slug,
         "situation": situation,
+        "quick_answer": framework,
         "h1": h1,
         "title": title,
         "meta_description": meta_description,
@@ -597,7 +541,7 @@ SITUATION_PAGES = {
     ),
     "how-to-confess-feelings-over-text": _page(
         slug="how-to-confess-feelings-over-text",
-        situation="sincere",
+        situation="spark_deeper_conversation",
         h1="How to Confess Feelings Over Text (And Actually Get a Real Response).",
         title="How To Confess Feelings Over Text | TryAgainText",
         meta_description="Express genuine feelings over text without being creepy, needy, or over the top.",
@@ -793,3 +737,11 @@ def list_related_pages(page):
             continue
         related.append(match)
     return related
+
+
+# These examples are editorial content, not prefilled user conversations.
+from seoapp.situation_editorial import SAMPLE_REPLIES, SITUATION_EDITORIAL
+
+for _slug, _data in SITUATION_PAGES.items():
+    _data["sample_reply"] = SAMPLE_REPLIES.get(_slug, "")
+    _data.update(SITUATION_EDITORIAL.get(_slug, {}))

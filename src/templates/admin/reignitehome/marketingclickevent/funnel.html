@@ -1,0 +1,27 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p><a href="{% url 'admin:reignitehome_marketingclickevent_changelist' %}">Back to marketing clicks</a></p>
+{% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+<form method="get" style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;margin:1rem 0">
+    <label>Click period <select name="days"><option value="7"{% if days == 7 %} selected{% endif %}>Last 7 days</option><option value="28"{% if days == 28 %} selected{% endif %}>Last 28 days</option><option value="90"{% if days == 90 %} selected{% endif %}>Last 90 days</option></select></label>
+    <label>Group by <select name="group"><option value="campaign"{% if group == 'campaign' %} selected{% endif %}>Campaign</option><option value="page"{% if group == 'page' %} selected{% endif %}>Landing page</option><option value="placement"{% if group == 'placement' %} selected{% endif %}>Placement / video</option></select></label>
+    <button type="submit" class="button">Update report</button>
+</form>
+{% if totals %}
+<p>Clicks from {{ since|date:"Y-m-d H:i T" }} through {{ as_of|date:"Y-m-d H:i T" }}.</p>
+<div style="overflow-x:auto">
+<table style="width:100%">
+    <caption style="text-align:left;padding:1rem 0">Tracked Google Play visits and subsequent app use</caption>
+    <thead><tr><th scope="col">Source / {{ group }}</th><th scope="col">Clicks</th><th scope="col">With reported install</th><th scope="col">Used app</th><th scope="col">Copied a message</th><th scope="col">Click → install</th><th scope="col">Install → use</th><th scope="col">Fully observed clicks</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+    <tr><th scope="row">{{ row.label }}</th><td>{{ row.clicks }}</td><td>{{ row.installed }}</td><td>{{ row.activated }}</td><td>{{ row.copied }}</td><td>{{ row.install_rate }}%</td><td>{{ row.activation_rate }}%</td><td>{{ row.mature }}</td></tr>
+    {% empty %}<tr><td colspan="8">No tracked clicks in this period yet.</td></tr>{% endfor %}
+    </tbody>
+    <tfoot><tr><th scope="row">Total</th><td>{{ totals.clicks }}</td><td>{{ totals.installed }}</td><td>{{ totals.activated }}</td><td>{{ totals.copied }}</td><td>{{ totals.install_rate }}%</td><td>{{ totals.activation_rate }}%</td><td>{{ totals.mature }}</td></tr></tfoot>
+</table>
+</div>
+<p>Each click counts at most once in each column. A reported install must link to that click and be reported within 7 days. App use means an AI reply/opener generation or a copy event within 7 days after the install report, matched by user or device identifier. OCR alone does not count.</p>
+<p>Recent clicks need up to 14 days for both observation windows to finish. These are app-reported conversions, not Google Play download totals. Missing install reports or identifiers cause undercounting. Guest activity cannot always be connected to a later login on older app versions. This report contains no chat text.</p>
+{% endif %}
+{% endblock %}

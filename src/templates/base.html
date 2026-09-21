@@ -349,6 +349,7 @@
     <link rel="stylesheet" href="{% static 'css/android_app_promo.css' %}">
     <script src="{% static 'js/android_app_promo.js' %}" defer></script>
     {% endif %}
+    {% if android_app_promo %}<link rel="stylesheet" href="{% static 'css/editorial_guides.css' %}">{% endif %}
     {% block extra_head %}
     {% endblock extra_head %}
 </head>

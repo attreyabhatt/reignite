@@ -1,0 +1,103 @@
+{
+  "campaign": "flirtfix_reach_2026_09",
+  "medium": "organic_social",
+  "platforms": ["instagram", "youtube", "tiktok"],
+  "videos": [
+    {
+      "id": "video01", "date": "2026-09-21", "topic": "An Instagram story reply that starts a conversation",
+      "landing_path": "/pickup-lines/dating-apps/instagram-dm-opener/",
+      "hook": "Their story already gives you something to say.",
+      "voiceover": "If someone posts a cafe, skip the generic compliment. Try: 'That pastry looks worth crossing town for. Is the coffee just as good?' You're reacting to something real and giving them an easy question. Change the detail to fit their actual story. For your own chat, FlirtFix can help you find a reply.",
+      "demo": "Show a fictional cafe story, then type the example. End with an actual FlirtFix reply screen using a clearly labeled sample chat.",
+      "caption": "One real detail. One easy question. More Instagram DM examples in the guide. FlirtFix is available for Android."
+    },
+    {
+      "id": "video02", "date": "2026-09-23", "topic": "What to say after a short reply",
+      "landing_path": "/situations/what-to-say-next-over-text/",
+      "hook": "They said 'haha.' You don't need five more messages.",
+      "voiceover": "A short reply can mean lots of things. Add one small opening, not an interrogation. If you were talking about your chaotic week, try: 'Has yours been any less chaotic?' Then see whether they meet you halfway. If every answer stays short, give the conversation space. A good message helps mutual interest; it doesn't force it.",
+      "demo": "Use two labeled sample chat bubbles. Show a calm pause after the suggested message, then the guide URL and Android CTA.",
+      "caption": "Reply to the conversation you actually have. Examples for getting unstuck, plus when to step back."
+    },
+    {
+      "id": "video03", "date": "2026-09-25", "topic": "Repair a blunt text",
+      "landing_path": "/situations/how-to-recover-awkward-text/",
+      "hook": "Sent something that sounded colder than you meant?",
+      "voiceover": "One clear correction is better than a wall of panic. Try: 'I reread that and it sounds abrupt. I meant I'd like to see you, but Thursday doesn't work. Is Saturday any better?' Explain the meaning and the practical issue. If you actually hurt someone, own that directly instead of calling it a misunderstanding.",
+      "demo": "Show a fictional scheduling mix-up and the correction. Finish with a real FlirtFix demonstration using that sample, without promising the same generated wording.",
+      "caption": "Clarify confusion. Apologize for harm. Give them room to respond. More examples in the guide."
+    },
+    {
+      "id": "video04", "date": "2026-09-28", "topic": "Make a Hinge prompt less generic",
+      "landing_path": "/pickup-lines/dating-apps/hinge-prompt-answers/",
+      "hook": "'I like adventure' gives your match very little to work with.",
+      "voiceover": "Show what adventure looks like for you. For example: 'I pick a new walking route every Saturday and usually discover a great cafe or a very steep hill.' Now someone can ask about the route, the coffee, or the disaster. Use your real routine. Your profile starts the conversation; FlirtFix helps with openers and replies after that.",
+      "demo": "Show a before-and-after profile answer as an illustration. Link to the profile guide. Do not present FlirtFix's reply tool as a profile-writing feature.",
+      "caption": "Specific beats vague. Hinge prompt examples to adapt to your own profile, with no borrowed personality required."
+    },
+    {
+      "id": "video05", "date": "2026-09-30", "topic": "Follow their recommendation",
+      "landing_path": "/pickup-lines/dating-apps/instagram-dm-opener/",
+      "hook": "They recommended a coffee. Here's your next message.",
+      "voiceover": "They say, 'Get the iced latte.' You can acknowledge it and add something about yourself: 'Strong endorsement. My usual spot keeps disappointing me, so I'm taking your advice. Are you a regular there?' The point isn't this exact sentence. It's answer, share, then leave an easy opening. Keep the details true.",
+      "demo": "Show the cafe exchange from the guide. Use a fictional screenshot for an actual FlirtFix demo, showing the real response it returns.",
+      "caption": "Build on the detail they gave you. More first-message and follow-up examples in the Instagram guide."
+    },
+    {
+      "id": "video06", "date": "2026-10-02", "topic": "A lawyer opener without a whole courtroom speech",
+      "landing_path": "/pickup-lines/professions/lawyer/",
+      "hook": "Matched with a lawyer? One legal pun is plenty.",
+      "voiceover": "If their profile invites a joke, try: 'Important question before proceedings begin: great coffee or great dessert?' Then actually talk about their answer. Better still, ask about a hobby from their profile. The job is one detail, not their entire personality. Our guide has legal puns and ordinary openers for both moods.",
+      "demo": "Show a fictional profile with law and hiking interests. Compare one pun with one hiking question. End on the guide and Android app CTA.",
+      "caption": "A little wordplay, then a real conversation. Lawyer pickup lines and follow-ups in the guide."
+    },
+    {
+      "id": "video07", "date": "2026-10-05", "topic": "Stop interviewing your match",
+      "landing_path": "/situations/what-to-say-next-over-text/",
+      "hook": "If every message is a question, try adding something about you.",
+      "voiceover": "They say they love cooking. Instead of sending your next question immediately, share a detail: 'Same, although my homemade pizza is still a work in progress. What's your reliable go-to dish?' Now they can answer the question or ask about the pizza. Use your real experience. Conversation is an exchange, not a questionnaire.",
+      "demo": "Compare a stack of fictional interview questions with a balanced two-person exchange. Briefly show the reply options in FlirtFix.",
+      "caption": "Answer, share, ask when it fits. More ways to keep a text conversation mutual in the guide."
+    },
+    {
+      "id": "video08", "date": "2026-10-07", "topic": "An apology that takes responsibility",
+      "landing_path": "/situations/how-to-recover-awkward-text/",
+      "hook": "'Sorry you felt that way' isn't owning the message.",
+      "voiceover": "If your joke hurt someone, name what you did: 'That comment about your work was unfair. I'm sorry. I understand why it upset you, and I won't make that joke again.' Keep it honest and follow through. They don't owe you an immediate reply or reassurance. Our guide separates a real apology from a simple clarification.",
+      "demo": "Show only fictional messages. Highlight the specific action and apology. End with the guide link; avoid a comedic reaction shot or a promised outcome.",
+      "caption": "Be specific, take responsibility, and respect their response. Examples for repairing an awkward or hurtful text."
+    },
+    {
+      "id": "video09", "date": "2026-10-09", "topic": "Tell someone you like them without a dramatic confession",
+      "landing_path": "/situations/how-to-confess-feelings-over-text/",
+      "hook": "You can say you like someone in two clear sentences.",
+      "voiceover": "Try: 'I've enjoyed getting to know you, and I'd like to take you on a date. Would you be interested?' You don't have to explain every feeling at once. Be clear about what you're asking and leave room for either answer. If it's a no, accept it. The guide has examples for friends and people you're already dating.",
+      "demo": "Show the invitation, then two respectful response paths. Put the guide link on the closing frame alongside the Android app name.",
+      "caption": "Clear interest, low pressure, room for an honest answer. Text examples in the guide."
+    },
+    {
+      "id": "video10", "date": "2026-10-12", "topic": "Open with their dog, not a generic compliment",
+      "landing_path": "/pickup-lines/dog-breeds/pitbull/",
+      "hook": "The pet in their profile is already a conversation starter.",
+      "voiceover": "If their dog is in a hiking photo, try: 'Your dog looks like the official guide. Who actually chooses the trail?' You're responding to the photo and making room for a story. You don't need to guess their personality from the breed. Use the detail they shared, then keep the conversation about both of you.",
+      "demo": "Use a licensed or self-created sample pet profile, clearly labeled as an example. Demonstrate an opener generated from a sample profile in FlirtFix.",
+      "caption": "A real profile detail gives you somewhere to start. Pet-themed openers in the guide; personalized help in FlirtFix for Android."
+    },
+    {
+      "id": "video11", "date": "2026-10-14", "topic": "A hobby opener without pretending you're an expert",
+      "landing_path": "/pickup-lines/hobbies/pilates/",
+      "hook": "You don't have to fake their hobby to start a conversation.",
+      "voiceover": "If their profile mentions Pilates and you're curious, be honest: 'I've been meaning to try a class. What surprised you most when you started?' You can show interest without pretending to know the equipment. Skip comments about their body. Ask about the experience they chose to share, and listen to the answer.",
+      "demo": "Show a fictional profile and a simple question. Use a real FlirtFix sample-profile demonstration for the final few seconds.",
+      "caption": "Curiosity works without pretending. Hobby-based openers and an easy way to personalize yours on Android."
+    },
+    {
+      "id": "video12", "date": "2026-10-16", "topic": "From screenshot to a reply you would actually send",
+      "landing_path": "/situations/what-to-say-next-over-text/",
+      "hook": "Would you actually say that? Check before you hit send.",
+      "voiceover": "A suggested reply is a starting point. Read it aloud, remove anything that isn't true, and check whether it matches the conversation. In FlirtFix, you can use a chat screenshot to get ideas, then choose and edit the one that sounds like you. Here's that process with a sample conversation. FlirtFix is available on Android.",
+      "demo": "Record the actual Android app: upload a fictional sample, wait for real results, select a reply and edit it. Show timing honestly; label any time cut. Do not use a real user's chat.",
+      "caption": "Your voice, with help getting unstuck. See the reply guide or get FlirtFix for Android."
+    }
+  ]
+}

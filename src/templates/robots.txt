@@ -1,4 +1,4 @@
 User-agent: *
 Disallow: /admin/
 Disallow: /accounts/
-Sitemap: https://tryagaintext.com/sitemap.xml
+Sitemap: {{ public_site_url }}/sitemap.xml
