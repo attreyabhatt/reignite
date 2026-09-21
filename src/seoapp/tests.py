@@ -46,7 +46,8 @@ class SituationSeoPagesTests(TestCase):
                     html=False,
                 )
                 self.assertContains(response, 'id="last-reply"', html=False)
-                self.assertNotContains(response, escape(page["prefill_text"]))
+                if page["prefill_text"]:
+                    self.assertNotContains(response, escape(page["prefill_text"]))
                 self.assertContains(response, 'data-tool-variant="pickup"', html=False)
                 self.assertContains(response, 'id="playground"', html=False)
 

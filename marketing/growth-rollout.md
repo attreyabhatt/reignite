@@ -2,7 +2,7 @@
 
 ## Ship the website changes
 
-This branch refreshes three database-backed pages (Instagram DM openers, Hinge profile prompt answers and lawyer pickup lines) and three detailed texting guides (what to say next, awkward-text recovery and expressing feelings). Other texting guides now have a direct answer and an illustrative reply, with shared filler removed.
+The first growth batch refreshes three database-backed pages (Instagram DM openers, Hinge profile prompt answers and lawyer pickup lines) and three detailed texting guides (what to say next, awkward-text recovery and expressing feelings). Other texting guides have a direct answer and an illustrative reply, with shared filler removed. The second SEO content batch is described below and has its own publication option.
 
 The pickup content remains editable in Django admin under **Pickup topics → Detailed Guide**. Existing unrelated content and URLs are retained. Hinge's profile guide intentionally does not show the conversation-reply form; that form cannot promise to write profile answers.
 
@@ -18,6 +18,53 @@ python src/manage.py collectstatic --noinput
 For a completely new database, run `seed_pickup_data` after migrations. Do not run the full seed command to refresh an established site's three priority pages: it also overwrites other seeded topics. The targeted command updates only the reviewed fields on those three pages, is repeatable, and rolls back if any target is missing. A backup of those three records is appropriate before publishing further editorial changes. To roll back content, restore those records; the new JSON field can remain empty.
 
 Deploy the schema migration before serving code that reads `guide_content`. The migration only adds an empty JSON field. The content command is a separate, explicit publication step. Nothing in this document has been run against production by the assistant.
+
+## Publish the SEO expansion batch
+
+This batch adds **14 pages** and expands **four existing pages**, retaining the existing Android app card, Android-only bar, page attribution and canonical URLs. These additions are experiments for the site's existing audience; the export does not establish search volume for the new topics.
+
+The six new pickup pages each contain 15 original lines (five witty, five flirty and five deliberately cheesy), explanations, three fictional follow-up conversations and personalization advice:
+
+| Topic | New URL |
+| --- | --- |
+| Tennis | `/pickup-lines/hobbies/tennis/` |
+| Badminton | `/pickup-lines/hobbies/badminton/` |
+| Pickleball | `/pickup-lines/hobbies/pickleball/` |
+| Data scientist | `/pickup-lines/professions/data-scientist/` |
+| Journalist | `/pickup-lines/professions/journalist/` |
+| Optometrist | `/pickup-lines/professions/optometrist/` |
+
+The eight new texting guides each provide a direct answer, four specific sections and eight illustrative examples:
+
+- `/situations/how-to-respond-to-hey/`
+- `/situations/how-to-respond-to-a-compliment-over-text/`
+- `/situations/how-to-reply-to-instagram-story/`
+- `/situations/dating-app-openers-with-no-bio/`
+- `/situations/how-to-confirm-a-date-over-text/`
+- `/situations/how-to-respond-to-im-busy-text/`
+- `/situations/how-to-end-a-text-conversation/`
+- `/situations/how-to-reply-to-a-pickup-line/`
+
+The existing pickup pages being expanded are `dating-apps/tinder-opener`, `professions/barista`, `professions/flight-attendant` and `fandoms/lord-of-the-rings`. Together those four URLs received 4,480 impressions and 98 clicks in the supplied March 13–September 18 export. Tinder's average position was 34.38, so treat it as a longer-term opportunity. These figures describe existing page performance, not search volumes or a forecast.
+
+Before publication, back up the four records being refreshed. The schema must already include the earlier `guide_content` migration; this batch adds no new migration. Deploying the code makes the eight situation guides available. Then run these commands against the deployment database from the repository root:
+
+```text
+python src/manage.py refresh_search_content --batch expansion --dry-run
+python src/manage.py refresh_search_content --batch expansion
+```
+
+On a database without these six additions, the dry run reports four refreshes and six creations without saving anything. The real command refreshes only the four selected records and appends missing new topics after each category's existing sort order. Already-present new topics are reported as **skipped**: their text, ordering and active status are preserved, including admin edits. Missing required categories or any of the four refresh targets aborts the transaction; a failure during writing also rolls back the whole command.
+
+The default command, without `--batch expansion`, still updates only the original three priority records. Do not run `seed_pickup_data` on an established database to publish this batch: it can overwrite unrelated seeded content. On a fresh database, normal seeding includes all additions, for 302 pickup topics; the code now registers 32 situation guides.
+
+Each new page appears in its directory and the sitemap. New sports pages link to one another; the professions category features the three new professions. Existing situation guides link to the relevant new guides, and Instagram and Tinder opener pages link to story replies and no-bio openers respectively. All six new pickup pages link to the pickup-line reply guide and next-step advice.
+
+After release, check representative pages on an Android phone, verify the app link reaches Google Play, and inspect the new URLs and sitemap in Search Console. Record the actual deployment/publication date. After 28 days, compare the four refreshed pages with the preceding period and review new-page impressions, clicks, CTR and position separately. Use the acquisition report grouped by page for reported installs and subsequent app use; allow its 14-day observation window to mature. No production publication or Search Console submission has been performed by the assistant.
+
+To undo the database publication, restore the four backed-up records and deactivate newly created topics in admin. The eight code-backed situation pages require reverting their code and incoming links if they must be removed.
+
+Local verification for this expansion: all 38 SEO tests passed, along with four canonical tests and four Android promotion tests (46 distinct tests). Checks cover all 18 affected pages, single rendering of each of the 90 new pickup lines, sitemap and incoming links, CTA attribution, repeatable seeding, command dry runs, preservation of edits and rollback after an interrupted write. Django system checks, migration consistency and whitespace checks passed. Testing used an isolated SQLite database; PostgreSQL execution, visual phone/desktop review and a real Android install were not exercised. No connected browser was available for visual review.
 
 ## Confirm the hostname change
 
@@ -74,7 +121,7 @@ Record the deployment date and first publication date. Every week, compare the s
 
 For the social experiment, record views and landing-page visits from each platform alongside mature reported installs and app use. Repeat topics that produce users who actually use the app. Review after four weeks; do not promise a ranking increase or treat a handful of installs as a conclusive A/B test. Keep canonical URLs stable while experimenting with content.
 
-## Local verification
+## First growth batch verification
 
 - 343 public routes rendered successfully against an isolated, freshly migrated and seeded SQLite database. Canonical URLs, JSON-LD parsing and unique element IDs were checked.
 - 134 of 135 tests passed across `seoapp`, `reignitehome` and `mobileapi`. The remaining Community navbar assertion also fails with the original templates; it expects a navigation link that was already absent.

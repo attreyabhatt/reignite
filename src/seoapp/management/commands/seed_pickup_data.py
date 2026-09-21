@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 from seoapp.models import PickupCategory, PickupTopic
 from seoapp.seed_data.search_refresh import PICKUP_REFRESH
+from seoapp.seed_data.search_expansion import NEW_PICKUP_TOPICS, PICKUP_EXPANSION
 from seoapp.seed_data import (
     literature, zodiac, mbti, enneagram, hobbies, professions, dog_breeds, fandoms, music_genres,
     attachment_styles, love_languages, astrology_placements, book_genres, gaming_niches, wellness,
@@ -33,8 +34,14 @@ class Command(BaseCommand):
                 },
             )
 
-            for i, topic in enumerate(data["topics"]):
-                topic = {**topic, **PICKUP_REFRESH.get((data["category_slug"], topic["slug"]), {})}
+            topics = [*data["topics"], *[
+                {"slug": slug, **fields}
+                for (category_slug, slug), fields in NEW_PICKUP_TOPICS.items()
+                if category_slug == data["category_slug"]
+            ]]
+            refreshes = {**PICKUP_REFRESH, **PICKUP_EXPANSION}
+            for i, topic in enumerate(topics):
+                topic = {**topic, **refreshes.get((data["category_slug"], topic["slug"]), {})}
                 _, created = PickupTopic.objects.update_or_create(
                     category=category,
                     slug=topic["slug"],
@@ -60,7 +67,7 @@ class Command(BaseCommand):
                     total_updated += 1
 
             self.stdout.write(
-                f"  {category.name}: {len(data['topics'])} topics"
+                f"  {category.name}: {len(topics)} topics"
             )
 
         self.stdout.write(

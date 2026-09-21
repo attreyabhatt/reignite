@@ -10,7 +10,7 @@ from django.db.models import Count, Q
 
 from seoapp.models import PickupCategory, PickupTopic
 from reignitehome.seo import breadcrumb_json, public_url
-from seoapp.discovery import featured_topics, next_step_guides
+from seoapp.discovery import featured_topics, next_step_guides, related_pickup_topics
 from seoapp.glossary_terms import GLOSSARY_BY_ALPHA
 from seoapp.situation_pages import (
     get_situation_page,
@@ -256,10 +256,8 @@ def pickup_line_detail(request, category_slug, topic_slug):
     context.update(
         {
             "pickup_topic": pickup_topic,
-            "featured_topics": [t.to_dict() for t in PickupTopic.objects.filter(
-                category=topic_obj.category, is_active=True,
-            ).exclude(pk=topic_obj.pk).select_related("category")[:4]],
-            "next_step_guides": next_step_guides(),
+            "featured_topics": related_pickup_topics(topic_obj),
+            "next_step_guides": next_step_guides(category_slug, topic_slug),
             "breadcrumb_json": breadcrumb_json([
                 ("Home", "/"), ("Pickup Lines", reverse("pickup_lines_index")),
                 (topic_obj.category.name, reverse("pickup_category_detail", args=[category_slug])),

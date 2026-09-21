@@ -745,3 +745,13 @@ from seoapp.situation_editorial import SAMPLE_REPLIES, SITUATION_EDITORIAL
 for _slug, _data in SITUATION_PAGES.items():
     _data["sample_reply"] = SAMPLE_REPLIES.get(_slug, "")
     _data.update(SITUATION_EDITORIAL.get(_slug, {}))
+
+
+from seoapp.situation_expansion import NEW_SITUATION_PAGES, SITUATION_INCOMING_LINKS
+
+SITUATION_PAGES.update(NEW_SITUATION_PAGES)
+SITUATION_PAGE_ORDER.extend(NEW_SITUATION_PAGES)
+for _slug, _links in SITUATION_INCOMING_LINKS.items():
+    SITUATION_PAGES[_slug]["related_slugs"] = list(dict.fromkeys(
+        [*SITUATION_PAGES[_slug]["related_slugs"], *_links]
+    ))
