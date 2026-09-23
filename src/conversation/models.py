@@ -134,6 +134,9 @@ class Conversation(models.Model):
     situation = models.CharField(max_length=150)  # e.g. 'left_on_read'
     her_info = models.TextField(blank=True)       # Freeform input about her
     last_updated = models.DateTimeField(auto_now=True)
+    latest_suggestions = models.JSONField(default=list, blank=True)
+    latest_generation_id = models.UUIDField(null=True, blank=True)
+    guest_draft_id = models.UUIDField(null=True, blank=True, unique=True)
 
     def __str__(self):
         return f"{self.girl_title} ({self.user.username})"
@@ -374,6 +377,32 @@ class GuestWebConversationAttempt(models.Model):
 
     def __str__(self):
         return f"{self.endpoint} {self.status} ({self.http_status})"
+
+
+class WebConversionEvent(models.Model):
+    class Kind(models.TextChoices):
+        GENERATED = "generated", "Successful generation"
+        COPIED = "copied", "Copy action"
+        OFFER_SHOWN = "offer_shown", "Continuation displayed"
+        OFFER_CLICKED = "offer_clicked", "Continuation clicked"
+        SIGNUP = "signup", "Completed signup"
+        CHECKOUT = "checkout", "Checkout redirect"
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    journey_id = models.UUIDField(db_index=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    kind = models.CharField(max_length=24, choices=Kind.choices, db_index=True)
+    generation_id = models.UUIDField(null=True, blank=True, db_index=True)
+    dedupe_key = models.CharField(max_length=160, unique=True)
+    was_guest = models.BooleanField(default=True)
+    origin_path = models.CharField(max_length=255, blank=True)
+    situation = models.CharField(max_length=150, blank=True)
+    offer_kind = models.CharField(max_length=16, blank=True)
+    credit_pack = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["journey_id", "created_at"], name="web_journey_created_idx")]
 
 
 class CopyEvent(models.Model):

@@ -2,6 +2,7 @@
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.vary import vary_on_headers
 
 from conversation.models import WebAppConfig
 from reignitehome.models import TrialIP
@@ -28,6 +29,8 @@ def _get_web_config():
 
 
 def _build_guest_chat_context(request):
+    if request.user.is_authenticated:
+        return {"chat_credits": request.user.chat_credit.balance}
     if "chat_credits" not in request.session:
         request.session["chat_credits"] = _get_web_config().guest_reply_limit
 
@@ -129,6 +132,7 @@ def situation_index(request):
 
 
 @require_http_methods(["GET"])
+@vary_on_headers("User-Agent", "Sec-CH-UA-Platform")
 def situation_landing(request, slug):
     situation_page = get_situation_page(slug)
     if not situation_page:
@@ -141,6 +145,7 @@ def situation_landing(request, slug):
     context.update(
         {
             "situation_page": situation_page,
+            "early_web_tool": slug == "what-to-say-next-over-text",
             "breadcrumb_json": breadcrumb_json([
                 ("Home", "/"), ("Texting Guides", reverse("situation_index")),
                 (situation_page["h1"], reverse("situation_landing", args=[slug])),
@@ -232,6 +237,7 @@ def pickup_category_detail(request, category_slug):
 
 
 @require_http_methods(["GET"])
+@vary_on_headers("User-Agent", "Sec-CH-UA-Platform")
 def pickup_line_detail(request, category_slug, topic_slug):
     try:
         topic_obj = (
@@ -269,6 +275,7 @@ def pickup_line_detail(request, category_slug, topic_slug):
             "og_description": pickup_topic["meta_description"],
             "og_url": canonical_url,
             "pickup_heading": _split_pickup_heading(pickup_topic.get("h1")),
+            "early_web_tool": (category_slug, topic_slug) in {("professions", "lawyer"), ("dating-apps", "instagram-dm-opener")},
             "tool_config": _build_tool_config(
                 ui_variant="pickup",
                 selected_situation="just_matched",

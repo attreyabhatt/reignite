@@ -171,13 +171,13 @@ class WebMarketingAndSignupConfigTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Powered by FlirtFix")
         self.assertContains(response, 'id="chatCredits">7</span> Credits Remaining')
-        self.assertContains(response, "Never lose a match to a bad reply.")
+        self.assertContains(response, "Get three replies tailored to your conversation.")
 
     def test_signup_template_marketing_line_follows_web_app_config(self):
         response = self.client.get(reverse("account_signup"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "11 Free Credits (no card needed)")
+        self.assertContains(response, "11 free generations (no card needed)")
 
     def test_web_signup_applies_configured_signup_bonus_credits(self):
         self.cfg.signup_bonus_credits = 9
@@ -292,17 +292,17 @@ class CommunityWebPagesTests(TestCase):
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, 'data-community-detail-root="1"', html=False)
 
-    def test_navbar_contains_community_for_guest_and_authenticated(self):
+    def test_navbar_keeps_community_hidden_for_guest_and_authenticated(self):
         guest_response = self.client.get(reverse("home"))
         self.assertEqual(guest_response.status_code, 200)
-        self.assertContains(guest_response, 'href="/community/"', html=False)
-        self.assertContains(guest_response, ">Community<", html=False)
+        self.assertNotContains(guest_response, 'href="/community/"', html=False)
+        self.assertNotContains(guest_response, ">Community<", html=False)
 
         self.client.login(username=self.user.username, password=self.password)
         auth_response = self.client.get(reverse("conversation_home"))
         self.assertEqual(auth_response.status_code, 200)
-        self.assertContains(auth_response, 'href="/community/"', html=False)
-        self.assertContains(auth_response, ">Community<", html=False)
+        self.assertNotContains(auth_response, 'href="/community/"', html=False)
+        self.assertNotContains(auth_response, ">Community<", html=False)
 
     def test_community_new_requires_login_and_renders_form_with_csrf(self):
         guest_response = self.client.get(reverse("community_create"))

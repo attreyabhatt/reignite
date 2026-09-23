@@ -84,7 +84,9 @@
     <!-- Font Awesome (icons) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <link rel="stylesheet" href="{% static 'css/web_conversion.css' %}">
     <!-- Google Analytics -->
+    {% if web_analytics_enabled %}
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-5KFLPTVDQ7"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -92,6 +94,7 @@
         gtag('js', new Date());
         gtag('config', 'G-5KFLPTVDQ7');
     </script>
+    {% endif %}
 
     <style>
         :root {
@@ -368,19 +371,7 @@
     {% include "partials/android_app_bar.html" %}
     {% endif %}
 
-    <script>
-        // Copy suggestion analytics
-        document.addEventListener('click', function (e) {
-            if (e.target.classList.contains('copy-btn')) {
-                const suggestionId = e.target.dataset.suggestionId || 'unknown';
-                gtag('event', 'copy_suggestion', {
-                    event_category: 'engagement',
-                    event_label: 'suggestion_' + suggestionId,
-                    value: 1
-                });
-            }
-        });
-    </script>
+
     {% block extra_scripts %}
     {% endblock %}
 </body>

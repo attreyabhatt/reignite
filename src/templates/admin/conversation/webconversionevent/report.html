@@ -1,0 +1,34 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+{% if error %}<p class="errornote">{{ error }}</p>{% else %}
+<p><strong>{{ experiment }}</strong> · {{ since|date:"Y-m-d H:i" }} to {{ as_of|date:"Y-m-d H:i" }}.</p>
+<p>First recorded event: {{ tracking_started|date:"Y-m-d H:i"|default:"No events yet" }}. Actual release time should be recorded in the rollout log.</p>
+<nav aria-label="Reporting period"><a href="?days=7">7 days</a> · <a href="?days=28">28 days</a> · <a href="?days=90">90 days</a></nav>
+<p>Android visitors are directed to the app; iPhone and desktop visitors to the web tool. See the separate <a href="{% url 'admin:reignitehome_marketingclickevent_funnel' %}">Android acquisition report</a> for app installs and purchases. Android visitors who choose the web tool are included here.</p>
+<h2>New guest cohorts and what happened within seven days</h2>
+<p>{{ cohort_count }} cohorts started in this period; {{ mature_count }} have a complete seven-day observation window. Linked accounts are counted once; other visitors are identified by their browser session.</p>
+<table><thead><tr><th>Milestone</th><th>All cohorts</th><th>Mature cohorts</th><th>Rate among mature cohorts</th></tr></thead>
+<tbody>{% for row in milestones %}<tr><td>{{ row.label }}</td><td>{{ row.count }}</td><td>{{ row.mature_count }}</td><td>{% if row.rate != None %}{{ row.rate }}%{% else %}Not enough time{% endif %}</td></tr>{% endfor %}</tbody></table>
+<p>Milestones can occur in different orders. Return usage means another successful generation on a later UTC date within seven days. Older visitors and direct account signups are excluded from this new-guest cohort.</p>
+<h2>All recorded web activity in this period</h2>
+<table><tbody>
+<tr><th>Guest browser sessions with a successful generation</th><td>{{ guest_session_count }}</td></tr>
+<tr><th>Successful generations</th><td>{{ totals.generated }}</td></tr>
+<tr><th>Copy actions</th><td>{{ totals.copied }}</td></tr>
+<tr><th>Continuation displays / clicks</th><td>{{ totals.offer_shown }} / {{ totals.offer_clicked }}</td></tr>
+<tr><th>Completed signups</th><td>{{ totals.signup }}</td></tr>
+<tr><th>Checkout redirects</th><td>{{ totals.checkout }}</td></tr>
+<tr><th>Completed website purchases (deduplicated)</th><td>{{ purchase_count }}</td></tr>
+<tr><th>First-time website buyers</th><td>{{ first_buyers }}</td></tr>
+<tr><th>First buyers outside a matched seven-day cohort</th><td>{{ unmatched_buyers }}</td></tr>
+</tbody></table>
+<p>A checkout redirect is not a completed payment. Purchases use completed Dodo records, deduplicated by transaction ID; blank historical IDs are counted by record. Staff accounts and Android payment records are excluded. Copy actions do not prove a message was sent.</p>
+<h2>Historical counters for comparison</h2>
+<p>{{ legacy_generations }} successful guest generations and {{ legacy_copies }} web copy actions in the older logging tables for this period. These overlap the new events after release: do not add the counts together. Historical guest-to-signup attribution is unavailable.</p>
+<h2>Where generated replies started</h2>
+<table><thead><tr><th>Page</th><th>Situation</th><th>Generations</th></tr></thead><tbody>
+{% for row in pages %}<tr><td>{{ row.path }}</td><td>{{ row.situation }}</td><td>{{ row.count }}</td></tr>{% empty %}<tr><td colspan="3">No generations recorded yet.</td></tr>{% endfor %}
+</tbody></table>
+<p>Review at day 28. If fewer than 150 guest sessions have generated successfully, extend observation to day 56. Review confirmed purchases and repeat use alongside signups; small samples do not establish a causal lift.</p>
+{% endif %}
+{% endblock %}

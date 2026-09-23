@@ -6,6 +6,7 @@
 {% block accountcontent %}
 <form method="post" action="{% url 'account_login' %}" novalidate>
     {% csrf_token %}
+            {% if redirect_field_value %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">{% endif %}
 
     <div class="mb-4">
         <label for="{{ form.login.id_for_label }}" class="block text-xs font-medium text-brand-muted dark:text-dbrand-muted mb-1.5">
@@ -53,7 +54,7 @@
 
     <div class="text-center mt-2 text-sm text-brand-muted dark:text-dbrand-muted">
         Don't have an account?
-        <a href="{% url 'account_signup' %}" class="font-semibold text-brand-primary dark:text-dbrand-primary no-underline">Sign up</a>
+        <a href="{% url 'account_signup' %}{% if redirect_field_value %}?{{ redirect_field_name }}={{ redirect_field_value|urlencode }}{% endif %}" class="font-semibold text-brand-primary dark:text-dbrand-primary no-underline">Sign up</a>
     </div>
 </form>
 {% endblock %}

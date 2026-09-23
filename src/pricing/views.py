@@ -9,6 +9,9 @@ import json
 from django.urls import reverse
 from django.contrib.auth.models import User
 from decouple import config
+from .catalog import CREDIT_PACKS
+from conversation.models import WebConversionEvent
+from conversation.web_conversion import record_event
 
 DODO_TEST_PRODUCT_IDS = {
     10: "pdt_QWDNC1hvRqnpHk4oxM9LK", 
@@ -23,11 +26,7 @@ DODO_LIVE_PRODUCT_IDS = {
 }
 
 def pricing(request):
-    credit_packs = [
-        {'amount': 10, 'price': 1.99},
-        {'amount': 50, 'price': 6.99},
-        {'amount': 200, 'price': 19.99},
-    ]
+    credit_packs = CREDIT_PACKS
     context = {'credit_packs': credit_packs}
     return render(request, 'pricing/pricing.html', context)
 
@@ -61,6 +60,8 @@ def purchase_credits(request, amount):
         f"{dodo_base_url}{product_id}"
         f"?quantity=1&redirect_url={redirect_url}"
     )
+
+    record_event(request, WebConversionEvent.Kind.CHECKOUT, credit_pack=amount)
 
     return redirect(payment_url)
 
@@ -128,5 +129,4 @@ def dodo_webhook(request):
 
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
 

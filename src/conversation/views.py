@@ -1,8 +1,11 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponse
+from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
-from .models import Conversation, ChatCredit, CopyEvent, GuestWebConversationAttempt, WebAppConfig
+from .models import Conversation, ChatCredit, CopyEvent, GuestWebConversationAttempt, WebAppConfig, WebConversionEvent
+from .web_conversion import (continuation_context, record_event, save_pending, restore_pending,
+                             journey_id, pending_draft)
 
 from conversation.utils.web.image_web import extract_conversation_from_image_web
 from conversation.utils.web.custom_web import generate_web_response
@@ -11,6 +14,7 @@ from conversation.utils.web_guest_logging import log_guest_web_attempt
 from django_ratelimit.decorators import ratelimit
 import json
 import re
+import uuid
 
 # --------- Helpers ---------
 ALLOWED_SITUATIONS = {
@@ -83,12 +87,14 @@ def _read_reply_input(request):
             "last_text": (data.get("last_text") or "").strip(),
             "situation": (data.get("situation") or "").strip(),
             "her_info": (data.get("her_info") or "").strip(),
+            "conversation_id": data.get("conversation_id"),
         }
 
     return {
         "last_text": (request.POST.get("last_text") or request.POST.get("last-reply") or "").strip(),
         "situation": (request.POST.get("situation") or "").strip(),
         "her_info": (request.POST.get("her_info") or "").strip(),
+        "conversation_id": request.POST.get("conversation_id"),
     }
 
 
@@ -201,12 +207,22 @@ def conversation_home(request):
     if not request.user.is_authenticated:
         return redirect('home')
 
+    restore_pending(request, request.user)
+    if request.GET.get("new") == "1":
+        request.session.pop("web_active_conversation", None)
     conversations = Conversation.objects.filter(user=request.user).order_by('-last_updated')
+    active = conversations.filter(pk=request.session.get("web_active_conversation")).first()
     chat_credit = request.user.chat_credit
     context = {
         'conversations': conversations,
         'chat_credits': chat_credit.balance,
-        'tool_config': _build_conversation_tool_config(),
+        'tool_config': _build_conversation_tool_config(**({
+            "prefill_text": active.content, "her_info_prefill": active.her_info,
+            "selected_situation": active.situation,
+        } if active else {})),
+        'active_conversation_id': active.pk if active else '',
+        'suggestions': active.latest_suggestions if active else [],
+        **continuation_context(request, chat_credit.balance, active.latest_generation_id if active else None),
     }
     return render(request, 'conversation/index.html', context)
 
@@ -313,24 +329,18 @@ def ajax_reply(request):
         if chat_credit.balance < 1:
             pricing_url = reverse('pricing:pricing')
             if is_htmx:
-                return _render_htmx_redirect(pricing_url)
+                active = Conversation.objects.filter(user=request.user, pk=request.session.get("web_active_conversation")).first()
+                return render(request, "conversation/partials/response_suggestions.html", {
+                    "suggestions": active.latest_suggestions if active else [],
+                    **continuation_context(request, 0, active.latest_generation_id if active else None),
+                })
             return JsonResponse({'redirect_url': pricing_url})
 
-        convo = Conversation.objects.filter(user=request.user, content=last_text).first()
-        if convo:
-            convo.content = last_text
-            convo.situation = situation
-            convo.her_info = her_info
-            convo.save()
-        else:
-            convo = Conversation.objects.create(
-                user=request.user,
-                content=last_text,
-                situation=situation,
-                her_info=her_info,
-                girl_title=generate_title(last_text),
-            )
-            created = True
+        conversation_id = str(data.get("conversation_id") or "")
+        if conversation_id.isdigit():
+            convo = Conversation.objects.filter(user=request.user, pk=conversation_id).first()
+        if convo is None:
+            convo = Conversation.objects.filter(user=request.user, content=last_text).first()
 
         try:
             custom_response, success = generate_web_response(last_text, situation, her_info)
@@ -353,11 +363,25 @@ def ajax_reply(request):
         chat_credit.balance = max(0, chat_credit.balance - 1)
         chat_credit.save()
         credits_left = chat_credit.balance
+        generation_id = uuid.uuid4()
+        if convo is None:
+            convo = Conversation(user=request.user, girl_title=generate_title(last_text))
+            created = True
+        convo.content = last_text
+        convo.situation = situation
+        convo.her_info = her_info
+        convo.latest_suggestions = suggestions
+        convo.latest_generation_id = generation_id
+        convo.save()
+        request.session["web_active_conversation"] = convo.pk
+        record_event(request, WebConversionEvent.Kind.GENERATED, generation_id=generation_id,
+                     situation=situation, dedupe_key=f"generated:{generation_id}")
 
         payload = {
             "custom": custom_response,
             "suggestions": suggestions,
             "credits_left": credits_left,
+            "generation_id": str(generation_id),
         }
         if created:
             payload["new_conversation"] = {"id": convo.id, "girl_title": convo.girl_title}
@@ -365,7 +389,9 @@ def ajax_reply(request):
         if not is_htmx:
             return JsonResponse(payload)
 
-        html_response = render(request, "conversation/partials/response_suggestions.html", {"suggestions": suggestions})
+        html_response = render(request, "conversation/partials/response_suggestions.html", {
+            "suggestions": suggestions, **continuation_context(request, credits_left, generation_id),
+        })
         triggers = {
             "creditsUpdated": {"credits_left": credits_left},
         }
@@ -388,7 +414,11 @@ def ajax_reply(request):
             error_message="Guest out of credits.",
         )
         if is_htmx:
-            return _render_htmx_redirect(signup_url)
+            draft = pending_draft(request) or {}
+            return render(request, "conversation/partials/response_suggestions.html", {
+                "suggestions": draft.get("suggestions", []),
+                **continuation_context(request, 0, draft.get("id")),
+            })
         return JsonResponse({'redirect_url': signup_url}, status=403)
 
     try:
@@ -441,11 +471,17 @@ def ajax_reply(request):
 
     request.session['chat_credits'] = max(0, credits - 1)
     credits_left = request.session['chat_credits']
+    generation_id = uuid.uuid4()
+    record_event(request, WebConversionEvent.Kind.GENERATED, generation_id=generation_id,
+                 situation=situation, dedupe_key=f"generated:{generation_id}")
+    save_pending(request, text=last_text, situation=situation, her_info=her_info,
+                 suggestions=suggestions, generation_id=generation_id)
 
     payload = {
         "custom": custom_response,
         "suggestions": suggestions,
         "credits_left": credits_left,
+        "generation_id": str(generation_id),
     }
     log_guest_web_attempt(
         request=request,
@@ -459,7 +495,9 @@ def ajax_reply(request):
     if not is_htmx:
         return JsonResponse(payload)
 
-    html_response = render(request, "conversation/partials/response_suggestions.html", {"suggestions": suggestions})
+    html_response = render(request, "conversation/partials/response_suggestions.html", {
+        "suggestions": suggestions, **continuation_context(request, credits_left, generation_id),
+    })
     html_response["HX-Trigger"] = json.dumps({
         "creditsUpdated": {"credits_left": credits_left},
     })
@@ -474,11 +512,16 @@ def conversation_detail(request, pk):
     except Conversation.DoesNotExist:
         return _json_error("Not found", status=404)
 
+    request.session["web_active_conversation"] = convo.pk
     return JsonResponse({
         'girl_title': convo.girl_title,
         'content': convo.content,
         'situation': convo.situation,
         'her_info': convo.her_info,
+        'result_html': render_to_string("conversation/partials/response_suggestions.html", {
+            "suggestions": convo.latest_suggestions,
+            **continuation_context(request, request.user.chat_credit.balance, convo.latest_generation_id),
+        }, request=request),
     })
 
 
@@ -497,7 +540,7 @@ def ocr_screenshot(request):
         if request.session['screenshot_credits'] <= 0:
             signup_url = reverse('account_signup')
             return _json_error(
-                "Screenshot upload limit reached. Sign up to unlock unlimited uploads.",
+                "Screenshot upload limit reached. Create a free account to continue with your chat.",
                 status=403, redirect_url=signup_url
             )
         request.session['screenshot_credits'] = max(0, request.session['screenshot_credits'] - 1)
@@ -594,4 +637,51 @@ def log_copy(request):
         copied_message=copied_message,
     )
 
+    generation = _owned_generation(request, data.get("generation_id"))
+    if generation:
+        action_id = _uuid(data.get("action_id")) or uuid.uuid4()
+        record_event(request, WebConversionEvent.Kind.COPIED, generation_id=generation.generation_id,
+                     situation=generation.situation, origin=generation.origin_path,
+                     dedupe_key=f"copy:{journey_id(request)}:{action_id}")
+
     return JsonResponse({'ok': True})
+
+
+def _uuid(value):
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _owned_generation(request, value):
+    generation_id = _uuid(value)
+    if not generation_id:
+        return None
+    events = WebConversionEvent.objects.filter(kind=WebConversionEvent.Kind.GENERATED, generation_id=generation_id)
+    if request.user.is_authenticated:
+        return events.filter(user=request.user).first()
+    return events.filter(journey_id=journey_id(request), user__isnull=True).first()
+
+
+@require_POST
+@ratelimit(key='ip', rate='200/d', block=True)
+def conversion_event(request):
+    try:
+        data = json.loads(request.body or "{}")
+    except (ValueError, UnicodeDecodeError):
+        return _json_error("Invalid event", 400)
+    if not isinstance(data, dict) or data.get("kind") not in {"offer_shown", "offer_clicked"}:
+        return _json_error("Invalid event", 400)
+    generation = _owned_generation(request, data.get("generation_id"))
+    if not generation:
+        return _json_error("Unknown result", 400)
+    offer = data.get("offer_kind")
+    if offer not in {"signup", "purchase"} or (offer == "signup" and request.user.is_authenticated):
+        return _json_error("Invalid offer", 400)
+    if offer == "purchase" and not request.user.is_authenticated:
+        return _json_error("Invalid offer", 400)
+    record_event(request, data["kind"], generation_id=generation.generation_id,
+                 situation=generation.situation, origin=generation.origin_path, offer_kind=offer,
+                 dedupe_key=f"{data['kind']}:{journey_id(request)}:{generation.generation_id}:{offer}")
+    return JsonResponse({"ok": True})

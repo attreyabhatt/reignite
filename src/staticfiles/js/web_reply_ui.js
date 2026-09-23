@@ -495,7 +495,13 @@
                 conversation_text: document.getElementById('last-reply')?.value || '',
                 copied_message: text,
                 conversation_id: document.getElementById('conversation-id')?.value || '',
+                generation_id: button.closest('[data-result-generation]')?.dataset.resultGeneration || '',
+                action_id: window.crypto?.randomUUID ? window.crypto.randomUUID() : '',
             };
+
+            if (typeof window.gtag === 'function') {
+                window.gtag('event', 'copy_suggestion', {event_category: 'engagement'});
+            }
 
             fetch('/conversations/copy/', {
                 method: 'POST',
@@ -599,7 +605,11 @@
                     updateCharCount();
                     toggleInputVisibility();
                     syncSituationControls();
-                    resetResponsePanel();
+                    if (data.result_html) {
+                        getResponsePanel().innerHTML = data.result_html;
+                    } else {
+                        resetResponsePanel();
+                    }
                 })
                 .catch(function () {
                     window.alert('Failed to load conversation.');
@@ -683,6 +693,41 @@
         });
     }
 
+    function setupContinuationTracking() {
+        const send = function (offer, kind) {
+            const generation = offer.closest('[data-result-generation]')?.dataset.resultGeneration;
+            if (!generation) return;
+            fetch('/conversations/conversion-event/', {
+                method: 'POST', keepalive: true,
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
+                body: JSON.stringify({kind: kind, generation_id: generation, offer_kind: offer.dataset.continuationOffer}),
+            }).catch(function () {});
+        };
+        const observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                    send(entry.target, 'offer_shown');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {threshold: 0.25});
+        const observe = function () {
+            document.querySelectorAll('[data-continuation-offer]').forEach(function (offer) {
+                if (offer.dataset.observed) return;
+                offer.dataset.observed = '1';
+                observer.observe(offer);
+            });
+        };
+        const panel = getResponsePanel();
+        if (panel) new MutationObserver(observe).observe(panel, {childList: true, subtree: true});
+        observe();
+        document.addEventListener('click', function (event) {
+            const link = event.target.closest('[data-continuation-click]');
+            const offer = link?.closest('[data-continuation-offer]');
+            if (offer) send(offer, 'offer_clicked');
+        });
+    }
+
     function initialize() {
         const textarea = document.getElementById('last-reply');
 
@@ -696,6 +741,7 @@
         setupKeyboardSubmit();
         setupHtmxFormLifecycle();
         setupCopyButtons();
+        setupContinuationTracking();
         setupConversationLoadAndDelete();
         setupOcrUpload();
         setSidebarVisibility();

@@ -5,7 +5,44 @@ from .models import (
     CopyEvent,
     GuestWebConversationAttempt,
     WebAppConfig,
+    WebConversionEvent,
 )
+
+
+@admin.register(WebConversionEvent)
+class WebConversionEventAdmin(admin.ModelAdmin):
+    change_list_template = "admin/conversation/webconversionevent/change_list.html"
+    list_display = ("created_at", "kind", "was_guest", "origin_path", "situation", "credit_pack")
+    list_filter = ("kind", "was_guest", "created_at")
+    readonly_fields = tuple(field.name for field in WebConversionEvent._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_urls(self):
+        from django.urls import path
+        return [path("report/", self.admin_site.admin_view(self.report_view),
+                     name="conversation_webconversionevent_report")] + super().get_urls()
+
+    def report_view(self, request):
+        from django.core.exceptions import PermissionDenied
+        from django.template.response import TemplateResponse
+        from .web_report import web_conversion_report
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        days = request.GET.get("days", "28")
+        context = {**self.admin_site.each_context(request), "title": "Website conversion experiment"}
+        if days not in {"7", "28", "90"}:
+            return TemplateResponse(request, "admin/conversation/webconversionevent/report.html",
+                                    {**context, "error": "Choose 7, 28 or 90 days."}, status=400)
+        return TemplateResponse(request, "admin/conversation/webconversionevent/report.html",
+                                {**context, **web_conversion_report(int(days))})
 
 @admin.register(ChatCredit)
 class ChatCreditAdmin(admin.ModelAdmin):

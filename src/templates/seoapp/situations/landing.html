@@ -109,6 +109,25 @@
             </p>
         </section>
 
+        {% if early_web_tool %}
+        {% include "partials/android_primary_action.html" %}
+        <section id="web-tool" class="situation-tool-layout mb-10">
+            <div class="pickup-tool-shell">
+                {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
+            </div>
+            <aside class="matte-card-tight p-4 sm:p-5">
+                <p class="text-xs font-semibold matte-copy uppercase tracking-wide mb-3">{{ tool_config.sidebar_heading|default:'Browse All Situations' }}</p>
+                <div class="space-y-1">
+                    {% for link in tool_config.sidebar_links %}
+                    <a href="{{ link.href }}" class="situation-sidebar-link{% if link.is_active %} is-active{% endif %}">
+                        {{ link.label }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </aside>
+        </section>
+        {% endif %}
+
         {% if situation_page.guide_content %}
         {% include "seoapp/partials/editorial_guide.html" with guide=situation_page.guide_content %}
         {% else %}
@@ -127,6 +146,7 @@
 
         {% include "partials/android_app_card.html" %}
 
+        {% if not early_web_tool %}
         <section class="situation-tool-layout mb-10">
             <div class="pickup-tool-shell">
                 {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
@@ -142,6 +162,7 @@
                 </div>
             </aside>
         </section>
+        {% endif %}
 
         {% if not situation_page.guide_content %}
         <section class="matte-card situation-seo-section p-6 sm:p-8 mb-8">

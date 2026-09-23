@@ -1,0 +1,9 @@
+{% if is_android_visitor %}
+<aside class="android-primary-action" aria-label="Continue in the Android app">
+    <p>Get replies tailored to your conversation in <strong>FlirtFix, our Android app.</strong></p>
+    <div>
+        {% include "partials/android_app_link.html" with placement="guide_primary" %}
+        <a href="#web-tool" class="web-secondary-action">Use the web version</a>
+    </div>
+</aside>
+{% endif %}

@@ -8,18 +8,20 @@
     <!-- Signup Form -->
     <div class="matte-card p-6 sm:p-8">
         <h4 class="text-center font-heading font-semibold text-xl mb-6">{% trans "Sign Up" %}</h4>
+        <p class="text-center matte-copy text-sm mb-5">Keep your conversations in a web account.{% if web_signup_bonus_credits %} {{ web_signup_bonus_credits }} free generation{{ web_signup_bonus_credits|pluralize }} (no card needed).{% endif %}</p>
 
         <form method="post" action="{% url 'account_signup' %}">
             {% csrf_token %}
+            {% if redirect_field_value %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">{% endif %}
 
             {% if request.GET.message == "out_of_credits" %}
             <div class="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 mb-4 text-center text-sm text-amber-800 dark:text-amber-300">
-                You're out of chat credits. <br>Sign up to unlock unlimited replies!
+                You're out of chat credits. <br>Create a free account to keep your conversation{% if web_signup_bonus_credits %} and get {{ web_signup_bonus_credits }} more free generation{{ web_signup_bonus_credits|pluralize }}{% endif %}.
             </div>
             {% endif %}
             {% if request.GET.message == "out_of_screenshots" %}
             <div class="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 mb-4 text-center text-sm text-amber-800 dark:text-amber-300">
-                Screenshot upload limit Reached.<br>Sign up to unlock unlimited uploads!
+                Screenshot upload limit Reached.<br>Create a free account to continue with your conversation.
             </div>
             {% endif %}
 
@@ -70,7 +72,7 @@
         <hr class="my-5 border-brand-outline dark:border-dbrand-outline">
         <p class="text-center text-sm text-brand-muted dark:text-dbrand-muted">
             Already have an account?
-            <a href="{% url 'account_login' %}" class="font-semibold text-brand-primary dark:text-dbrand-primary no-underline">Sign in</a>
+            <a href="{% url 'account_login' %}{% if redirect_field_value %}?{{ redirect_field_name }}={{ redirect_field_value|urlencode }}{% endif %}" class="font-semibold text-brand-primary dark:text-dbrand-primary no-underline">Sign in</a>
         </p>
     </div>
 
@@ -81,17 +83,17 @@
                 <thead>
                     <tr class="text-xs text-brand-muted dark:text-dbrand-muted">
                         <th class="text-left py-2"></th>
-                        <th class="py-2">Demo</th>
-                        <th class="py-2 font-bold text-brand-primary dark:text-dbrand-primary">Full App</th>
+                        <th class="py-2">Guest web tool</th>
+                        <th class="py-2 font-bold text-brand-primary dark:text-dbrand-primary">Web account</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-brand-outline/30 dark:divide-dbrand-outline/30">
-                    <tr><td class="text-left py-2.5">AI Comeback Generator</td><td><i class="fa fa-check text-green-500"></i></td><td><i class="fa fa-check text-green-500"></i></td></tr>
-                    <tr><td class="text-left py-2.5"><strong>3 unique comeback styles</strong><br><span class="text-xs text-brand-muted dark:text-dbrand-muted">(Playful, Flirty, Mysterious)</span></td><td><i class="fa fa-minus text-red-400"></i></td><td><i class="fa fa-check text-green-500"></i></td></tr>
-                    <tr><td class="text-left py-2.5">Upload screenshots</td><td><i class="fa fa-minus text-red-400"></i></td><td><i class="fa fa-check text-green-500"></i></td></tr>
+                    <tr><td class="text-left py-2.5">Personalized reply suggestions</td><td><i class="fa fa-check text-green-500"></i></td><td><i class="fa fa-check text-green-500"></i></td></tr>
+                    <tr><td class="text-left py-2.5"><strong>Three suggestions per generation</strong><br><span class="text-xs text-brand-muted dark:text-dbrand-muted">Choose the reply that sounds like you</span></td><td><i class="fa fa-check text-green-500"></i></td><td><i class="fa fa-check text-green-500"></i></td></tr>
+                    <tr><td class="text-left py-2.5">Upload screenshots</td><td><i class="fa fa-check text-green-500"></i></td><td><i class="fa fa-check text-green-500"></i></td></tr>
                     <tr><td class="text-left py-2.5">Save & revisit your chats</td><td><i class="fa fa-minus text-red-400"></i></td><td><i class="fa fa-check text-green-500"></i></td></tr>
                     <tr><td class="text-left py-2.5">Organize & delete conversations</td><td><i class="fa fa-minus text-red-400"></i></td><td><i class="fa fa-check text-green-500"></i></td></tr>
-                    <tr><td class="text-left py-2.5">{{ web_signup_bonus_credits }} Free Credits (no card needed)</td><td><i class="fa fa-minus text-red-400"></i></td><td><span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">Free</span></td></tr>
+                    <tr><td class="text-left py-2.5">Free generations</td><td>{{ web_guest_reply_limit }} to try</td><td>{{ web_signup_bonus_credits }} with signup</td></tr>
                 </tbody>
             </table>
         </div>

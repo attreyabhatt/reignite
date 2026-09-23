@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.db.utils import OperationalError, ProgrammingError
 from django.urls import reverse
 
@@ -14,7 +15,8 @@ DEFAULT_WEB_SIGNUP_BONUS_CREDITS = 3
 
 def public_site_metadata(request):
     return {"public_site_url": public_url("/").rstrip("/"),
-            "canonical_url": public_url(request.path)}
+            "canonical_url": public_url(request.path),
+            "web_analytics_enabled": getattr(settings, "WEB_ANALYTICS_ENABLED", True)}
 
 
 def android_app_promotion(request):
@@ -31,6 +33,9 @@ def android_app_promotion(request):
     }.get(match.url_name if match else None)
     if not page_group:
         return {}
+
+    is_android = (request.headers.get("Sec-CH-UA-Platform", "").strip('"').lower() == "android"
+                  or "android" in request.headers.get("User-Agent", "").lower())
 
     title, description = {
         "pickup_lines": (
@@ -66,7 +71,7 @@ def android_app_promotion(request):
         attribution.update(utm_source=source, utm_medium="organic_social", utm_campaign="flirtfix_reach_2026_09")
         content_prefix = video + "_"
     query = urlencode(attribution)
-    return {"android_app_promo": {
+    return {"is_android_visitor": is_android, "android_app_promo": {
         "page_group": page_group,
         "title": title,
         "description": description,
@@ -83,8 +88,8 @@ def web_marketing_limits(request):
 
     try:
         cfg = WebAppConfig.load()
-        guest_limit = int(cfg.guest_reply_limit or DEFAULT_WEB_GUEST_REPLY_LIMIT)
-        signup_bonus = int(cfg.signup_bonus_credits or DEFAULT_WEB_SIGNUP_BONUS_CREDITS)
+        guest_limit = int(cfg.guest_reply_limit)
+        signup_bonus = int(cfg.signup_bonus_credits)
     except (OperationalError, ProgrammingError):
         pass
 

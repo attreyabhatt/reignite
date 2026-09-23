@@ -15,7 +15,7 @@
         class="pickup-tool-form"
     >
         {% csrf_token %}
-        <input type="hidden" id="conversation-id" name="conversation_id" value="">
+        <input type="hidden" id="conversation-id" name="conversation_id" value="{{ active_conversation_id|default:'' }}">
 
         <div class="pickup-tool-inputs">
             <div class="pickup-form-section">
@@ -117,6 +117,7 @@
                 >
                     <i class="fa fa-bolt mr-2"></i>{{ tool_config.submit_label|default:'Generate Replies' }}
                 </button>
+                <p class="web-credit-explanation">One credit generates three reply suggestions.</p>
                 {% if tool_config.show_credits %}
                 <p class="pickup-credits-note {{ tool_config.credits_note_class|default:'' }}">
                     <i class="fa fa-circle text-[0.45rem] text-[#28D07A] mr-1"></i><span id="chatCredits">{{ chat_credits }}</span> {{ tool_config.credits_label|default:'Credits Remaining' }}
@@ -131,7 +132,11 @@
                     <i class="fa-solid fa-sparkles"></i>{{ tool_config.response_heading|default:'Send-Ready Replies' }}
                 </div>
                 <div id="responsePanel">
+                    {% if suggestions or continuation_kind %}
+                    {% include "conversation/partials/response_suggestions.html" %}
+                    {% else %}
                     {% include tool_config.response_empty_template|default:'conversation/partials/response_empty.html' %}
+                    {% endif %}
                 </div>
             </div>
         </aside>
@@ -154,7 +159,7 @@
             class="{% if tool_config.ui_variant == 'pickup' %}pickup-tool-form{% endif %}"
         >
             {% csrf_token %}
-            <input type="hidden" id="conversation-id" name="conversation_id" value="">
+            <input type="hidden" id="conversation-id" name="conversation_id" value="{{ active_conversation_id|default:'' }}">
 
             <div class="{% if tool_config.ui_variant == 'pickup' %}pickup-tool-block{% else %}mb-4{% endif %}">
                 <label for="situation-more" class="block text-sm font-semibold mb-2 {% if tool_config.ui_variant == 'pickup' %}pickup-tool-label{% endif %}">
@@ -286,6 +291,7 @@
                 >
                     <i class="fa fa-bolt mr-2"></i>{{ tool_config.submit_label|default:'Generate Replies' }}
                 </button>
+                <p class="web-credit-explanation">One credit generates three reply suggestions.</p>
                 {% if tool_config.show_credits %}
                 <p class="{{ tool_config.credits_note_class|default:'matte-credit-note mt-3 text-center' }}">
                     <i class="fa fa-circle text-[0.45rem] text-[#28D07A] mr-1"></i><span id="chatCredits">{{ chat_credits }}</span> {{ tool_config.credits_label|default:'Credits Remaining' }}
@@ -301,7 +307,11 @@
                 <i class="fa-solid fa-sparkles mr-1 text-[#FF2D6D]"></i>{{ tool_config.response_heading|default:'Send-Ready Replies' }}
             </div>
             <div id="responsePanel">
-                {% include tool_config.response_empty_template|default:'conversation/partials/response_empty.html' %}
+                {% if suggestions or continuation_kind %}
+                    {% include "conversation/partials/response_suggestions.html" %}
+                    {% else %}
+                    {% include tool_config.response_empty_template|default:'conversation/partials/response_empty.html' %}
+                    {% endif %}
             </div>
         </div>
         {% if tool_config.sidebar_links %}

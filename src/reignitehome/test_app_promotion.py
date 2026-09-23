@@ -57,7 +57,8 @@ class AndroidAppPromotionTests(TestCase):
                 links = AppLinkParser(response.content.decode()).links
                 self.assertTrue({"inline_card", "android_bar", "footer"} <= links.keys())
                 if group == "home":
-                    self.assertIn("hero", links)
+                    self.assertContains(response, 'href="#try"')
+                    self.assertLess(response.content.index(b'id="chatForm"'), response.content.index(b'data-app-promo-placement="inline_card"'))
                 for placement, href in links.items():
                     parsed = urlparse(href)
                     self.assertEqual(parsed.path, reverse("flirtfix_redirect"))

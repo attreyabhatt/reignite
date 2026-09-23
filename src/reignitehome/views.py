@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.vary import vary_on_headers
 from django_ratelimit.decorators import ratelimit
 
 from conversation.models import GuestWebConversationAttempt, WebAppConfig
@@ -92,6 +93,8 @@ def _get_web_config():
 
 
 def _build_guest_chat_context(request):
+    if request.user.is_authenticated:
+        return {"chat_credits": request.user.chat_credit.balance}
     if "chat_credits" not in request.session:
         request.session["chat_credits"] = _get_web_config().guest_reply_limit
 
@@ -269,6 +272,7 @@ def ratelimited_error(request, exception=None):
     )
 
 
+@vary_on_headers("User-Agent", "Sec-CH-UA-Platform")
 def home(request):
     context = _build_guest_chat_context(request)
     context["tool_config"] = _build_tool_config(
@@ -450,7 +454,7 @@ def ajax_reply_home(request):
             error_message="Guest out of credits.",
         )
         return JsonResponse({
-            'error': "You're out of chat credits. Sign up to unlock unlimited replies.",
+            'error': "You're out of chat credits. Create a free account to continue with more generations.",
             'redirect_url': signup_url
         }, status=403)
 
@@ -470,7 +474,7 @@ def ajax_reply_home(request):
             error_message="Guest out of credits.",
         )
         return JsonResponse({
-            'error': "You're out of chat credits. Sign up to unlock unlimited replies.",
+            'error': "You're out of chat credits. Create a free account to continue with more generations.",
             'redirect_url': signup_url
         }, status=403)
 

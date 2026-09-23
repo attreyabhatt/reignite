@@ -57,4 +57,9 @@ class AccountAdapter(DefaultAccountAdapter):
         if update_fields:
             chat_credit.save(update_fields=update_fields)
 
+        from conversation.web_conversion import link_account, record_event
+        from conversation.models import WebConversionEvent
+        link_account(request, user)
+        record_event(request, WebConversionEvent.Kind.SIGNUP, user=user,
+                     dedupe_key=f"signup:{user.pk}")
         return user

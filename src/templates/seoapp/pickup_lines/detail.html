@@ -146,10 +146,18 @@
             <p class="pickup-hero-copy">{{ pickup_topic.seo_intro }}</p>
         </section>
 
+        {% if early_web_tool %}
+        {% include "partials/android_primary_action.html" %}
+        <section id="web-tool" class="pickup-tool-shell mb-7" aria-label="Personalize your next message">
+            <div class="web-tool-intro"><h2>Make it fit your conversation</h2><p class="matte-copy">Get three suggestions using details from your actual chat or their profile.</p></div>
+            {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
+        </section>
+        {% endif %}
+
         {% if pickup_topic.guide_content %}
         {% include "seoapp/partials/editorial_guide.html" with guide=pickup_topic.guide_content %}
         {% include "partials/android_app_card.html" %}
-        {% if not pickup_topic.guide_content.hide_tool %}
+        {% if not pickup_topic.guide_content.hide_tool and not early_web_tool %}
         <section class="pickup-tool-shell mb-7" aria-label="Personalize your next message">
             {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
         </section>
@@ -169,10 +177,12 @@
 
         {% include "partials/android_app_card.html" %}
 
+        {% if not early_web_tool %}
         <section class="pickup-tool-shell mb-7">
             {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
         </section>
 
+        {% endif %}
         <section class="pickup-lines-card mb-7">
             <h2 class="pickup-lines-title matte-headline font-bold">The "Direct &amp; Flirty" Openers</h2>
             <ol class="pickup-lines-list">

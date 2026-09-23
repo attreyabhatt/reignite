@@ -58,7 +58,7 @@ class AjaxReplyViewTests(TestCase):
         self.assertContains(response, 'Could not generate replies')
         self.assertContains(response, 'Conversation text is required.')
 
-    def test_htmx_redirect_when_user_has_no_credits(self):
+    def test_htmx_inline_offer_when_user_has_no_credits(self):
         chat_credit = self.user.chat_credit
         chat_credit.balance = 0
         chat_credit.save()
@@ -74,7 +74,9 @@ class AjaxReplyViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers.get('HX-Redirect'), reverse('pricing:pricing'))
+        self.assertNotIn('HX-Redirect', response.headers)
+        self.assertContains(response, '/pricing/purchase/10/')
+        self.assertContains(response, '$1.99')
 
     @patch('conversation.views.generate_web_response')
     def test_non_htmx_success_returns_json_with_custom_and_suggestions(self, mock_generate):

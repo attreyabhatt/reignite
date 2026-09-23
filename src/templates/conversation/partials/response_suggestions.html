@@ -1,3 +1,4 @@
+<div data-result-generation="{{ suggestions_generation_id|default:'' }}">
 {% if suggestions %}
     {% for suggestion in suggestions %}
     <div class="relative matte-card-tight p-4 {% if not forloop.last %}mb-3{% endif %}">
@@ -13,6 +14,7 @@
             data-copy-target="suggestedReplyMsg{{ forloop.counter }}"
             data-suggestion-id="{{ forloop.counter }}"
             title="Copy"
+            aria-label="Copy suggestion {{ forloop.counter }}"
         >
             <i class="fa fa-copy"></i>
             <span class="copied-tooltip bg-[#1B1E25] text-white">Copied!</span>
@@ -26,3 +28,19 @@
 {% else %}
     {% include "conversation/partials/response_empty.html" %}
 {% endif %}
+{% if continuation_kind %}
+<section class="web-continuation" data-continuation-offer="{{ continuation_kind }}" aria-label="Continue your conversation">
+    {% if continuation_kind == 'signup' %}
+        <h3>{% if result_credits_left == 0 %}Continue this conversation{% else %}Keep this conversation for their next reply{% endif %}</h3>
+        <p>{% if suggestions %}Your chat and these suggestions will be ready in your account.{% else %}Create a web account to keep your conversations in one place.{% endif %}</p>
+        <a class="matte-btn-primary web-continuation-button" data-continuation-click href="{{ continuation_signup_url }}">{% if continuation_bonus %}Get {{ continuation_bonus }} more free generation{{ continuation_bonus|pluralize }}{% else %}Create your free account{% endif %}</a>
+        <p class="web-continuation-note">{% if continuation_bonus %}{{ continuation_bonus }} generation{{ continuation_bonus|pluralize }} included with signup. {% endif %}No card required. <a href="{{ continuation_login_url }}" data-continuation-click>Already have an account? Sign in</a></p>
+    {% else %}
+        <h3>Your next reply is worth thinking through.</h3>
+        <p>You've used your available credits. Keep this conversation going with three suggestions per generation.</p>
+        <a class="matte-btn-primary web-continuation-button" data-continuation-click href="{% url 'pricing:purchase' starter_pack.amount %}">{{ starter_pack.amount }} more generations — ${{ starter_pack.price }}<span class="web-continuation-payment">One-time payment</span></a>
+        <p class="web-continuation-note"><a href="{% url 'pricing:pricing' %}">See all packs</a> · No subscription.</p>
+    {% endif %}
+</section>
+{% endif %}
+</div>

@@ -1,0 +1,14 @@
+.web-continuation { margin-top: 1.25rem; padding: 1.1rem; border: 1px solid #5e3450; border-radius: 1rem; background: #211824; }
+.web-continuation h3 { font-size: 1.15rem; line-height: 1.4; color: #f4f2ee; margin: 0 0 .55rem; }
+.web-continuation p { color: #b5bed4; font-size: .9rem; line-height: 1.6; margin: .6rem 0; }
+.web-continuation-button { display: block; padding: .85rem 1rem; text-align: center; text-decoration: none; white-space: normal; line-height: 1.45; }
+.web-continuation-payment { display: block; font-size: .78rem; font-weight: 400; margin-top: .15rem; }
+.web-continuation .web-continuation-note { font-size: .78rem; margin-bottom: 0; }
+.web-continuation-note a { color: #e9b6ce; text-decoration: underline; }
+.web-credit-explanation { color: #b5bed4; font-size: .78rem; line-height: 1.5; text-align: center; margin-top: .65rem; }
+.web-tool-intro { margin-bottom: 1.1rem; }
+.web-tool-intro h2 { font-size: 1.5rem; margin-bottom: .45rem; }
+.web-secondary-action { display: inline-block; color: #B5BED4; text-underline-offset: 4px; font-size: .9rem; }
+.android-primary-action { margin-bottom: 1.5rem; padding: 1.25rem; border: 1px solid #663044; border-radius: 12px; background: #191820; }
+.android-primary-action p { color: #D8DCE6; margin-bottom: 1rem; }
+.android-primary-action > div { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
