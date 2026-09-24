@@ -55,6 +55,11 @@ urlpatterns = [
         "robots.txt",
         TemplateView.as_view(template_name="robots.txt", content_type="text/plain"),
     ),
+    path(
+        "app-ads.txt",
+        TemplateView.as_view(template_name="app-ads.txt", content_type="text/plain"),
+        name="app_ads_txt",
+    ),
     
 
     

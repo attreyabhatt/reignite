@@ -157,6 +157,15 @@ class SituationSeoPagesTests(TestCase):
         self.assertContains(response, "Disallow: /accounts/")
         self.assertContains(response, "Sitemap: https://www.tryagaintext.com/sitemap.xml")
 
+    def test_app_ads_txt_is_available_at_the_site_root(self):
+        response = self.client.get("/app-ads.txt")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/plain")
+        self.assertEqual(
+            response.content.decode(),
+            "google.com, pub-6625776524833074, DIRECT, f08c47fec0942fa0\n",
+        )
+
     def test_situation_page_seo_head_includes_canonical_and_meta_description(self):
         page = list_situation_pages()[0]
         response = self.client.get(
