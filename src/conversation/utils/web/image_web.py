@@ -14,10 +14,11 @@ from PIL import Image
 
 from conversation.models import WebAppConfig
 
+from ..gemini_config import normalize_gemini_thinking_level
+
 from .openai_web import GPT_MODEL, extract_conversation_from_image_openai_web
 
 GEMINI_FLASH = "gemini-3-flash-preview"
-VALID_THINKING_LEVELS = {"minimal", "low", "medium", "high"}
 WEB_DEFAULT_THINKING = "minimal"
 
 
@@ -27,10 +28,7 @@ def _get_client():
 
 
 def _normalize_thinking_level(thinking_level: str, default: str = WEB_DEFAULT_THINKING) -> str:
-    level = (thinking_level or "").strip().lower()
-    if level in VALID_THINKING_LEVELS:
-        return level
-    return default
+    return normalize_gemini_thinking_level(thinking_level, GEMINI_FLASH, default)
 
 
 def _get_provider_order():

@@ -13,6 +13,8 @@ import time
 from typing import Any, Dict
 from PIL import Image
 
+from ..gemini_config import normalize_gemini_thinking_level
+
 from .openai_mobile import extract_conversation_from_image_openai
 
 # Initialize Gemini client
@@ -20,14 +22,10 @@ client = genai.Client(api_key=config('GEMINI_API_KEY'))
 
 GEMINI_FLASH = "gemini-3-flash-preview"
 GPT_MODEL = "gpt-4.1-mini-2025-04-14"
-VALID_THINKING_LEVELS = {"minimal", "low", "medium", "high"}
 
 
 def _normalize_thinking_level(thinking_level: str, default: str = "low") -> str:
-    level = (thinking_level or "").strip().lower()
-    if level in VALID_THINKING_LEVELS:
-        return level
-    return default
+    return normalize_gemini_thinking_level(thinking_level, GEMINI_FLASH, default)
 
 
 def _extract_usage(response: Any) -> Dict[str, int]:

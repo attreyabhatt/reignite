@@ -10,6 +10,8 @@ from decouple import config
 import json
 from typing import Tuple, Optional, Dict, Any
 
+from ..gemini_config import normalize_gemini_thinking_level
+
 from .prompts_mobile import (
     get_mobile_opener_prompt,
     get_mobile_opener_user_prompt,
@@ -29,8 +31,6 @@ GEMINI_PRO = "gemini-3-pro-preview"      # For openers (paid users)
 GEMINI_FLASH = "gemini-3-flash-preview"  # For replies and free users
 GPT_MODEL = "gpt-4.1-mini-2025-04-14"    # Fallback model
 
-VALID_THINKING_LEVELS = {"minimal", "low", "medium", "high"}
-
 
 def _normalize_model(model: Optional[str], default: str) -> str:
     """Return a non-empty model name."""
@@ -38,12 +38,11 @@ def _normalize_model(model: Optional[str], default: str) -> str:
     return model or default
 
 
-def _normalize_thinking_level(thinking_level: Optional[str], default: str = "high") -> str:
+def _normalize_thinking_level(
+    thinking_level: Optional[str], default: str = "high", model: str = ""
+) -> str:
     """Clamp thinking level to a supported value."""
-    level = (thinking_level or "").strip().lower()
-    if level in VALID_THINKING_LEVELS:
-        return level
-    return default
+    return normalize_gemini_thinking_level(thinking_level, model, default)
 
 
 def _is_gemini_model(model: str) -> bool:
@@ -73,18 +72,18 @@ def _empty_usage() -> Dict[str, int]:
 
 # Config factories — thinking level is now caller-supplied
 
-def _make_text_config(thinking_level: Optional[str] = "high"):
+def _make_text_config(thinking_level: Optional[str] = "high", model: str = GEMINI_FLASH):
     """Build a text-only Gemini config with the given thinking level."""
-    thinking_level = _normalize_thinking_level(thinking_level)
+    thinking_level = _normalize_thinking_level(thinking_level, model=model)
     return types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
         temperature=1.0,
         top_p=0.95,
     )
 
-def _make_image_config(thinking_level: Optional[str] = "high"):
+def _make_image_config(thinking_level: Optional[str] = "high", model: str = GEMINI_FLASH):
     """Build an image Gemini config with the given thinking level."""
-    thinking_level = _normalize_thinking_level(thinking_level)
+    thinking_level = _normalize_thinking_level(thinking_level, model=model)
     return types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
         media_resolution="media_resolution_high",
@@ -170,7 +169,7 @@ def _call_gemini_openers(
             image_part,
             user_prompt,
         ],
-        config=_make_image_config(thinking_level)
+        config=_make_image_config(thinking_level, model=model)
     )
 
     ai_reply = _validate_and_clean_json(response.text)
@@ -287,7 +286,10 @@ def generate_mobile_openers_from_image(
 
     # Log final result
     if success:
-        thinking_for_log = thinking_level if _is_gemini_model(model_used or "") else "n/a"
+        thinking_for_log = (
+            _normalize_thinking_level(thinking_level, model=model_used)
+            if _is_gemini_model(model_used or "") else "n/a"
+        )
         print(
             f"[AI-ACTION] action=openers model_used={model_used} "
             f"thinking={thinking_for_log} status=success"
@@ -442,7 +444,10 @@ def generate_mobile_response(
 
     # Log final result
     if success:
-        thinking_for_log = thinking_level if _is_gemini_model(model_used or "") else "n/a"
+        thinking_for_log = (
+            _normalize_thinking_level(thinking_level, model=model_used)
+            if _is_gemini_model(model_used or "") else "n/a"
+        )
         print(
             f"[AI-ACTION] action=replies model_used={model_used} "
             f"thinking={thinking_for_log} status=success"
@@ -494,7 +499,7 @@ def _generate_gemini_response(
             system_prompt,
             user_prompt,
         ],
-        config=_make_text_config(thinking_level)
+        config=_make_text_config(thinking_level, model=model)
     )
 
     usage_info = _extract_usage(response)

@@ -13,6 +13,8 @@ from google.genai import types
 
 from conversation.models import WebAppConfig
 
+from ..gemini_config import normalize_gemini_thinking_level
+
 from .prompts_web import (
     get_web_opener_prompt,
     get_web_opener_user_prompt,
@@ -22,7 +24,6 @@ from .prompts_web import (
 from .openai_web import GPT_MODEL, generate_replies_openai_web
 
 GEMINI_FLASH = "gemini-3-flash-preview"
-VALID_THINKING_LEVELS = {"minimal", "low", "medium", "high"}
 WEB_DEFAULT_THINKING = "minimal"
 
 
@@ -32,10 +33,7 @@ def _get_client():
 
 
 def _normalize_thinking_level(thinking_level: str, default: str = WEB_DEFAULT_THINKING) -> str:
-    level = (thinking_level or "").strip().lower()
-    if level in VALID_THINKING_LEVELS:
-        return level
-    return default
+    return normalize_gemini_thinking_level(thinking_level, GEMINI_FLASH, default)
 
 
 def _get_provider_order():
@@ -207,7 +205,7 @@ def generate_web_response(
 
     success = False
     usage_info = _empty_usage()
-    thinking_level = WEB_DEFAULT_THINKING
+    thinking_level = _normalize_thinking_level(WEB_DEFAULT_THINKING)
     model_used = "none"
     thinking_used = thinking_level
 
