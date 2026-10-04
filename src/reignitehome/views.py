@@ -15,7 +15,8 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.vary import vary_on_headers
 from django_ratelimit.decorators import ratelimit
 
-from conversation.models import GuestWebConversationAttempt, WebAppConfig
+from conversation.models import GuestWebConversationAttempt
+from conversation.web_credits import get_guest_chat_credits, use_guest_chat_credit
 from conversation.utils.web_guest_logging import log_guest_web_attempt
 from conversation.utils.reignite_gpt import generate_reignite_comeback
 from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
@@ -88,17 +89,10 @@ DEFAULT_TOOL_CONVERSATION_PLACEHOLDER = "you: hey, free thursday?\nher: (seen, n
 DEFAULT_TOOL_UPLOAD_HINT = "Drag & drop a chat screenshot, or paste your convo below."
 
 
-def _get_web_config():
-    return WebAppConfig.load()
-
-
 def _build_guest_chat_context(request):
     if request.user.is_authenticated:
         return {"chat_credits": request.user.chat_credit.balance}
-    if "chat_credits" not in request.session:
-        request.session["chat_credits"] = _get_web_config().guest_reply_limit
-
-    current_chat_credits = request.session["chat_credits"]
+    current_chat_credits = get_guest_chat_credits(request)
 
     ip = get_client_ip(request)
     trial_record, created = TrialIP.objects.get_or_create(ip_address=ip)
@@ -458,7 +452,7 @@ def ajax_reply_home(request):
             'redirect_url': signup_url
         }, status=403)
 
-    credits = request.session.get('chat_credits', _get_web_config().guest_reply_limit)
+    credits = get_guest_chat_credits(request)
     guest_input_payload["credits_before"] = int(credits)
     if credits <= 0:
         trial_record.trial_used = True
@@ -570,10 +564,10 @@ def ajax_reply_home(request):
         )
         return JsonResponse({"error": error_message}, status=502)
 
-    request.session['chat_credits'] = max(0, credits - 1)
+    credits_left = use_guest_chat_credit(request)
     payload = {
         "custom": custom_response,
-        "credits_left": request.session['chat_credits'],
+        "credits_left": credits_left,
     }
     log_guest_web_attempt(
         request=request,

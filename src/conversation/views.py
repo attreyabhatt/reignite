@@ -3,7 +3,8 @@ from django.urls import reverse
 from django.http import JsonResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
-from .models import Conversation, ChatCredit, CopyEvent, GuestWebConversationAttempt, WebAppConfig, WebConversionEvent
+from .models import Conversation, ChatCredit, CopyEvent, GuestWebConversationAttempt, WebConversionEvent
+from .web_credits import get_guest_chat_credits, use_guest_chat_credit
 from .web_conversion import (continuation_context, record_event, save_pending, restore_pending,
                              journey_id, pending_draft)
 
@@ -70,10 +71,6 @@ def _json_error(msg, status=400, redirect_url=None):
     if redirect_url:
         payload["redirect_url"] = redirect_url
     return JsonResponse(payload, status=status)
-
-
-def _get_web_config():
-    return WebAppConfig.load()
 
 
 def _read_reply_input(request):
@@ -400,8 +397,7 @@ def ajax_reply(request):
         html_response["HX-Trigger"] = json.dumps(triggers)
         return html_response
 
-    guest_limit = _get_web_config().guest_reply_limit
-    credits = int(request.session.get('chat_credits', guest_limit))
+    credits = get_guest_chat_credits(request)
     if credits < 1:
         signup_url = reverse('account_signup') + "?next=/conversations/&message=out_of_credits"
         log_guest_web_attempt(
@@ -415,10 +411,12 @@ def ajax_reply(request):
         )
         if is_htmx:
             draft = pending_draft(request) or {}
-            return render(request, "conversation/partials/response_suggestions.html", {
+            response = render(request, "conversation/partials/response_suggestions.html", {
                 "suggestions": draft.get("suggestions", []),
                 **continuation_context(request, 0, draft.get("id")),
             })
+            response["HX-Trigger"] = json.dumps({"creditsUpdated": {"credits_left": 0}})
+            return response
         return JsonResponse({'redirect_url': signup_url}, status=403)
 
     try:
@@ -469,8 +467,7 @@ def ajax_reply(request):
         )
         return _json_or_htmx_error(request, is_htmx, error_message, status=500)
 
-    request.session['chat_credits'] = max(0, credits - 1)
-    credits_left = request.session['chat_credits']
+    credits_left = use_guest_chat_credit(request)
     generation_id = uuid.uuid4()
     record_event(request, WebConversionEvent.Kind.GENERATED, generation_id=generation_id,
                  situation=situation, dedupe_key=f"generated:{generation_id}")
@@ -533,7 +530,7 @@ def ocr_screenshot(request):
     # Auth / session credits
     if not request.user.is_authenticated:
         # Initialize session credits if missing
-        request.session.setdefault('chat_credits', _get_web_config().guest_reply_limit)
+        get_guest_chat_credits(request)
         request.session.setdefault('screenshot_credits', 5)
 
         # Deduct one screenshot credit (floor at 0)

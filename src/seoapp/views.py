@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.vary import vary_on_headers
 
-from conversation.models import WebAppConfig
+from conversation.web_credits import get_guest_chat_credits
 from reignitehome.models import TrialIP
 from reignitehome.utils.ip_check import get_client_ip
 from django.db.models import Count, Q
@@ -24,17 +24,10 @@ DEFAULT_TOOL_CONVERSATION_PLACEHOLDER = "you: hey, free thursday?\nher: (seen, n
 DEFAULT_TOOL_UPLOAD_HINT = "Drag & drop a chat screenshot, or paste your convo below."
 
 
-def _get_web_config():
-    return WebAppConfig.load()
-
-
 def _build_guest_chat_context(request):
     if request.user.is_authenticated:
         return {"chat_credits": request.user.chat_credit.balance}
-    if "chat_credits" not in request.session:
-        request.session["chat_credits"] = _get_web_config().guest_reply_limit
-
-    current_chat_credits = request.session["chat_credits"]
+    current_chat_credits = get_guest_chat_credits(request)
 
     ip = get_client_ip(request)
     trial_record, created = TrialIP.objects.get_or_create(ip_address=ip)
