@@ -250,7 +250,7 @@ class MobileAppConfig(models.Model):
 
 
 class WebAppConfig(models.Model):
-    """Singleton config for web AI provider routing."""
+    """Singleton config for web AI models and provider routing."""
 
     PROVIDER_GEMINI = "gemini"
     PROVIDER_GPT = "gpt"
@@ -264,6 +264,30 @@ class WebAppConfig(models.Model):
         choices=PROVIDER_CHOICES,
         default=PROVIDER_GEMINI,
         help_text="Primary AI provider for webapp generation and OCR.",
+    )
+    gemini_reply_model = models.CharField(
+        max_length=100, default="gemini-3-flash-preview",
+        help_text="Gemini model for web replies and openers, e.g. gemini-3.8-flash.",
+    )
+    reply_thinking = models.CharField(
+        max_length=20, default="minimal",
+        help_text="Gemini reply thinking (minimal/low/medium/high). Gemini 3.8 uses low for minimal.",
+    )
+    gemini_ocr_model = models.CharField(
+        max_length=100, default="gemini-3-flash-preview",
+        help_text="Image-capable Gemini model for web screenshot extraction.",
+    )
+    ocr_thinking = models.CharField(
+        max_length=20, default="minimal",
+        help_text="Gemini OCR thinking (minimal/low/medium/high). Gemini 3.8 uses low for minimal.",
+    )
+    gpt_reply_model = models.CharField(
+        max_length=100, default="gpt-4.1-mini-2025-04-14",
+        help_text="GPT model for web replies and openers, used in the configured provider order.",
+    )
+    gpt_ocr_model = models.CharField(
+        max_length=100, default="gpt-4.1-mini-2025-04-14",
+        help_text="Image-capable GPT model for web screenshot extraction.",
     )
     guest_reply_limit = models.PositiveIntegerField(
         default=5,

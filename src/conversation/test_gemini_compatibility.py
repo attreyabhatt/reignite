@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from django.test import SimpleTestCase
 from google.genai import types
 
+from conversation.models import WebAppConfig
 from conversation.utils.gemini_config import normalize_gemini_thinking_level
 from conversation.utils.mobile import custom_mobile, image_mobile
 from conversation.utils.web import custom_web, image_web
@@ -145,10 +146,9 @@ class GeminiThinkingCompatibilityTests(SimpleTestCase):
         for model, expected in self.MODEL_CASES:
             with self.subTest(model=model):
                 client = self._client()
-                with patch.object(custom_web, "GEMINI_FLASH", model), patch.object(
+                app_config = WebAppConfig(gemini_reply_model=model)
+                with patch.object(WebAppConfig, "load", return_value=app_config), patch.object(
                     custom_web, "_get_client", return_value=client
-                ), patch.object(
-                    custom_web, "_get_provider_order", return_value=["gemini", "gpt"]
                 ), patch.object(custom_web, "generate_replies_openai_web") as fallback:
                     _, success, meta = custom_web.generate_web_response(
                         "you: hi\nher: hey", "stuck_after_reply", return_meta=True
@@ -182,10 +182,9 @@ class GeminiThinkingCompatibilityTests(SimpleTestCase):
         for model, expected in self.MODEL_CASES:
             with self.subTest(model=model):
                 client = self._client("you [10:00]: hi\nher [10:01]: hey")
-                with patch.object(image_web, "GEMINI_FLASH", model), patch.object(
+                app_config = WebAppConfig(gemini_ocr_model=model)
+                with patch.object(WebAppConfig, "load", return_value=app_config), patch.object(
                     image_web, "_get_client", return_value=client
-                ), patch.object(
-                    image_web, "_get_provider_order", return_value=["gemini", "gpt"]
                 ), patch.object(
                     image_web, "_resize_image_bytes", side_effect=lambda data: data
                 ), patch.object(image_web, "_detect_mime", return_value="image/jpeg"):

@@ -21,7 +21,7 @@ from .prompts_web import (
     get_web_reply_prompt,
     get_web_reply_user_prompt,
 )
-from .openai_web import GPT_MODEL, generate_replies_openai_web
+from .openai_web import generate_replies_openai_web
 
 GEMINI_FLASH = "gemini-3-flash-preview"
 WEB_DEFAULT_THINKING = "minimal"
@@ -32,13 +32,10 @@ def _get_client():
     return genai.Client(api_key=config("GEMINI_API_KEY"))
 
 
-def _normalize_thinking_level(thinking_level: str, default: str = WEB_DEFAULT_THINKING) -> str:
-    return normalize_gemini_thinking_level(thinking_level, GEMINI_FLASH, default)
-
-
-def _get_provider_order():
-    config = WebAppConfig.load()
-    return config.provider_order()
+def _normalize_thinking_level(
+    thinking_level: str, default: str = WEB_DEFAULT_THINKING, model: str = GEMINI_FLASH
+) -> str:
+    return normalize_gemini_thinking_level(thinking_level, model, default)
 
 
 def _empty_usage() -> Dict[str, int]:
@@ -203,13 +200,16 @@ def generate_web_response(
     """
     del tone  # Kept for signature compatibility.
 
+    app_config = WebAppConfig.load()
+    gemini_model = app_config.gemini_reply_model.strip()
+    gpt_model = app_config.gpt_reply_model.strip()
     success = False
     usage_info = _empty_usage()
-    thinking_level = _normalize_thinking_level(WEB_DEFAULT_THINKING)
+    thinking_level = _normalize_thinking_level(app_config.reply_thinking, model=gemini_model)
     model_used = "none"
     thinking_used = thinking_level
 
-    provider_order = _get_provider_order()
+    provider_order = app_config.provider_order()
     system_prompt = None
     user_prompt = None
 
@@ -225,14 +225,14 @@ def generate_web_response(
                     )
 
                 response = _get_client().models.generate_content(
-                    model=GEMINI_FLASH,
+                    model=gemini_model,
                     contents=[
                         system_prompt,
                         user_prompt,
                     ],
                     config=types.GenerateContentConfig(
                         thinking_config=types.ThinkingConfig(
-                            thinking_level=_normalize_thinking_level(thinking_level)
+                            thinking_level=thinking_level
                         ),
                         temperature=1.0,
                         top_p=0.95,
@@ -242,7 +242,7 @@ def generate_web_response(
                 ai_reply = _validate_and_clean_json(response.text or "")
                 usage_info = _extract_usage(response)
                 success = True
-                model_used = GEMINI_FLASH
+                model_used = gemini_model
                 thinking_used = thinking_level
                 print(
                     f"[AI-ACTION] action=web_replies model_used={model_used} "
@@ -252,7 +252,7 @@ def generate_web_response(
                 break
             except Exception as exc:
                 print(
-                    f"[FAILSAFE] action=web_replies model={GEMINI_FLASH} "
+                    f"[FAILSAFE] action=web_replies model={gemini_model} "
                     f"status=failed error={type(exc).__name__}: {str(exc)}"
                 )
                 continue
@@ -264,13 +264,13 @@ def generate_web_response(
                     situation=situation,
                     her_info=her_info,
                     custom_instructions=custom_instructions,
-                    model=GPT_MODEL,
+                    model=gpt_model,
                     return_usage=True,
                 )
                 ai_reply = _validate_and_clean_json(fallback_reply)
                 usage_info = fallback_usage or _empty_usage()
                 success = True
-                model_used = GPT_MODEL
+                model_used = gpt_model
                 thinking_used = "n/a"
                 print(
                     f"[AI-ACTION] action=web_replies model_used={model_used} "
@@ -280,7 +280,7 @@ def generate_web_response(
                 break
             except Exception as fallback_exc:
                 print(
-                    f"[FAILSAFE] action=web_replies model={GPT_MODEL} "
+                    f"[FAILSAFE] action=web_replies model={gpt_model} "
                     f"status=failed error={type(fallback_exc).__name__}: {str(fallback_exc)}"
                 )
                 continue

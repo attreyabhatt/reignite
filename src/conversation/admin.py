@@ -102,6 +102,11 @@ class WebAppConfigAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Free Usage", {"fields": ("guest_reply_limit", "signup_bonus_credits")}),
         ("Provider Routing", {"fields": ("primary_provider", "fallback_provider_display")}),
+        ("Gemini Models & Thinking", {"fields": (
+            "gemini_reply_model", "reply_thinking",
+            "gemini_ocr_model", "ocr_thinking",
+        )}),
+        ("GPT Models", {"fields": ("gpt_reply_model", "gpt_ocr_model")}),
     )
     readonly_fields = ("fallback_provider_display",)
 

@@ -5,7 +5,7 @@ Web-specific OCR extraction with provider order from WebAppConfig.
 import time
 from functools import lru_cache
 from io import BytesIO
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from decouple import config
 from google import genai
@@ -16,7 +16,7 @@ from conversation.models import WebAppConfig
 
 from ..gemini_config import normalize_gemini_thinking_level
 
-from .openai_web import GPT_MODEL, extract_conversation_from_image_openai_web
+from .openai_web import extract_conversation_from_image_openai_web
 
 GEMINI_FLASH = "gemini-3-flash-preview"
 WEB_DEFAULT_THINKING = "minimal"
@@ -27,13 +27,10 @@ def _get_client():
     return genai.Client(api_key=config("GEMINI_API_KEY"))
 
 
-def _normalize_thinking_level(thinking_level: str, default: str = WEB_DEFAULT_THINKING) -> str:
-    return normalize_gemini_thinking_level(thinking_level, GEMINI_FLASH, default)
-
-
-def _get_provider_order():
-    config = WebAppConfig.load()
-    return config.provider_order()
+def _normalize_thinking_level(
+    thinking_level: Optional[str], default: str = WEB_DEFAULT_THINKING, model: str = GEMINI_FLASH
+) -> str:
+    return normalize_gemini_thinking_level(thinking_level, model, default)
 
 
 def _empty_usage() -> Dict[str, int]:
@@ -95,13 +92,20 @@ def _contains_labeled_lines(output: str) -> bool:
 
 def extract_conversation_from_image_web(
     screenshot_file,
-    thinking_level: str = WEB_DEFAULT_THINKING,
+    thinking_level: Optional[str] = None,
     return_meta: bool = False,
 ) -> Union[str, Tuple[str, bool, Dict[str, Any]]]:
     """
     Extract conversation text using configured provider order.
     Gemini provider uses resized+original attempts; GPT provider uses original image.
     """
+    app_config = WebAppConfig.load()
+    gemini_model = app_config.gemini_ocr_model.strip()
+    gpt_model = app_config.gpt_ocr_model.strip()
+    thinking_level = _normalize_thinking_level(
+        app_config.ocr_thinking if thinking_level is None else thinking_level,
+        model=gemini_model,
+    )
     img_bytes = screenshot_file.read()
     if not img_bytes:
         failed_text = (
@@ -111,14 +115,13 @@ def extract_conversation_from_image_web(
         if return_meta:
             return failed_text, False, {
                 "model_used": "none",
-                "thinking_used": _normalize_thinking_level(thinking_level),
+                "thinking_used": thinking_level,
                 "usage": _empty_usage(),
                 "source_type": "ai",
             }
         return failed_text
 
     original_bytes = len(img_bytes)
-    thinking_level = _normalize_thinking_level(thinking_level)
     resized_bytes = _resize_image_bytes(img_bytes)
     if len(resized_bytes) != original_bytes:
         print(f"[DEBUG] Resized image bytes: {original_bytes} -> {len(resized_bytes)}")
@@ -131,7 +134,7 @@ def extract_conversation_from_image_web(
         ("original", img_bytes),
     ]
 
-    provider_order = _get_provider_order()
+    provider_order = app_config.provider_order()
 
     for provider in provider_order:
         if provider == WebAppConfig.PROVIDER_GEMINI:
@@ -143,17 +146,18 @@ def extract_conversation_from_image_web(
                         mime=mime,
                         start_time=time.time(),
                         thinking_level=thinking_level,
+                        model=gemini_model,
                     )
                     if not _contains_labeled_lines(output):
                         raise ValueError("OCR output missing labeled lines")
 
                     print(
-                        f"[AI-ACTION] action=web_ocr model_used={GEMINI_FLASH} "
+                        f"[AI-ACTION] action=web_ocr model_used={gemini_model} "
                         f"status=success attempt={attempt_number} payload={attempt_name}"
                     )
                     if return_meta:
                         return output, True, {
-                            "model_used": GEMINI_FLASH,
+                            "model_used": gemini_model,
                             "thinking_used": thinking_level,
                             "usage": usage_info or _empty_usage(),
                             "source_type": "ai",
@@ -161,18 +165,18 @@ def extract_conversation_from_image_web(
                     return output
                 except Exception as exc:
                     print(
-                        f"[FAILSAFE] action=web_ocr attempt={attempt_number} model={GEMINI_FLASH} "
+                        f"[FAILSAFE] action=web_ocr attempt={attempt_number} model={gemini_model} "
                         f"status=failed error={type(exc).__name__}: {str(exc)}"
                     )
             continue
 
         if provider == WebAppConfig.PROVIDER_GPT:
             try:
-                print(f"[FAILSAFE] action=web_ocr model={GPT_MODEL} status=attempting")
+                print(f"[FAILSAFE] action=web_ocr model={gpt_model} status=attempting")
                 output, usage_info = extract_conversation_from_image_openai_web(
                     img_bytes=img_bytes,
                     mime=mime,
-                    model=GPT_MODEL,
+                    model=gpt_model,
                     return_usage=True,
                 )
 
@@ -180,12 +184,12 @@ def extract_conversation_from_image_web(
                     raise ValueError("OCR output missing labeled lines")
 
                 print(
-                    f"[AI-ACTION] action=web_ocr model_used={GPT_MODEL} "
+                    f"[AI-ACTION] action=web_ocr model_used={gpt_model} "
                     f"status=success payload=original"
                 )
                 if return_meta:
                     return output, True, {
-                        "model_used": GPT_MODEL,
+                        "model_used": gpt_model,
                         "thinking_used": "n/a",
                         "usage": usage_info or _empty_usage(),
                         "source_type": "ai",
@@ -193,7 +197,7 @@ def extract_conversation_from_image_web(
                 return output
             except Exception as exc:
                 print(
-                    f"[FAILSAFE] action=web_ocr model={GPT_MODEL} "
+                    f"[FAILSAFE] action=web_ocr model={gpt_model} "
                     f"status=failed error={type(exc).__name__}: {str(exc)}"
                 )
             continue
@@ -218,12 +222,13 @@ def _run_ocr_call(
     mime: str,
     start_time: float,
     thinking_level: str = WEB_DEFAULT_THINKING,
+    model: str = GEMINI_FLASH,
 ) -> Tuple[str, Dict[str, int]]:
     image_part = types.Part.from_bytes(data=img_bytes, mime_type=mime)
-    thinking_level = _normalize_thinking_level(thinking_level)
+    thinking_level = _normalize_thinking_level(thinking_level, model=model)
 
     response = _get_client().models.generate_content(
-        model=GEMINI_FLASH,
+        model=model,
         contents=[prompt, image_part],
         config=types.GenerateContentConfig(
             thinking_config=types.ThinkingConfig(thinking_level=thinking_level)
