@@ -317,7 +317,7 @@ def generate_mobile_openers_from_image(
     return ai_reply, success
 
 
-def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = GEMINI_FLASH, thinking_level: str = "high") -> Tuple[str, Optional[Dict[str, Any]]]:
+def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = GEMINI_FLASH, thinking_level: str = "high", input_source: str = "") -> Tuple[str, Optional[Dict[str, Any]]]:
     """
     Call Gemini for reply generation.
 
@@ -333,8 +333,8 @@ def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = 
     Raises:
         Exception: If API call or validation fails
     """
-    system_prompt = get_mobile_reply_prompt(last_text, custom_instructions)
-    user_prompt = get_mobile_reply_user_prompt()
+    system_prompt = get_mobile_reply_prompt(last_text, custom_instructions, input_source=input_source)
+    user_prompt = get_mobile_reply_user_prompt(last_text, input_source=input_source)
 
     response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=model, thinking_level=thinking_level)
     ai_reply = _validate_and_clean_json(response.text)
@@ -346,6 +346,7 @@ def _call_openai_replies(
     last_text: str,
     custom_instructions: str,
     model: str = GPT_MODEL,
+    input_source: str = "",
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Call OpenAI GPT-4.1-mini for reply generation (fallback).
@@ -365,6 +366,7 @@ def _call_openai_replies(
         custom_instructions,
         model=model,
         return_usage=True,
+        input_source=input_source,
     )
     return _validate_and_clean_json(ai_reply), usage_info
 
@@ -380,6 +382,7 @@ def generate_mobile_response(
     primary_model: Optional[str] = None,
     fallback_model: str = GPT_MODEL,
     return_meta: bool = False,
+    input_source: str = "",
 ) -> Tuple[str, bool]:
     """
     Generate reply suggestions for mobile app with cascading fallback.
@@ -403,6 +406,7 @@ def generate_mobile_response(
         Tuple of (JSON array string of replies, success boolean)
         When return_meta=True, returns (reply, success, meta)
     """
+    context_options = {"input_source": input_source} if input_source == "accessibility" else {}
     success = False
     ai_reply = None
     model_used = None
@@ -423,12 +427,13 @@ def generate_mobile_response(
     for i, model in enumerate(models, 1):
         try:
             if _is_gemini_model(model):
-                ai_reply, usage_info = _call_gemini_replies(last_text, custom_instructions, model=model, thinking_level=thinking_level)
+                ai_reply, usage_info = _call_gemini_replies(last_text, custom_instructions, model=model, thinking_level=thinking_level, **context_options)
             else:
                 ai_reply, usage_info = _call_openai_replies(
                     last_text,
                     custom_instructions,
                     model=model,
+                    **context_options,
                 )
 
             # Success!
@@ -437,7 +442,8 @@ def generate_mobile_response(
             break
 
         except Exception as e:
-            print(f"[FAILSAFE] action=replies attempt={i} model={model} status=failed error={type(e).__name__}: {str(e)}")
+            error_detail = type(e).__name__ if input_source == "accessibility" else f"{type(e).__name__}: {str(e)}"
+            print(f"[FAILSAFE] action=replies attempt={i} model={model} status=failed error={error_detail}")
             continue
 
     usage_info = usage_info or _empty_usage()
@@ -469,7 +475,8 @@ def generate_mobile_response(
         "source_type": "ai",
     }
 
-    print(ai_reply)
+    if input_source != "accessibility":
+        print(ai_reply)
     if return_meta:
         return ai_reply, success, meta
     return ai_reply, success

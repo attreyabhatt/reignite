@@ -314,7 +314,7 @@ def _parse_reply_input_context(request, last_text: str = "") -> Tuple[str, str]:
     else:
         input_source = str(raw_input_source).strip().lower()
 
-    if input_source not in {"ocr", "manual"}:
+    if input_source not in {"ocr", "manual", "accessibility"}:
         input_source = "manual"
 
     ocr_text = (request.data.get("ocr_text") or "").strip()
@@ -1951,10 +1951,14 @@ def delete_account(request):
 
 @ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_GENERATE_IP"), block=True)
 @ratelimit(key=_ratelimit_device, rate=_rate("MOBILE_RATELIMIT_GENERATE_DEVICE"), block=True)
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 def generate_text_with_credits(request):
     """Generate text with credit system"""
+    if request.method == "GET":
+        return Response({"assistant_protocol": 1, "input_source": "accessibility",
+                         "max_messages": 12, "max_characters": 6000})
+    input_source = "manual"
     try:
         _normalize_mobile_auth_header(request)
         auth_header_present = bool(request.META.get("HTTP_AUTHORIZATION"))
@@ -1971,6 +1975,12 @@ def generate_text_with_credits(request):
         tone = request.data.get("tone", "Natural")  # Default to Natural
         custom_instructions = request.data.get("custom_instructions", "")[:250]  # Max 250 chars
         input_source, ocr_text = _parse_reply_input_context(request, last_text=last_text)
+        generation_options = {}
+        if input_source == "accessibility":
+            if not isinstance(last_text, str) or not last_text.strip() or len(last_text) > 6000:
+                return Response({"success": False, "error": "invalid_context",
+                                 "message": "Provide between 1 and 6000 characters of conversation."}, status=400)
+            generation_options["input_source"] = "accessibility"
 
         if not last_text or not situation:
             return HttpResponseBadRequest("Missing required fields")
@@ -2013,6 +2023,7 @@ def generate_text_with_credits(request):
                         primary_model=model,
                         fallback_model=cfg.fallback_model,
                         return_meta=True,
+                        **generation_options,
                     )
                     reply, success, meta = _normalize_generation_result(result)
                     generation_event = None
@@ -2077,6 +2088,7 @@ def generate_text_with_credits(request):
                         primary_model=cfg.registered_reply_model,
                         fallback_model=cfg.fallback_model,
                         return_meta=True,
+                        **generation_options,
                     )
                     reply, success, meta = _normalize_generation_result(result)
 
@@ -2132,6 +2144,7 @@ def generate_text_with_credits(request):
                     primary_model=cfg.registered_reply_model,
                     fallback_model=cfg.fallback_model,
                     return_meta=True,
+                    **generation_options,
                 )
                 reply, success, meta = _normalize_generation_result(result)
                 generation_event = None
@@ -2184,6 +2197,7 @@ def generate_text_with_credits(request):
                     primary_model=cfg.registered_reply_model,
                     fallback_model=cfg.fallback_model,
                     return_meta=True,
+                    **generation_options,
                 )
                 reply, success, meta = _normalize_generation_result(result)
                 generation_event = None
@@ -2257,6 +2271,7 @@ def generate_text_with_credits(request):
                 primary_model=cfg.free_reply_model,
                 fallback_model=cfg.fallback_model,
                 return_meta=True,
+                **generation_options,
             )
             reply, success, meta = _normalize_generation_result(result)
             generation_event = None
@@ -2298,8 +2313,11 @@ def generate_text_with_credits(request):
             })
             
     except Exception as e:
-        logger.error(f"Generate text error: {str(e)}", exc_info=True)
-        return Response({"success": False, "error": "Generation failed", "message": str(e)})
+        if input_source == "accessibility":
+            logger.error("Accessibility generation failed error_type=%s", type(e).__name__)
+        else:
+            logger.error(f"Generate text error: {str(e)}", exc_info=True)
+        return Response({"success": False, "error": "Generation failed", "message": "Please try again." if input_source == "accessibility" else str(e)})
 
 
 @ratelimit(key="ip", rate=_rate("MOBILE_RATELIMIT_EXTRACT_IP"), block=True)
