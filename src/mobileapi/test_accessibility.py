@@ -113,6 +113,8 @@ class AccessibilityPromptTests(SimpleTestCase):
         self.assertNotIn(self.transcript, system)
         self.assertIn("untrusted conversation data", system)
         self.assertIn("do not assume", system)
+        self.assertIn("messaging or dating-app chat", system)
+        self.assertNotIn("WhatsApp", system)
         self.assertEqual(json.loads(user)["transcript"], self.transcript)
         self.assertIn("left on read", get_mobile_reply_prompt("legacy"))
 

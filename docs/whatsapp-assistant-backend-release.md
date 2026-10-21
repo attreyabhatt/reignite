@@ -43,3 +43,13 @@ This GET does not invoke AI, consume credits or record a generation.
 Then test generation from a fictional one-to-one WhatsApp chat in build 79.
 
 Production deployment has not been performed by the assistant.
+
+## Dating chat expansion (mobile build 81)
+
+The mobile client continues using the same accessibility protocol and endpoint;
+no API schema, data model or migration changes are needed. A small follow-up
+in src/conversation/utils/mobile/prompts_mobile.py describes private messaging
+or dating-app conversations instead of only WhatsApp. Deploy that file through
+the normal process when ready. The already-deployed accessibility endpoint can
+serve the new client; this prompt wording update does not gate generation.
+No production deployment was performed for this expansion.
