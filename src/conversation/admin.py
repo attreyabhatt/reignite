@@ -46,9 +46,18 @@ class WebConversionEventAdmin(admin.ModelAdmin):
 
 @admin.register(ChatCredit)
 class ChatCreditAdmin(admin.ModelAdmin):
-    list_display = ('user', 'balance', 'last_updated')
-    search_fields = ('user__username',)
+    list_display = ('user', 'email', 'balance', 'complimentary_access', 'mobile_access_expires_at', 'last_updated')
+    search_fields = ('user__username', 'user__email')
+    list_filter = ('mobile_full_access',)
     list_select_related = ('user',)
+
+    @admin.display(description="Email", ordering="user__email")
+    def email(self, obj):
+        return obj.user.email
+
+    @admin.display(description="Complimentary mobile access", boolean=True)
+    def complimentary_access(self, obj):
+        return obj.has_mobile_full_access
 
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):

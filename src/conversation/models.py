@@ -98,6 +98,15 @@ class ChatCredit(models.Model):
     subscription_auto_renewing = models.BooleanField(default=False)
     subscription_purchase_token = models.TextField(blank=True, null=True)
     subscription_last_checked = models.DateTimeField(blank=True, null=True)
+    mobile_full_access = models.BooleanField(
+        default=False,
+        verbose_name="Complimentary mobile access",
+        help_text="Grant all mobile subscription features without a purchase. Does not change web credits or billing.",
+    )
+    mobile_access_expires_at = models.DateTimeField(
+        blank=True, null=True,
+        help_text="Optional expiry for complimentary mobile access. Leave blank for access until revoked.",
+    )
     # Fair-use tracking for subscribers (legacy weekly)
     subscriber_weekly_actions = models.PositiveIntegerField(default=0)
     subscriber_weekly_reset_at = models.DateTimeField(blank=True, null=True)
@@ -111,6 +120,12 @@ class ChatCredit(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.balance} credits"
+
+    @property
+    def has_mobile_full_access(self):
+        return self.mobile_full_access and (
+            self.mobile_access_expires_at is None or self.mobile_access_expires_at > timezone.now()
+        )
 
     def use_credit(self):
         """Use one credit if available"""

@@ -242,6 +242,9 @@ def _persist_mobile_generation_event(
         guest_hash = _get_guest_hash_for_mobile_analytics(request)
 
         usage = _normalize_usage_payload(usage)
+        metadata = dict(metadata or {})
+        if chat_credit and chat_credit.has_mobile_full_access:
+            metadata["mobile_access_granted"] = True
         event = MobileGenerationEvent.objects.create(
             user=user,
             guest_id_hash=guest_hash or None,
@@ -667,6 +670,11 @@ def _is_subscription_active(chat_credit):
     return True
 
 
+def _has_mobile_access(chat_credit):
+    """Mobile features accept a paid subscription or an active admin grant."""
+    return _is_subscription_active(chat_credit) or chat_credit.has_mobile_full_access
+
+
 def _check_subscriber_allowance(chat_credit):
     """Check weekly fair-use cap for subscribers (legacy). Returns (allowed, remaining)."""
     cfg = _get_config()
@@ -911,6 +919,11 @@ def _subscription_payload(chat_credit, request=None):
     expiry = chat_credit.subscription_expiry.isoformat() if chat_credit.subscription_expiry else None
     return {
         "is_subscribed": _is_subscription_active(chat_credit),
+        "has_mobile_access": _has_mobile_access(chat_credit),
+        "mobile_access_granted": chat_credit.has_mobile_full_access,
+        "mobile_access_expires_at": (
+            chat_credit.mobile_access_expires_at.isoformat() if chat_credit.mobile_access_expires_at else None
+        ),
         "subscription_expiry": expiry,
         "subscription_product_id": chat_credit.subscription_product_id,
         "subscription_platform": chat_credit.subscription_platform,
@@ -2001,17 +2014,17 @@ def generate_text_with_credits(request):
                 logger.info(f"User credits: {chat_credit.balance}")
 
                 # Safety: ensure every non-subscriber gets at least 3 free generations total
-                if not _is_subscription_active(chat_credit) and chat_credit.total_used < 3 and chat_credit.balance <= 0:
+                if not _has_mobile_access(chat_credit) and chat_credit.total_used < 3 and chat_credit.balance <= 0:
                     top_up = 3 - chat_credit.total_used
                     chat_credit.balance += top_up
                     chat_credit.total_earned += top_up
                     chat_credit.save(update_fields=["balance", "total_earned"])
 
                 # Subscription path — silent degradation (no hard cap)
-                if _is_subscription_active(chat_credit):
+                if _has_mobile_access(chat_credit):
                     cfg = _get_config()
                     model, thinking = _get_subscriber_tier(chat_credit, cfg, 'reply', 'subscriber_daily_replies')
-                    _log_ai_action("replies", model, True, True, request.user.username)
+                    _log_ai_action("replies", model, _is_subscription_active(chat_credit), True, request.user.username)
 
                     result = generate_mobile_response(
                         last_text,
@@ -2358,7 +2371,7 @@ def extract_from_image_with_credits(request):
         if request.user.is_authenticated:
             try:
                 chat_credit = ChatCredit.objects.get(user=request.user)
-                is_sub_active = _is_subscription_active(chat_credit)
+                is_sub_active = _has_mobile_access(chat_credit)
                 if is_sub_active:
                     allowed, remaining = _check_subscriber_allowance(chat_credit)
                     if not allowed:
@@ -2519,7 +2532,7 @@ def extract_from_image_with_credits_stream(request):
     if request.user.is_authenticated:
         try:
             chat_credit = ChatCredit.objects.get(user=request.user)
-            is_sub_active = _is_subscription_active(chat_credit)
+            is_sub_active = _has_mobile_access(chat_credit)
             if is_sub_active:
                 allowed, remaining = _check_subscriber_allowance(chat_credit)
                 if not allowed:
@@ -2530,7 +2543,7 @@ def extract_from_image_with_credits_stream(request):
             # For non-subscribers, OCR streaming is free (no credit gate)
         except ChatCredit.DoesNotExist:
             chat_credit = ChatCredit.objects.create(user=request.user, balance=9)
-            is_sub_active = _is_subscription_active(chat_credit)
+            is_sub_active = _has_mobile_access(chat_credit)
 
         def gen():
             output_parts = []
@@ -2646,7 +2659,7 @@ def analyze_profile(request):
             except ChatCredit.DoesNotExist:
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)
 
-            is_sub_active = _is_subscription_active(chat_credit)
+            is_sub_active = _has_mobile_access(chat_credit)
             if is_sub_active:
                 allowed, remaining = _check_subscriber_allowance(chat_credit)
                 if not allowed:
@@ -2677,7 +2690,7 @@ def analyze_profile(request):
         if request.user.is_authenticated:
             if chat_credit is None:
                 chat_credit, _ = ChatCredit.objects.get_or_create(user=request.user)
-                is_sub_active = _is_subscription_active(chat_credit)
+                is_sub_active = _has_mobile_access(chat_credit)
             if is_sub_active:
                 consumed, _ = _consume_subscriber_allowance(chat_credit)
                 if not consumed:
@@ -2787,7 +2800,7 @@ def analyze_profile_stream(request):
     if request.user.is_authenticated:
         try:
             chat_credit = ChatCredit.objects.get(user=request.user)
-            is_sub_active = _is_subscription_active(chat_credit)
+            is_sub_active = _has_mobile_access(chat_credit)
             if is_sub_active:
                 allowed, remaining = _check_subscriber_allowance(chat_credit)
                 if not allowed:
@@ -2802,7 +2815,7 @@ def analyze_profile_stream(request):
                 )
         except ChatCredit.DoesNotExist:
             chat_credit = ChatCredit.objects.create(user=request.user, balance=9)
-            is_sub_active = _is_subscription_active(chat_credit)
+            is_sub_active = _has_mobile_access(chat_credit)
 
     def gen():
         output_parts = []
@@ -2893,17 +2906,17 @@ def generate_openers_from_profile_image(request):
                 logger.info(f"User credits: {chat_credit.balance}")
 
                 # Safety: ensure every non-subscriber gets at least 3 free generations total
-                if not _is_subscription_active(chat_credit) and chat_credit.total_used < 3 and chat_credit.balance <= 0:
+                if not _has_mobile_access(chat_credit) and chat_credit.total_used < 3 and chat_credit.balance <= 0:
                     top_up = 3 - chat_credit.total_used
                     chat_credit.balance += top_up
                     chat_credit.total_earned += top_up
                     chat_credit.save(update_fields=["balance", "total_earned"])
 
                 # Subscription path — silent degradation (no hard cap)
-                if _is_subscription_active(chat_credit):
+                if _has_mobile_access(chat_credit):
                     cfg = _get_config()
                     model, thinking = _get_subscriber_tier(chat_credit, cfg, 'opener', 'subscriber_daily_openers')
-                    _log_ai_action("openers", model, True, True, request.user.username)
+                    _log_ai_action("openers", model, _is_subscription_active(chat_credit), True, request.user.username)
 
                     result = generate_mobile_openers_from_image(
                         img_bytes,
@@ -3182,7 +3195,7 @@ def unlock_reply(request):
     except ChatCredit.DoesNotExist:
         return Response({"success": False, "error": "profile_required"}, status=400)
 
-    if not _is_subscription_active(chat_credit):
+    if not _has_mobile_access(chat_credit):
         return Response({
             "success": False,
             "error": "subscription_required",
@@ -3312,7 +3325,7 @@ def recommended_openers(request):
 
         if request.user.is_authenticated:
             chat_credit = ChatCredit.objects.get(user=request.user)
-            is_elite = _is_subscription_active(chat_credit)
+            is_elite = _has_mobile_access(chat_credit)
             tier = "elite" if is_elite else "free"
             if is_elite:
                 unlocked_ids = {opener.id for opener in archive}
@@ -3429,7 +3442,7 @@ def _chat_credit_or_none(user: User) -> Optional[ChatCredit]:
 @permission_classes([IsAuthenticated])
 def reply_threads(request):
     chat_credit = _chat_credit_or_none(request.user)
-    is_subscribed = bool(chat_credit and _is_subscription_active(chat_credit))
+    is_subscribed = bool(chat_credit and _has_mobile_access(chat_credit))
     subscription_payload = _subscription_payload(chat_credit, request=request) if chat_credit else {}
 
     if request.method == "GET":
@@ -3577,7 +3590,7 @@ def reply_threads(request):
 @permission_classes([IsAuthenticated])
 def reply_thread_detail(request, thread_id):
     chat_credit = _chat_credit_or_none(request.user)
-    is_subscribed = bool(chat_credit and _is_subscription_active(chat_credit))
+    is_subscribed = bool(chat_credit and _has_mobile_access(chat_credit))
     subscription_payload = _subscription_payload(chat_credit, request=request) if chat_credit else {}
 
     thread = MobileReplyThread.objects.filter(id=thread_id, user=request.user).first()

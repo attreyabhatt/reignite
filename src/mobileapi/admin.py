@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.db.models import Exists, Max, OuterRef, Q
 from django.utils import timezone
+from django.urls import reverse
+from django.utils.html import format_html
 
 from conversation.models import (
     ChatCredit,
@@ -327,7 +329,7 @@ class MobileSignupSubscriptionFilter(admin.SimpleListFilter):
 
 @admin.register(MobileSignupUser)
 class MobileSignupUserAdmin(admin.ModelAdmin):
-    list_display = ("username", "email", "subscription_status", "last_active", "date_joined")
+    list_display = ("username", "email", "subscription_status", "mobile_access", "last_active", "date_joined")
     list_filter = (MobileSignupSubscriptionFilter, "date_joined")
     search_fields = ("username", "email")
     ordering = ("-date_joined",)
@@ -370,6 +372,15 @@ class MobileSignupUserAdmin(admin.ModelAdmin):
         if generation_at and copy_at:
             return generation_at if generation_at >= copy_at else copy_at
         return generation_at or copy_at
+
+    @admin.display(description="Complimentary mobile access")
+    def mobile_access(self, obj):
+        credit = getattr(obj, "chat_credit", None)
+        if not isinstance(credit, ChatCredit):
+            return "No account credits"
+        return format_html('<a href="{}">{}</a>',
+            reverse("admin:conversation_chatcredit_change", args=[credit.pk]),
+            "Active - manage" if credit.has_mobile_full_access else "Grant access")
 
     def has_add_permission(self, request):
         return False
