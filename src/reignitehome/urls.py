@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 from django.views.generic import TemplateView
 
+from reignitehome.app_links import android_asset_links
 from reignitehome.views import (
     ajax_reply_home,
     community_create,
@@ -20,6 +21,7 @@ from reignitehome.views import (
 
 
 urlpatterns = [
+    path('.well-known/assetlinks.json', android_asset_links, name='android_asset_links'),
     path('admin/', admin.site.urls),
     path('', home, name='home'),
     path("community/", community_home, name="community_home"),
