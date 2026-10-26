@@ -127,6 +127,7 @@ def generate_replies_openai(
     model: str = GPT_MODEL,
     return_usage: bool = False,
     input_source: str = "",
+    reply_language: str = "en",
 ) -> Union[str, Tuple[str, Dict[str, int]]]:
     """
     Generate reply suggestions using GPT-4.1-mini.
@@ -143,7 +144,7 @@ def generate_replies_openai(
     Raises:
         Exception: If API call fails (caller should handle)
     """
-    system_prompt = get_mobile_reply_prompt(last_text, custom_instructions, input_source=input_source)
+    system_prompt = get_mobile_reply_prompt(last_text, custom_instructions, input_source=input_source, reply_language=reply_language)
 
     # Add formatting rules
     system_prompt += "\nNo em dashes. No dashes. Do not put single quotes around words unless necessary."

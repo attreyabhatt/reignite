@@ -24,6 +24,7 @@ from urllib.parse import parse_qs
 
 from conversation.utils.custom_gpt import generate_custom_response, generate_openers_from_image
 from conversation.utils.mobile.custom_mobile import generate_mobile_response, generate_mobile_openers_from_image
+from conversation.utils.mobile.prompts_mobile import normalize_reply_language
 from conversation.utils.mobile.image_mobile import extract_conversation_from_image_mobile
 from conversation.utils.image_gpt import extract_conversation_from_image, stream_conversation_from_image_bytes
 from conversation.utils.profile_analyzer import analyze_profile_image, stream_profile_analysis_bytes
@@ -1994,6 +1995,7 @@ def generate_text_with_credits(request):
                 return Response({"success": False, "error": "invalid_context",
                                  "message": "Provide between 1 and 6000 characters of conversation."}, status=400)
             generation_options["input_source"] = "accessibility"
+            generation_options["reply_language"] = normalize_reply_language(request.data.get("reply_language"))
 
         if not last_text or not situation:
             return HttpResponseBadRequest("Missing required fields")

@@ -317,7 +317,7 @@ def generate_mobile_openers_from_image(
     return ai_reply, success
 
 
-def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = GEMINI_FLASH, thinking_level: str = "high", input_source: str = "") -> Tuple[str, Optional[Dict[str, Any]]]:
+def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = GEMINI_FLASH, thinking_level: str = "high", input_source: str = "", reply_language: str = "en") -> Tuple[str, Optional[Dict[str, Any]]]:
     """
     Call Gemini for reply generation.
 
@@ -333,7 +333,7 @@ def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = 
     Raises:
         Exception: If API call or validation fails
     """
-    system_prompt = get_mobile_reply_prompt(last_text, custom_instructions, input_source=input_source)
+    system_prompt = get_mobile_reply_prompt(last_text, custom_instructions, input_source=input_source, reply_language=reply_language)
     user_prompt = get_mobile_reply_user_prompt(last_text, input_source=input_source)
 
     response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=model, thinking_level=thinking_level)
@@ -347,6 +347,7 @@ def _call_openai_replies(
     custom_instructions: str,
     model: str = GPT_MODEL,
     input_source: str = "",
+    reply_language: str = "en",
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Call OpenAI GPT-4.1-mini for reply generation (fallback).
@@ -367,6 +368,7 @@ def _call_openai_replies(
         model=model,
         return_usage=True,
         input_source=input_source,
+        reply_language=reply_language,
     )
     return _validate_and_clean_json(ai_reply), usage_info
 
@@ -383,6 +385,7 @@ def generate_mobile_response(
     fallback_model: str = GPT_MODEL,
     return_meta: bool = False,
     input_source: str = "",
+    reply_language: str = "en",
 ) -> Tuple[str, bool]:
     """
     Generate reply suggestions for mobile app with cascading fallback.
@@ -406,7 +409,7 @@ def generate_mobile_response(
         Tuple of (JSON array string of replies, success boolean)
         When return_meta=True, returns (reply, success, meta)
     """
-    context_options = {"input_source": input_source} if input_source == "accessibility" else {}
+    context_options = {"input_source": input_source, "reply_language": reply_language} if input_source == "accessibility" else {}
     success = False
     ai_reply = None
     model_used = None
