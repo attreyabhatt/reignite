@@ -206,7 +206,10 @@ class AccessibilityPromptTests(SimpleTestCase):
     def test_fallback_carries_source_and_does_not_log_content(self):
         output = io.StringIO()
         with patch.object(custom_mobile, "_call_gemini_replies", side_effect=RuntimeError(self.transcript)), \
-             patch.object(custom_mobile, "_call_openai_replies", return_value=('[{"message":"Private reply"}]', {})) as fallback, \
+             patch.object(custom_mobile, "_call_openai_replies", return_value=(json.dumps([
+                 {"message": "Private reply", "tone": "Flirty"},
+                 {"message": "Second reply", "tone": "Funny"},
+                 {"message": "Third reply", "tone": "Natural"}]), {})) as fallback, \
              redirect_stdout(output):
             _, success, _ = custom_mobile.generate_mobile_response(
                 self.transcript, "stuck_after_reply", primary_model="gemini-3-flash-preview",
@@ -219,7 +222,10 @@ class AccessibilityPromptTests(SimpleTestCase):
 
     def test_gpt_only_routing_retains_the_language_preference(self):
         with patch.object(custom_mobile, "_call_gemini_replies") as gemini, \
-             patch.object(custom_mobile, "_call_openai_replies", return_value=('[{"message":"Hola"}]', {})) as fallback, \
+             patch.object(custom_mobile, "_call_openai_replies", return_value=(json.dumps([
+                 {"message": "Hola", "tone": "Flirty"},
+                 {"message": "Que tal", "tone": "Funny"},
+                 {"message": "Buenos dias", "tone": "Natural"}]), {})) as fallback, \
              redirect_stdout(io.StringIO()):
             _, success, _ = custom_mobile.generate_mobile_response(
                 "Them: Haha", "stuck_after_reply", use_gpt_only=True,

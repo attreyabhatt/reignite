@@ -83,6 +83,20 @@ def _get_config():
     """Load admin-configurable settings from the MobileAppConfig singleton."""
     return MobileAppConfig.load()
 
+
+def _generate_mobile_reply(config, *args, **options):
+    if options.get("input_source") == "accessibility":
+        for setting, argument in (("overlay_reply_model", "primary_model"),
+                                  ("overlay_fallback_model", "fallback_model"),
+                                  ("overlay_reply_thinking", "thinking_level")):
+            value = (getattr(config, setting, "") or "").strip()
+            if value:
+                options[argument] = value
+        instructions = (getattr(config, "overlay_reply_prompt", "") or "").strip()
+        if instructions:
+            options["overlay_instructions"] = instructions
+    return generate_mobile_response(*args, **options)
+
 def _mask_token(token):
     if not token:
         return ""
@@ -2028,7 +2042,7 @@ def generate_text_with_credits(request):
                     model, thinking = _get_subscriber_tier(chat_credit, cfg, 'reply', 'subscriber_daily_replies')
                     _log_ai_action("replies", model, _is_subscription_active(chat_credit), True, request.user.username)
 
-                    result = generate_mobile_response(
+                    result = _generate_mobile_reply(cfg,
                         last_text,
                         situation,
                         her_info,
@@ -2093,7 +2107,7 @@ def generate_text_with_credits(request):
 
                     # First time at limit today — generate ONE blurred reply, store server-side
                     _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
-                    result = generate_mobile_response(
+                    result = _generate_mobile_reply(cfg,
                         last_text,
                         situation,
                         her_info,
@@ -2149,7 +2163,7 @@ def generate_text_with_credits(request):
 
                 # Normal free user path (has daily credits remaining)
                 _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
-                result = generate_mobile_response(
+                result = _generate_mobile_reply(cfg,
                     last_text,
                     situation,
                     her_info,
@@ -2202,7 +2216,7 @@ def generate_text_with_credits(request):
                 chat_credit = ChatCredit.objects.create(user=request.user, balance=5)  # 6-1
                 cfg = _get_config()
                 _log_ai_action("replies", cfg.registered_reply_model, False, True, request.user.username)
-                result = generate_mobile_response(
+                result = _generate_mobile_reply(cfg,
                     last_text,
                     situation,
                     her_info,
@@ -2276,7 +2290,7 @@ def generate_text_with_credits(request):
 
             # Generate response with tone and custom instructions
             _log_ai_action("replies", cfg.free_reply_model, False, False)
-            result = generate_mobile_response(
+            result = _generate_mobile_reply(cfg,
                 last_text,
                 situation,
                 her_info,

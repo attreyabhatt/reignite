@@ -132,6 +132,27 @@ def _validate_and_clean_json(text: str) -> str:
     return json.dumps(cleaned)
 
 
+def _validate_overlay_replies(text: str) -> str:
+    """Require three usable alternatives, ordered consistently across providers."""
+    replies = json.loads(text)
+    tones = ("Flirty", "Funny", "Natural")
+    if not isinstance(replies, list) or len(replies) != 3:
+        raise ValueError("Overlay requires three replies")
+    ordered = {}
+    messages = set()
+    for reply in replies:
+        if not isinstance(reply, dict) or not isinstance(reply.get("message"), str):
+            raise ValueError("Invalid overlay reply")
+        message = reply["message"].strip()
+        tone = str(reply.get("tone", "")).strip().title()
+        fingerprint = " ".join(message.casefold().split())
+        if not message or tone not in tones or tone in ordered or fingerprint in messages:
+            raise ValueError("Missing or duplicate overlay alternative")
+        ordered[tone] = {"message": message, "tone": tone}
+        messages.add(fingerprint)
+    return json.dumps([ordered[tone] for tone in tones], ensure_ascii=False)
+
+
 def _call_gemini_openers(
     image_bytes: bytes,
     custom_instructions: str,
@@ -317,7 +338,7 @@ def generate_mobile_openers_from_image(
     return ai_reply, success
 
 
-def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = GEMINI_FLASH, thinking_level: str = "high", input_source: str = "", reply_language: str = "en") -> Tuple[str, Optional[Dict[str, Any]]]:
+def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = GEMINI_FLASH, thinking_level: str = "high", input_source: str = "", reply_language: str = "en", overlay_instructions: str = "") -> Tuple[str, Optional[Dict[str, Any]]]:
     """
     Call Gemini for reply generation.
 
@@ -333,7 +354,7 @@ def _call_gemini_replies(last_text: str, custom_instructions: str, model: str = 
     Raises:
         Exception: If API call or validation fails
     """
-    system_prompt = get_mobile_reply_prompt(last_text, custom_instructions, input_source=input_source, reply_language=reply_language)
+    system_prompt = get_mobile_reply_prompt(last_text, custom_instructions, input_source=input_source, reply_language=reply_language, overlay_instructions=overlay_instructions)
     user_prompt = get_mobile_reply_user_prompt(last_text, input_source=input_source)
 
     response, usage_info = _generate_gemini_response(system_prompt, user_prompt, model=model, thinking_level=thinking_level)
@@ -348,6 +369,7 @@ def _call_openai_replies(
     model: str = GPT_MODEL,
     input_source: str = "",
     reply_language: str = "en",
+    overlay_instructions: str = "",
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Call OpenAI GPT-4.1-mini for reply generation (fallback).
@@ -369,6 +391,7 @@ def _call_openai_replies(
         return_usage=True,
         input_source=input_source,
         reply_language=reply_language,
+        overlay_instructions=overlay_instructions,
     )
     return _validate_and_clean_json(ai_reply), usage_info
 
@@ -386,6 +409,7 @@ def generate_mobile_response(
     return_meta: bool = False,
     input_source: str = "",
     reply_language: str = "en",
+    overlay_instructions: str = "",
 ) -> Tuple[str, bool]:
     """
     Generate reply suggestions for mobile app with cascading fallback.
@@ -410,6 +434,8 @@ def generate_mobile_response(
         When return_meta=True, returns (reply, success, meta)
     """
     context_options = {"input_source": input_source, "reply_language": reply_language} if input_source == "accessibility" else {}
+    if input_source == "accessibility" and overlay_instructions:
+        context_options["overlay_instructions"] = overlay_instructions
     success = False
     ai_reply = None
     model_used = None
@@ -439,7 +465,8 @@ def generate_mobile_response(
                     **context_options,
                 )
 
-            # Success!
+            if input_source == "accessibility":
+                ai_reply = _validate_overlay_replies(ai_reply)
             success = True
             model_used = model
             break

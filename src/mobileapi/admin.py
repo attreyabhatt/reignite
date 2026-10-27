@@ -109,6 +109,7 @@ class DegradationTierInline(admin.TabularInline):
 
 @admin.register(MobileAppConfigProxy)
 class MobileAppConfigAdmin(admin.ModelAdmin):
+    readonly_fields = ("overlay_default_prompt",)
     fieldsets = (
         ("Free User Limits", {"fields": ("free_daily_credit_limit", "guest_lifetime_credits")}),
         ("Guest Models & Thinking", {"fields": (
@@ -119,6 +120,10 @@ class MobileAppConfigAdmin(admin.ModelAdmin):
             "registered_reply_model", "registered_reply_thinking",
             "registered_opener_model", "registered_opener_thinking",
         )}),
+        ("Overlay Assistant: Models & Prompt", {"fields": (
+            "overlay_reply_model", "overlay_reply_thinking", "overlay_fallback_model",
+            "overlay_reply_prompt", "overlay_default_prompt",
+        ), "description": "Only floating-assistant requests. Overrides apply to all account tiers; credit limits and usage counters still apply. Leave models blank to retain account-tier routing."}),
         ("OCR Thinking", {"fields": (
             "ocr_thinking",
         )}),
@@ -127,6 +132,11 @@ class MobileAppConfigAdmin(admin.ModelAdmin):
         ("Blur Settings", {"fields": ("blur_preview_word_count",)}),
     )
     inlines = [DegradationTierInline]
+
+    @admin.display(description="Built-in overlay writing prompt")
+    def overlay_default_prompt(self, obj):
+        from conversation.utils.mobile.prompts_mobile import DEFAULT_OVERLAY_REPLY_STYLE
+        return DEFAULT_OVERLAY_REPLY_STYLE
 
     def has_add_permission(self, request):
         return not MobileAppConfig.objects.exists()

@@ -218,6 +218,17 @@ class MobileAppConfig(models.Model):
         help_text="Fallback model (GPT) used after tier2 threshold"
     )
 
+    # Optional overrides for the floating assistant only.
+    overlay_reply_model = models.CharField(max_length=100, blank=True, default="",
+        help_text="Overlay primary model for all account tiers. Blank follows existing guest, registered and subscriber tier routing.")
+    overlay_fallback_model = models.CharField(max_length=100, blank=True, default="",
+        help_text="Overlay fallback model. Blank uses the existing fallback model.")
+    overlay_reply_thinking = models.CharField(max_length=20, blank=True, default="",
+        choices=[("", "Follow account tier"), ("minimal", "Minimal"), ("low", "Low"), ("medium", "Medium"), ("high", "High")],
+        help_text="Overlay Gemini thinking level; ignored for OpenAI models.")
+    overlay_reply_prompt = models.TextField(blank=True, default="",
+        help_text="Optional overlay writing instructions. Blank uses the built-in prompt. Fixed tone order, privacy, quoted-context and language rules still apply.")
+
     # --- Guest thinking levels ---
     free_reply_thinking = models.CharField(
         max_length=20, default="high",
