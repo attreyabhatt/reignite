@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse
+from .acquisition import analytics_event
 from django.http import JsonResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
@@ -371,7 +372,7 @@ def ajax_reply(request):
         convo.latest_generation_id = generation_id
         convo.save()
         request.session["web_active_conversation"] = convo.pk
-        record_event(request, WebConversionEvent.Kind.GENERATED, generation_id=generation_id,
+        generation_event = record_event(request, WebConversionEvent.Kind.GENERATED, generation_id=generation_id,
                      situation=situation, dedupe_key=f"generated:{generation_id}")
 
         payload = {
@@ -379,6 +380,7 @@ def ajax_reply(request):
             "suggestions": suggestions,
             "credits_left": credits_left,
             "generation_id": str(generation_id),
+            "analytics": analytics_event(generation_event),
         }
         if created:
             payload["new_conversation"] = {"id": convo.id, "girl_title": convo.girl_title}
@@ -391,6 +393,7 @@ def ajax_reply(request):
         })
         triggers = {
             "creditsUpdated": {"credits_left": credits_left},
+            "replyGenerated": analytics_event(generation_event),
         }
         if created:
             triggers["conversationCreated"] = {"id": convo.id, "girl_title": convo.girl_title}
@@ -469,7 +472,7 @@ def ajax_reply(request):
 
     credits_left = use_guest_chat_credit(request)
     generation_id = uuid.uuid4()
-    record_event(request, WebConversionEvent.Kind.GENERATED, generation_id=generation_id,
+    generation_event = record_event(request, WebConversionEvent.Kind.GENERATED, generation_id=generation_id,
                  situation=situation, dedupe_key=f"generated:{generation_id}")
     save_pending(request, text=last_text, situation=situation, her_info=her_info,
                  suggestions=suggestions, generation_id=generation_id)
@@ -479,6 +482,7 @@ def ajax_reply(request):
         "suggestions": suggestions,
         "credits_left": credits_left,
         "generation_id": str(generation_id),
+        "analytics": analytics_event(generation_event),
     }
     log_guest_web_attempt(
         request=request,
@@ -497,6 +501,7 @@ def ajax_reply(request):
     })
     html_response["HX-Trigger"] = json.dumps({
         "creditsUpdated": {"credits_left": credits_left},
+        "replyGenerated": analytics_event(generation_event),
     })
     return html_response
 

@@ -448,23 +448,14 @@
                         Get three replies tailored to your conversation. Paste your chat or upload a screenshot to start.
                     </p>
                     <div class="home-hero-actions">
-                        {% if is_android_visitor %}
-                        {% include "partials/android_app_link.html" with placement="hero" extra_class="home-hero-btn" %}
-                        <a href="#try" class="matte-btn-secondary home-hero-btn no-underline">Use the web version</a>
-                        {% else %}
                         <a href="#try" class="matte-btn-primary home-hero-btn no-underline">Get my next reply</a>
-                        {% endif %}
                     </div>
-                    {% if is_android_visitor %}
-                    <p class="android-app-hero-note">FlirtFix is our Android app for personalized openers and replies.</p>
-                    {% else %}
                     <p class="android-app-hero-note">{{ web_guest_reply_limit }} free generation{{ web_guest_reply_limit|pluralize }} to try. No account needed.</p>
-                    {% endif %}
                 </div>
                 <div class="home-phone-column">
                     <div class="home-phone-glow"></div>
                     <div class="home-phone-stage">
-                        <img src="{% static 'images/flirtfix-hero-phone.png' %}" alt="FlirtFix mobile app screenshot with three reply options and explanations" class="home-phone-image">
+                        <img src="{% static 'images/flirtfix-hero-phone.webp' %}" width="1290" height="2796" fetchpriority="high" decoding="async" alt="FlirtFix mobile app screenshot with three reply options and explanations" class="home-phone-image">
                         <div class="home-phone-badge">
                             <p class="home-phone-badge-title">AI Suggestion</p>
                             <p class="home-phone-badge-copy">3 Replies Ready</p>

@@ -9,6 +9,7 @@ from django.utils.html import escape
 
 from seoapp.models import PickupTopic
 from seoapp.seed_data.search_refresh import PICKUP_REFRESH
+from seoapp.organic_refresh import PICKUP_ORGANIC_REFRESH
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -19,6 +20,7 @@ class SearchRefreshTests(TestCase):
 
     def test_editorial_pages_answer_intent_and_keep_relevant_tools(self):
         for (category, slug), content in PICKUP_REFRESH.items():
+            content = PICKUP_ORGANIC_REFRESH.get((category, slug), content)
             with self.subTest(slug=slug):
                 response = self.client.get(reverse("pickup_line_detail", args=[category, slug]))
                 self.assertEqual(response.status_code, 200)
@@ -63,7 +65,8 @@ class SearchRefreshTests(TestCase):
         response = self.client.get("/pickup-lines/professions/lawyer/")
         html = response.content.decode()
         blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
-        self.assertEqual(len(blocks), 1)
+        self.assertEqual(len(blocks), 2)
+        self.assertEqual(json.loads(blocks[1])["@type"], "Article")
         data = json.loads(blocks[0])
         self.assertEqual(data["itemListElement"][-1]["name"], topic.keyword)
         self.assertNotIn("</script>", blocks[0])

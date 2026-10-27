@@ -58,7 +58,7 @@
             </div>
 
             <div class="md:hidden">
-                <button onclick="document.getElementById('mobileMenu').classList.toggle('hidden')" class="p-2 rounded-lg text-[#F4F2EE] border border-[#3A3F4A]">
+                <button type="button" aria-label="Toggle navigation menu" aria-controls="mobileMenu" aria-expanded="false" onclick="const menu=document.getElementById('mobileMenu'); menu.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!menu.classList.contains('hidden')))" class="p-2 rounded-lg text-[#F4F2EE] border border-[#3A3F4A]">
                     <i class="fa fa-bars text-lg"></i>
                 </button>
             </div>

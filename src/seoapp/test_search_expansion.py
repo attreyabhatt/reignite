@@ -77,7 +77,11 @@ class SearchExpansionTests(TestCase):
                 response = self.client.get(path, {"private_query": "not-for-tracking"})
                 self.assertEqual(response.status_code, 200)
                 html = response.content.decode()
-                self.assertIn(escape(fields["guide_content"]["answer"]), html)
+                from seoapp.organic_refresh import PICKUP_ORGANIC_REFRESH, SITUATION_REFRESH
+                refreshed = next((v for k, v in PICKUP_ORGANIC_REFRESH.items()
+                                  if path == reverse("pickup_line_detail", args=k)), None)
+                refreshed = refreshed or SITUATION_REFRESH.get(fields.get("slug"), fields)
+                self.assertIn(escape(refreshed["guide_content"]["answer"]), html)
                 self.assertIn(f'<option value="{scenario}" selected>', html)
                 self.assertIn("Illustrative examples", html)
                 self.assertIn('id="playground"', html)
@@ -99,7 +103,7 @@ class SearchExpansionTests(TestCase):
                     self.assertEqual(query["utm_content"], [placement])
                     self.assertNotIn("not-for-tracking", href)
                 blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
-                self.assertEqual(len(blocks), 1)
+                self.assertTrue(all(json.loads(block)["@type"] in {"BreadcrumbList", "Article"} for block in blocks))
                 breadcrumb = json.loads(blocks[0])
                 self.assertEqual(breadcrumb["itemListElement"][-1]["item"], "https://www.tryagaintext.com" + path)
 

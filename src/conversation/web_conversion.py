@@ -4,11 +4,13 @@ from datetime import timedelta
 from urllib.parse import urlencode, urlsplit
 
 from django.db import transaction
+from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 
 from pricing.catalog import STARTER_PACK
 from .models import Conversation, WebAppConfig, WebConversionEvent
+from .acquisition import acquisition, analytics_event, PENDING_KEY
 
 DRAFT_KEY = "web_pending_conversation"
 JOURNEY_KEY = "web_conversion_journey"
@@ -39,13 +41,21 @@ def record_event(request, kind, *, generation_id=None, situation="", origin="", 
         previous = WebConversionEvent.objects.filter(journey_id=identity, kind="generated").order_by("created_at").first()
         if previous:
             origin, situation = previous.origin_path, situation or previous.situation
-    event, _ = WebConversionEvent.objects.get_or_create(
+    first_touch = acquisition(request)
+    event, created = WebConversionEvent.objects.get_or_create(
         dedupe_key=dedupe_key or str(uuid.uuid4()),
         defaults={"journey_id": identity, "user": user, "kind": kind,
                   "generation_id": generation_id, "situation": situation[:150],
                   "origin_path": origin or origin_path(request), "was_guest": user is None,
+                  "landing_path": first_touch.get("landing_path", ""),
+                  "acquisition_source": first_touch.get("source", ""),
+                  "acquisition_medium": first_touch.get("medium", ""),
                   "offer_kind": offer_kind, "credit_pack": credit_pack},
     )
+    if created and kind == WebConversionEvent.Kind.SIGNUP and settings.WEB_ANALYTICS_ENABLED:
+        pending = request.session.get(PENDING_KEY, [])
+        pending.append({"name": "sign_up", "parameters": analytics_event(event)})
+        request.session[PENDING_KEY] = pending[-10:]
     return event
 
 

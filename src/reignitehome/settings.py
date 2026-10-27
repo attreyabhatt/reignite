@@ -168,6 +168,7 @@ MIDDLEWARE = [
     'reignitehome.middleware.PublicCanonicalHostMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'conversation.acquisition.WebAcquisitionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -196,6 +197,7 @@ TEMPLATES = [
                 'reignitehome.context_processors.web_marketing_limits',
                 'reignitehome.context_processors.android_app_promotion',
                 'reignitehome.context_processors.public_site_metadata',
+                'conversation.acquisition.analytics_context',
             ],
         },
     },
@@ -323,6 +325,11 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+# Optional editorial metadata only; all twelve guides are available immediately.
+# Set this to their actual first public release date, not a scheduling date.
+SEO_GUIDES_PUBLISHED_ON = config('SEO_GUIDES_PUBLISHED_ON', default='')
+WEB_ANALYTICS_ENABLED = config('WEB_ANALYTICS_ENABLED', default=True, cast=bool)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

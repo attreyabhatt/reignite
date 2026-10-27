@@ -22,6 +22,12 @@ class PublicCanonicalTests(SimpleTestCase):
         for host in ("www.tryagaintext.com", "localhost", "testserver"):
             self.assertEqual(self.middleware(self.factory.get("/", HTTP_HOST=host)).status_code, 200)
 
+    def test_retired_first_date_path_and_hostname_consolidate_in_one_hop(self):
+        request = self.factory.get('/situations/what-to-text-after-a-date/?utm_source=reddit', HTTP_HOST='tryagaintext.com')
+        response = self.middleware(request)
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response['Location'], 'https://www.tryagaintext.com/situations/what-to-text-after-first-date/?utm_source=reddit')
+
     def test_api_auth_payments_and_posts_are_not_moved(self):
         for path in ("/api/profile/", "/accounts/login/", "/admin/", "/pricing/", "/conversations/", "/flirtfix?utm_source=website"):
             self.assertEqual(self.middleware(self.factory.get(path, HTTP_HOST="tryagaintext.com")).status_code, 200)

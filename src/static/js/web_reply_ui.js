@@ -477,6 +477,28 @@
             }
 
             navigator.clipboard.writeText(text).then(function () {
+                const actionId = window.crypto?.randomUUID ? window.crypto.randomUUID() : String(Date.now());
+                let attribution = {};
+                try { attribution = JSON.parse(document.getElementById('web-analytics-acquisition')?.textContent || '{}'); } catch (_) {}
+                window.webAnalytics?.track('copy_suggestion', {
+                    event_id: actionId,
+                    landing_path: attribution.landing_path || '',
+                    acquisition_source: attribution.source || '',
+                    acquisition_medium: attribution.medium || '',
+                });
+                fetch('/conversations/copy/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
+                    body: JSON.stringify({
+                        situation: document.getElementById('situation')?.value || '',
+                        her_info: document.getElementById('her_info')?.value || '',
+                        conversation_text: document.getElementById('last-reply')?.value || '',
+                        copied_message: text,
+                        conversation_id: document.getElementById('conversation-id')?.value || '',
+                        generation_id: button.closest('[data-result-generation]')?.dataset.resultGeneration || '',
+                        action_id: actionId,
+                    }),
+                }).catch(function () {});
                 const tooltip = button.querySelector('.copied-tooltip');
                 if (!tooltip) {
                     return;
@@ -489,30 +511,6 @@
                 // Clipboard may fail in older browsers; ignore silently.
             });
 
-            const payload = {
-                situation: document.getElementById('situation')?.value || '',
-                her_info: document.getElementById('her_info')?.value || '',
-                conversation_text: document.getElementById('last-reply')?.value || '',
-                copied_message: text,
-                conversation_id: document.getElementById('conversation-id')?.value || '',
-                generation_id: button.closest('[data-result-generation]')?.dataset.resultGeneration || '',
-                action_id: window.crypto?.randomUUID ? window.crypto.randomUUID() : '',
-            };
-
-            if (typeof window.gtag === 'function') {
-                window.gtag('event', 'copy_suggestion', {event_category: 'engagement'});
-            }
-
-            fetch('/conversations/copy/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken(),
-                },
-                body: JSON.stringify(payload),
-            }).catch(function () {
-                // Non-critical analytics event.
-            });
         });
     }
 

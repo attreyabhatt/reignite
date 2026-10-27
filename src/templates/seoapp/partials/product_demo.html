@@ -1,0 +1,15 @@
+{% load static %}
+{% if product_demo %}
+<section class="product-demo matte-card p-5 sm:p-8 mb-8" aria-label="Product demonstration">
+    <h2 class="matte-headline text-2xl font-bold mb-3">{{ product_demo.title }}</h2>
+    <p class="matte-copy mb-4">A walkthrough with fictional messages and illustrative replies.</p>
+    {% with base='demos/'|add:product_demo.slug %}
+    <video controls preload="none" playsinline width="1280" height="850" poster="{% static base|add:'.webp' %}">
+        <source src="{% static base|add:'.mp4' %}" type="video/mp4">
+        <track kind="captions" src="{% static base|add:'.vtt' %}" srclang="en" label="English" default>
+        Your browser cannot play this video. Read the transcript below.
+    </video>
+    {% endwith %}
+    <details class="mt-4"><summary>Read the transcript</summary><p class="matte-copy mt-3">{{ product_demo.transcript }}</p></details>
+</section>
+{% endif %}

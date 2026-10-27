@@ -1,0 +1,81 @@
+{
+  "review_date": "2026-10-27",
+  "comparison_limit": "Production baseline vs local preview with GA disabled, without production compression/caching. Not a field-performance or causal comparison.",
+  "pages": [
+    {
+      "page": "home",
+      "production_before": {
+        "url": "https://www.tryagaintext.com/",
+        "measured_at": "2026-10-26T20:52:42.426Z",
+        "lighthouse_version": "13.5.0",
+        "performance": 43,
+        "accessibility": 91,
+        "seo": 100,
+        "lcp_ms": 12600,
+        "tbt_ms": 1344,
+        "cls": 0
+      },
+      "local_after": {
+        "url": "http://127.0.0.1:8000/",
+        "measured_at": "2026-10-26T21:39:34.468Z",
+        "lighthouse_version": "13.5.0",
+        "performance": 91,
+        "accessibility": 96,
+        "seo": 100,
+        "lcp_ms": 3392,
+        "tbt_ms": 0,
+        "cls": 0
+      }
+    },
+    {
+      "page": "pickup",
+      "production_before": {
+        "url": "https://www.tryagaintext.com/pickup-lines/professions/lawyer/",
+        "measured_at": "2026-10-26T20:58:07.713Z",
+        "lighthouse_version": "13.5.0",
+        "performance": 41,
+        "accessibility": 91,
+        "seo": 100,
+        "lcp_ms": 6432,
+        "tbt_ms": 2312,
+        "cls": 0.0038
+      },
+      "local_after": {
+        "url": "http://127.0.0.1:8000/pickup-lines/professions/lawyer/",
+        "measured_at": "2026-10-26T21:39:47.982Z",
+        "lighthouse_version": "13.5.0",
+        "performance": 94,
+        "accessibility": 96,
+        "seo": 100,
+        "lcp_ms": 2743,
+        "tbt_ms": 0,
+        "cls": 0
+      }
+    },
+    {
+      "page": "guide",
+      "production_before": {
+        "url": "https://www.tryagaintext.com/situations/what-to-say-next-over-text/",
+        "measured_at": "2026-10-26T20:58:07.790Z",
+        "lighthouse_version": "13.5.0",
+        "performance": 44,
+        "accessibility": 91,
+        "seo": 100,
+        "lcp_ms": 6381,
+        "tbt_ms": 1639,
+        "cls": 0.0028
+      },
+      "local_after": {
+        "url": "http://127.0.0.1:8000/situations/what-to-say-next-over-text/",
+        "measured_at": "2026-10-26T21:40:01.077Z",
+        "lighthouse_version": "13.5.0",
+        "performance": 94,
+        "accessibility": 96,
+        "seo": 100,
+        "lcp_ms": 2939,
+        "tbt_ms": 0,
+        "cls": 0
+      }
+    }
+  ]
+}

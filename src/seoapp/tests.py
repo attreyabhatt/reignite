@@ -8,7 +8,7 @@ from django.utils.html import escape
 
 from reignitehome.views import DEFAULT_TOOL_CONVERSATION_PLACEHOLDER
 from seoapp.models import PickupCategory, PickupTopic
-from seoapp.situation_pages import SITUATION_PAGE_ORDER, list_situation_pages
+from seoapp.situation_pages import SITUATION_PAGE_ORDER, list_situation_pages, get_situation_page
 
 def _list_pickup_topics():
     """Return pickup topics as dicts, same shape as the old pickup_pages helper."""
@@ -26,7 +26,9 @@ class SituationSeoPagesTests(TestCase):
     def test_situations_directory_returns_200_and_links_to_all_situations(self):
         response = self.client.get(reverse("situation_index"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "All Scenario Guides")
+        self.assertContains(response, "Everyday replies")
+        self.assertContains(response, "Warm and flirty replies")
+        self.assertContains(response, "Dating plans and intentions")
 
         for page in list_situation_pages():
             expected_href = reverse("situation_landing", kwargs={"slug": page["slug"]})
@@ -115,6 +117,8 @@ class SituationSeoPagesTests(TestCase):
                 )
                 self.assertContains(response, "Related Situation Guides")
                 for related_slug in page["related_slugs"]:
+                    if not get_situation_page(related_slug):
+                        continue
                     related_href = reverse("situation_landing", kwargs={"slug": related_slug})
                     self.assertContains(response, f'href="{related_href}"', html=False)
 
@@ -142,7 +146,8 @@ class SituationSeoPagesTests(TestCase):
         for absolute_url in expected_core_urls:
             self.assertContains(response, f"<loc>{absolute_url}</loc>", html=False)
 
-        for slug in SITUATION_PAGE_ORDER:
+        for page in list_situation_pages():
+            slug = page["slug"]
             self.assertContains(
                 response,
                 f"<loc>https://www.tryagaintext.com/situations/{slug}/</loc>",

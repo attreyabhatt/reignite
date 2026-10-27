@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TryAgainText organic growth review</title>
+<style>
+:root{font:16px/1.6 system-ui,sans-serif;color:#edeef5;background:#10141e}body{max-width:1150px;margin:auto;padding:32px 20px}h1{font-size:clamp(28px,5vw,43px);margin-bottom:4px}h2{font-size:22px;margin-top:36px}p{color:#b6bfd4}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px}.card{border:1px solid #34405b;background:#192030;border-radius:14px;padding:20px}.number{display:block;font-size:34px;font-weight:700;color:#fff}.muted{font-size:13px;color:#b6bfd4}.bar{height:10px;background:#303c56;border-radius:8px;margin-top:12px;overflow:hidden}.bar>span{height:100%;display:block;background:#ff5385}label{display:inline-flex;gap:10px;margin:6px 18px 12px 0}select,input{font:inherit;background:#192030;color:white;border:1px solid #5e6c87;border-radius:6px;padding:6px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;border-bottom:1px solid #34405b;padding:12px 10px}td:first-child{max-width:430px;overflow-wrap:anywhere}th{color:#ffc069}a{color:#ffa5c0}.table-wrap{overflow:auto}button{font:inherit;border:0;border-radius:7px;background:#ff5385;color:#10141e;padding:8px 14px;cursor:pointer}.positive{color:#8ae4c6}.negative{color:#ffadb9}@media print{body{color:#111;background:#fff}.card,select,input{background:#fff;color:#111}.number{color:#111}p,.muted{color:#333}button{display:none}}
+</style></head><body>
+<p class="muted">PRIVATE WORKING REVIEW · SNAPSHOT, NOT A LIVE GOOGLE CONNECTION</p>
+<h1>Grow useful organic visits.</h1><p id="period"></p>
+<div class="cards" id="cards"></div>
+<h2>Priority pages</h2><p id="page-source"></p>
+<label>Filter <input id="filter" placeholder="Guide or pickup topic"></label>
+<label>Sort <select id="sort"><option value="impressions">Impressions</option><option value="clicks">Clicks</option><option value="loss">Largest click decline</option></select></label>
+<div class="table-wrap"><table><thead><tr><th>Canonical path</th><th>Clicks</th><th>Prior</th><th>Change</th><th>Impressions</th><th>CTR</th><th>Position</th></tr></thead><tbody id="pages"></tbody></table></div>
+<h2>Monthly click target</h2><p>700 is a working target for day 90, not a forecast. Track successful generations, signups and later-date use alongside search clicks.</p>
+<label>Explore CTR at baseline impressions <input id="ctr" type="range" min="1" max="5" step="0.1" value="3"></label><p id="estimate"></p>
+<h2>Measurement notes</h2><ul id="notes"></ul><p>The server conversion report is at <code>/admin/conversation/webconversionevent/report/</code>. It requires the existing admin view permission.</p>
+<p>To refresh page comparisons, run <code>python scripts/seo_report.py --current pages.csv --previous prior-pages.csv</code> with complete 28-day Pages exports. Property cards remain the dated baseline; page-export sums are not substituted for property totals.</p>
+<button onclick="window.print()">Print this review</button>
+<script type="application/json" id="data">__DATA__</script>
+<script>
+const data=JSON.parse(document.getElementById('data').textContent),p=data.property;
+const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+document.getElementById('period').textContent=`Baseline: ${data.current_period}; compared with ${data.previous_period}. Reviewed ${data.reviewed_on}.`;
+const metrics=[['Google clicks',p.clicks,`${p.previous_clicks} previously`],['Search impressions',p.impressions.toLocaleString(),`${p.previous_impressions.toLocaleString()} previously`],['CTR',p.ctr+'%',p.previous_ctr+'% previously'],['Organic sessions',data.ga4.organic_sessions,data.ga4.period]];
+document.getElementById('cards').innerHTML=metrics.map(([label,value,note])=>`<div class="card">${label}<span class="number">${value}</span><span class="muted">${note}</span></div>`).join('');
+document.getElementById('page-source').textContent=data.page_export?`Page comparison loaded from ${data.page_export}. Hostname variants and the first-date redirect are combined.`:'Nine selected priorities from the baseline review. These are not all website pages.';
+function render(){const term=document.getElementById('filter').value.toLowerCase(),sort=document.getElementById('sort').value;let rows=data.pages.filter(r=>r.path.toLowerCase().includes(term));rows.sort((a,b)=>sort==='loss'?(a.clicks-a.previous_clicks)-(b.clicks-b.previous_clicks):b[sort]-a[sort]);document.getElementById('pages').innerHTML=rows.map(r=>{const change=r.clicks-r.previous_clicks;return `<tr><td><a target="_blank" rel="noreferrer" href="https://www.tryagaintext.com${escapeHtml(r.path)}">${escapeHtml(r.path)}</a></td><td>${r.clicks}</td><td>${r.previous_clicks}</td><td class="${change>=0?'positive':'negative'}">${change>0?'+':''}${change}</td><td>${r.impressions}</td><td>${(100*r.clicks/Math.max(1,r.impressions)).toFixed(2)}%</td><td>${r.position}</td></tr>`}).join('')}
+function estimate(){const ctr=Number(document.getElementById('ctr').value);document.getElementById('estimate').textContent=`At ${ctr.toFixed(1)}% CTR and ${p.impressions.toLocaleString()} impressions: approximately ${Math.round(p.impressions*ctr/100)} clicks. This arithmetic holds impressions constant; it is not a ranking or traffic prediction.`}
+document.getElementById('notes').innerHTML=data.notes.map(n=>`<li>${escapeHtml(n)}</li>`).join('');document.getElementById('filter').addEventListener('input',render);document.getElementById('sort').addEventListener('change',render);document.getElementById('ctr').addEventListener('input',estimate);render();estimate();
+</script></body></html>

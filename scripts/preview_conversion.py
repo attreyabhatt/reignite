@@ -63,7 +63,27 @@ def local_checkout(destination, *args, **kwargs):
 
 print(f"Disposable preview database: {settings.DATABASES['default']['NAME']}", flush=True)
 print("Preview: http://127.0.0.1:8000/ | Admin: preview / PreviewOnly123!", flush=True)
-with patch("conversation.views.generate_web_response", return_value=(REPLIES, True)), \
+
+def illustrative_replies(text, *args):
+    text = " ".join(str(value) for value in (text, *args)).lower()
+    if "exam" in text:
+        messages = ["That must be a relief. What's the first thing you're doing with your free evening?",
+                    "Congratulations on getting through them! Have you got something nice planned?",
+                    "I hope you get a proper break now. How are you feeling about it all?"]
+    elif "saturday" in text:
+        messages = ["Looking forward to Saturday. Still good for two at the station cafe?",
+                    "Just checking our plan for Saturday: two at the station cafe still works for you?",
+                    "Hope your week's going well. Looking forward to coffee at two on Saturday."]
+    elif "bookshop" in text:
+        messages = ["That bookshop in your story looks like somewhere I could lose an afternoon. Did you find anything good?",
+                    "Your bookshop story has made my reading list nervous. What caught your eye?",
+                    "That little bookshop looks lovely. Would you recommend a visit?"]
+    else:
+        return REPLIES, True
+    return [{"message": message} for message in messages], True
+
+
+with patch("conversation.views.generate_web_response", side_effect=illustrative_replies), \
      patch("reignitehome.views.generate_reignite_comeback", return_value=(REPLIES, True)), \
      patch("conversation.views.extract_conversation_from_image_web", return_value="You: Coffee?\nHer: Yes!"), \
      patch("pricing.views.redirect", side_effect=local_checkout):

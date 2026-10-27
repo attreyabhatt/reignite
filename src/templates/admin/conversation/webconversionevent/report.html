@@ -4,7 +4,7 @@
 <p><strong>{{ experiment }}</strong> · {{ since|date:"Y-m-d H:i" }} to {{ as_of|date:"Y-m-d H:i" }}.</p>
 <p>First recorded event: {{ tracking_started|date:"Y-m-d H:i"|default:"No events yet" }}. Actual release time should be recorded in the rollout log.</p>
 <nav aria-label="Reporting period"><a href="?days=7">7 days</a> · <a href="?days=28">28 days</a> · <a href="?days=90">90 days</a></nav>
-<p>Android visitors are directed to the app; iPhone and desktop visitors to the web tool. See the separate <a href="{% url 'admin:reignitehome_marketingclickevent_funnel' %}">Android acquisition report</a> for app installs and purchases. Android visitors who choose the web tool are included here.</p>
+<p>The web tool is the primary action across devices. See the separate <a href="{% url 'admin:reignitehome_marketingclickevent_funnel' %}">Android acquisition report</a> for people who choose the app.</p>
 <h2>New guest cohorts and what happened within seven days</h2>
 <p>{{ cohort_count }} cohorts started in this period; {{ mature_count }} have a complete seven-day observation window. Linked accounts are counted once; other visitors are identified by their browser session.</p>
 <table><thead><tr><th>Milestone</th><th>All cohorts</th><th>Mature cohorts</th><th>Rate among mature cohorts</th></tr></thead>
@@ -26,6 +26,11 @@
 <h2>Historical counters for comparison</h2>
 <p>{{ legacy_generations }} successful guest generations and {{ legacy_copies }} web copy actions in the older logging tables for this period. These overlap the new events after release: do not add the counts together. Historical guest-to-signup attribution is unavailable.</p>
 <h2>Where generated replies started</h2>
+<h2>Original landing pages and acquisition</h2>
+<p>First touch within the browser session; query strings and full referrer URLs are not stored. Counts are observed actions, not unique people or causal attribution. Historical events have no acquisition metadata.</p>
+<table><thead><tr><th>Original landing page</th><th>Source</th><th>Medium</th><th>Generations</th><th>Copies</th><th>Signups</th></tr></thead><tbody>
+{% for row in acquisition_rows %}<tr><td>{{ row.path }}</td><td>{{ row.source }}</td><td>{{ row.medium }}</td><td>{{ row.generated }}</td><td>{{ row.copied }}</td><td>{{ row.signup }}</td></tr>{% empty %}<tr><td colspan="6">No attributed activity yet.</td></tr>{% endfor %}
+</tbody></table>
 <table><thead><tr><th>Page</th><th>Situation</th><th>Generations</th></tr></thead><tbody>
 {% for row in pages %}<tr><td>{{ row.path }}</td><td>{{ row.situation }}</td><td>{{ row.count }}</td></tr>{% empty %}<tr><td colspan="3">No generations recorded yet.</td></tr>{% endfor %}
 </tbody></table>

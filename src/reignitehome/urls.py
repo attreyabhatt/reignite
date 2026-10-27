@@ -21,6 +21,7 @@ from reignitehome.views import (
 
 
 urlpatterns = [
+    path('about/', TemplateView.as_view(template_name='about.html'), name='about'),
     path('.well-known/assetlinks.json', android_asset_links, name='android_asset_links'),
     path('admin/', admin.site.urls),
     path('', home, name='home'),

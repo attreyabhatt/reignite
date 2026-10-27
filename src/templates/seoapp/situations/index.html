@@ -52,8 +52,8 @@
                 Find the Exact Texting Playbook for Your Situation
             </h1>
             <p class="matte-copy text-base sm:text-lg max-w-3xl mb-6">
-                Each guide maps to a real-world dating app pain point and opens a pre-configured AI flow with the right scenario selected.
-                Pick your situation, generate options fast, and keep the conversation moving.
+                Read example replies for everyday messages, warm conversations and dating plans.
+                Find the situation that fits, then adapt an example or use the web reply tool with your own context.
             </p>
             <div class="flex flex-wrap gap-3">
                 <a href="{% url 'home' %}#try" class="matte-btn-primary px-6 py-3 text-sm no-underline">Open The Reply Tool</a>
@@ -61,12 +61,15 @@
             </div>
         </section>
 
-        {% include "partials/android_app_card.html" %}
-
-        <section class="mb-8">
-            <h2 class="text-2xl font-bold matte-headline mb-4">All Scenario Guides</h2>
+        <nav aria-label="Guide topics" class="flex flex-wrap gap-4 mb-8">
+            {% for group in situation_groups %}<a class="guide-cta" href="#{{ group.key }}">{{ group.title }}</a>{% endfor %}
+        </nav>
+        {% for group in situation_groups %}
+        <section id="{{ group.key }}" class="mb-8">
+            <h2 class="text-2xl font-bold matte-headline mb-4">{{ group.title }}</h2>
+            <p class="matte-copy mb-4">{{ group.description }}</p>
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {% for page in situation_pages %}
+                {% for page in group.pages %}
                 <a href="{% url 'situation_landing' page.slug %}" class="guide-card no-underline p-5">
                     <h3 class="text-lg font-semibold text-brand-text mb-2">{{ page.h1 }}</h3>
                     <p class="text-sm mb-4">{{ page.meta_description }}</p>
@@ -75,6 +78,8 @@
                 {% endfor %}
             </div>
         </section>
+        {% endfor %}
+        {% include "partials/android_app_card.html" %}
 
         <section class="matte-card p-6 sm:p-8">
             <h2 class="text-2xl font-bold matte-headline mb-3">How to Use These Guides</h2>

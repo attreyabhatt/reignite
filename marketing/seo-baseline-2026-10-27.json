@@ -1,0 +1,21 @@
+{
+  "reviewed_on": "2026-10-27",
+  "current_period": "2026-09-27 to 2026-10-24",
+  "previous_period": "2026-08-30 to 2026-09-26",
+  "property": {"clicks": 462, "previous_clicks": 495, "impressions": 19800, "previous_impressions": 14900, "ctr": 2.3, "previous_ctr": 3.3, "position": 7.8, "previous_position": 8.5},
+  "ga4": {"period": "2026-09-29 to 2026-10-26", "organic_sessions": 449, "engagement_rate": 60.58, "key_events": 0},
+  "indexing": {"indexed": 296, "crawled_not_indexed": 60, "discovered_not_indexed": 30, "sitemap_urls": 363},
+  "target": {"day_90_monthly_clicks": 700, "type": "Working target, not a forecast"},
+  "pages": [
+    {"path": "/situations/what-to-say-next-over-text/", "clicks": 32, "previous_clicks": 40, "impressions": 1970, "previous_impressions": 1561, "position": 7.1},
+    {"path": "/pickup-lines/professions/lawyer/", "clicks": 48, "previous_clicks": 47, "impressions": 1771, "previous_impressions": 1535, "position": 6.1},
+    {"path": "/pickup-lines/dating-apps/instagram-dm-opener/", "clicks": 18, "previous_clicks": 32, "impressions": 808, "previous_impressions": 1106, "position": 8.5},
+    {"path": "/situations/how-to-confirm-a-date-over-text/", "clicks": 4, "previous_clicks": 0, "impressions": 579, "previous_impressions": 0, "position": 10.6},
+    {"path": "/pickup-lines/hobbies/fishing/", "clicks": 5, "previous_clicks": 1, "impressions": 713, "previous_impressions": 332, "position": 9.1},
+    {"path": "/pickup-lines/professions/firefighter/", "clicks": 11, "previous_clicks": 0, "impressions": 625, "previous_impressions": 0, "position": 6.7},
+    {"path": "/pickup-lines/professions/flight-attendant/", "clicks": 6, "previous_clicks": 14, "impressions": 517, "previous_impressions": 474, "position": 7.9},
+    {"path": "/situations/how-to-end-a-text-conversation/", "clicks": 4, "previous_clicks": 1, "impressions": 474, "previous_impressions": 37, "position": 8.1},
+    {"path": "/situations/how-to-respond-to-a-compliment-over-text/", "clicks": 1, "previous_clicks": 0, "impressions": 334, "previous_impressions": 0, "position": 10.3}
+  ],
+  "notes": ["Property impressions are rounded in the observed UI.", "Page paths combine www and non-www history. Page-export totals can differ from property totals.", "The nine listed pages are priorities, not the full website.", "GA4 and Search Console cover different dates and measure different things."]
+}

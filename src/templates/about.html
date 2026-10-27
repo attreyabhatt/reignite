@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block head_title %}About TryAgainText and Our Editorial Approach{% endblock %}
+{% block meta_description %}Learn who publishes TryAgainText's texting guides, how illustrative examples are prepared, and how to use AI reply suggestions thoughtfully.{% endblock %}
+{% block content %}
+<article class="max-w-3xl mx-auto px-5 py-12 editorial-guide">
+    <h1 class="matte-headline text-3xl font-bold mb-6">About TryAgainText</h1>
+    <p>TryAgainText is a web tool for thinking through dating conversations. Paste an exchange or upload a screenshot to get reply ideas, then choose and edit the wording yourself. FlirtFix is our companion Android app.</p>
+    <p>The guides are published by TryAgainText. They offer practical examples for common texting moments; they are not professional counselling, evidence of a particular person's intentions, or a promise that someone will reply.</p>
+    <section id="editorial" class="guide-section">
+        <h2>How our examples are prepared</h2>
+        <p>We use AI assistance to draft and organise examples, then check the published text for relevance, clarity, repeated wording, unsupported claims and respect for boundaries. The byline identifies the publisher; it does not claim that a named relationship expert wrote or endorsed the advice.</p>
+        <p>Conversations in guides and demonstrations are fictional illustrations. They are not customer messages, testimonials, research findings or predictions of how another person will respond. Demonstrations label illustrative reply output on screen.</p>
+        <p>We add or update guides when they answer a distinct question, improve an explanation, or reflect a useful correction. Dates on reviewed guides refer to substantive editorial changes or first publication, rather than changing automatically every day.</p>
+    </section>
+    <section class="guide-section">
+        <h2>Use the ideas in your own voice</h2>
+        <p>Only use details that are true for you. Match the familiarity of the relationship, accept a refusal, and respect requests for space. No wording can manufacture another person's interest.</p>
+        <p>Remove private details you do not want to share before using the tool. Read our <a href="{% url 'privacy_policy' %}">privacy policy</a> for information about processing and retention.</p>
+    </section>
+    <section class="guide-section">
+        <h2>Corrections and questions</h2>
+        <p>If an example is unclear or a guide needs a correction, <a href="{% url 'contact' %}">contact TryAgainText</a> with the page URL and the issue. We welcome specific feedback.</p>
+        <p><a href="{% url 'situation_index' %}">Browse texting guides</a> or <a href="{% url 'home' %}#try">try the web reply tool</a>.</p>
+    </section>
+</article>
+{% endblock %}

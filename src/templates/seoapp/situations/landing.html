@@ -96,6 +96,7 @@
     }
 </style>
 <script type="application/ld+json">{{ breadcrumb_json|safe }}</script>
+{% if article_json %}<script type="application/ld+json">{{ article_json|safe }}</script>{% endif %}
 {% endblock extra_head %}
 
 {% block content %}
@@ -105,31 +106,12 @@
             <p class="text-xs uppercase tracking-wide matte-copy mb-2">Situation Guide</p>
             <h1 class="matte-headline text-3xl sm:text-4xl font-bold leading-tight mb-3">{{ situation_page.h1 }}</h1>
             <p class="matte-copy max-w-3xl">
-                Built for this exact texting moment. Use the pre-selected scenario, generate send-ready responses, and adapt fast.
+                {{ situation_page.meta_description }}
             </p>
         </section>
 
-        {% if early_web_tool %}
-        {% include "partials/android_primary_action.html" %}
-        <section id="web-tool" class="situation-tool-layout mb-10">
-            <div class="pickup-tool-shell">
-                {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
-            </div>
-            <aside class="matte-card-tight p-4 sm:p-5">
-                <p class="text-xs font-semibold matte-copy uppercase tracking-wide mb-3">{{ tool_config.sidebar_heading|default:'Browse All Situations' }}</p>
-                <div class="space-y-1">
-                    {% for link in tool_config.sidebar_links %}
-                    <a href="{{ link.href }}" class="situation-sidebar-link{% if link.is_active %} is-active{% endif %}">
-                        {{ link.label }}
-                    </a>
-                    {% endfor %}
-                </div>
-            </aside>
-        </section>
-        {% endif %}
-
         {% if situation_page.guide_content %}
-        {% include "seoapp/partials/editorial_guide.html" with guide=situation_page.guide_content %}
+        {% include "seoapp/partials/editorial_guide.html" with guide=editorial_guide %}
         {% else %}
         <section class="guide-quick-answer" aria-label="Quick answer and example">
             <p class="guide-eyebrow">What to say</p>
@@ -144,11 +126,10 @@
         </section>
         {% endif %}
 
-        {% include "partials/android_app_card.html" %}
-
-        {% if not early_web_tool %}
-        <section class="situation-tool-layout mb-10">
+        {% include "seoapp/partials/product_demo.html" %}
+        <section id="web-tool" class="situation-tool-layout mb-10" aria-label="Reply help for your conversation">
             <div class="pickup-tool-shell">
+                <p class="matte-copy mb-4">Try {{ web_guest_reply_limit }} free generation{{ web_guest_reply_limit|pluralize }}. No account needed. Choose the suggestion that fits your voice.</p>
                 {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
             </div>
             <aside class="matte-card-tight p-4 sm:p-5">
@@ -162,7 +143,7 @@
                 </div>
             </aside>
         </section>
-        {% endif %}
+        {% include "partials/android_app_card.html" %}
 
         {% if not situation_page.guide_content %}
         <section class="matte-card situation-seo-section p-6 sm:p-8 mb-8">

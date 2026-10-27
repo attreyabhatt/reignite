@@ -1,5 +1,6 @@
 ﻿from django.http import Http404
 from django.shortcuts import render
+from django.http import HttpResponsePermanentRedirect
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.vary import vary_on_headers
@@ -10,14 +11,32 @@ from reignitehome.utils.ip_check import get_client_ip
 from django.db.models import Count, Q
 
 from seoapp.models import PickupCategory, PickupTopic
-from reignitehome.seo import breadcrumb_json, public_url
+from reignitehome.seo import article_json, breadcrumb_json, public_url
+from seoapp.organic_guides import REDIRECTS, editorial_metadata
+from seoapp.product_demos import DEMOS
 from seoapp.discovery import featured_topics, next_step_guides, related_pickup_topics
 from seoapp.glossary_terms import GLOSSARY_BY_ALPHA
 from seoapp.situation_pages import (
     get_situation_page,
     list_related_pages,
     list_situation_pages,
+    grouped_situation_pages,
 )
+
+
+def editorial_context(page, related, path, title, description):
+    """Attach contextual links without modifying shared editorial dictionaries."""
+    guide = dict(page.get("guide_content") or {})
+    metadata = editorial_metadata({**guide, **page})
+    sections = []
+    for index, original in enumerate(guide.get("sections", [])):
+        section = dict(original)
+        if index < min(3, len(related)):
+            section["related_guide"] = related[index]
+        sections.append(section)
+    guide["sections"] = sections
+    return {"editorial_guide": guide, "editorial_metadata": metadata,
+            "article_json": article_json(title, description, path, metadata)}
 
 
 DEFAULT_TOOL_CONVERSATION_PLACEHOLDER = "you: hey, free thursday?\nher: (seen, no reply)"
@@ -109,6 +128,7 @@ def situation_index(request):
     context.update(
         {
             "situation_pages": list_situation_pages(),
+            "situation_groups": grouped_situation_pages(),
             "meta_description": (
                 "Explore texting guides for every dating app scenario, from dry replies to asking for dates. "
                 "Open the exact guide and generate send-ready responses."
@@ -127,6 +147,10 @@ def situation_index(request):
 @require_http_methods(["GET"])
 @vary_on_headers("User-Agent", "Sec-CH-UA-Platform")
 def situation_landing(request, slug):
+    if slug in REDIRECTS:
+        return HttpResponsePermanentRedirect(public_url(
+            reverse("situation_landing", args=[REDIRECTS[slug]])
+            + ("?" + request.META["QUERY_STRING"] if request.META.get("QUERY_STRING") else "")))
     situation_page = get_situation_page(slug)
     if not situation_page:
         raise Http404("Situation page not found.")
@@ -134,16 +158,26 @@ def situation_landing(request, slug):
     canonical_url = public_url(
         reverse("situation_landing", kwargs={"slug": situation_page["slug"]})
     )
+    related_pages = list_related_pages(situation_page)
+    for fallback in ("what-to-say-next-over-text", "how-to-respond-to-hey", "sincere-text-messages", "how-to-confirm-a-date-over-text"):
+        if len(related_pages) >= 3:
+            break
+        candidate = get_situation_page(fallback)
+        if candidate and candidate != situation_page and candidate not in related_pages:
+            related_pages.append(candidate)
     context = _build_guest_chat_context(request)
+    context.update(editorial_context(situation_page, related_pages, request.path,
+                                    situation_page["h1"], situation_page["meta_description"]))
     context.update(
         {
             "situation_page": situation_page,
+            "product_demo": DEMOS.get(slug),
             "early_web_tool": slug == "what-to-say-next-over-text",
             "breadcrumb_json": breadcrumb_json([
                 ("Home", "/"), ("Texting Guides", reverse("situation_index")),
                 (situation_page["h1"], reverse("situation_landing", args=[slug])),
             ]),
-            "related_pages": list_related_pages(situation_page),
+            "related_pages": related_pages,
             "meta_description": situation_page["meta_description"],
             "canonical_url": canonical_url,
             "og_title": situation_page["title"],
@@ -255,6 +289,7 @@ def pickup_line_detail(request, category_slug, topic_slug):
     context.update(
         {
             "pickup_topic": pickup_topic,
+            "product_demo": DEMOS.get(topic_slug),
             "featured_topics": related_pickup_topics(topic_obj),
             "next_step_guides": next_step_guides(category_slug, topic_slug),
             "breadcrumb_json": breadcrumb_json([
@@ -289,6 +324,8 @@ def pickup_line_detail(request, category_slug, topic_slug):
             ),
         }
     )
+    context.update(editorial_context(pickup_topic, next_step_guides(category_slug, topic_slug),
+                                    request.path, pickup_topic["h1"], pickup_topic["meta_description"]))
     return render(request, "seoapp/pickup_lines/detail.html", context)
 
 @require_http_methods(["GET"])

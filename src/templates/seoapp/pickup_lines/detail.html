@@ -121,6 +121,7 @@
 </style>
 <link rel="stylesheet" href="{% static 'css/pickup_playground.css' %}">
 <script type="application/ld+json">{{ breadcrumb_json|safe }}</script>
+{% if article_json %}<script type="application/ld+json">{{ article_json|safe }}</script>{% endif %}
 {% endblock extra_head %}
 
 {% block content %}
@@ -146,8 +147,7 @@
             <p class="pickup-hero-copy">{{ pickup_topic.seo_intro }}</p>
         </section>
 
-        {% if early_web_tool %}
-        {% include "partials/android_primary_action.html" %}
+        {% if early_web_tool and not pickup_topic.guide_content %}
         <section id="web-tool" class="pickup-tool-shell mb-7" aria-label="Personalize your next message">
             <div class="web-tool-intro"><h2>Make it fit your conversation</h2><p class="matte-copy">Get three suggestions using details from your actual chat or their profile.</p></div>
             {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
@@ -155,13 +155,15 @@
         {% endif %}
 
         {% if pickup_topic.guide_content %}
-        {% include "seoapp/partials/editorial_guide.html" with guide=pickup_topic.guide_content %}
-        {% include "partials/android_app_card.html" %}
-        {% if not pickup_topic.guide_content.hide_tool and not early_web_tool %}
-        <section class="pickup-tool-shell mb-7" aria-label="Personalize your next message">
+        {% include "seoapp/partials/editorial_guide.html" with guide=editorial_guide %}
+        {% include "seoapp/partials/product_demo.html" %}
+        {% if not pickup_topic.guide_content.hide_tool %}
+        <section id="web-tool" class="pickup-tool-shell mb-7" aria-label="Personalize your next message">
+            <p class="matte-copy mb-4">Try {{ web_guest_reply_limit }} free generation{{ web_guest_reply_limit|pluralize }}. No account needed.</p>
             {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
         </section>
         {% endif %}
+        {% include "partials/android_app_card.html" %}
         {% else %}
         <section class="pickup-lines-card mb-7">
             <h2 class="pickup-lines-title matte-headline font-bold">The "Intellectual &amp; Witty" Openers</h2>
@@ -175,14 +177,13 @@
             </ol>
         </section>
 
-        {% include "partials/android_app_card.html" %}
-
         {% if not early_web_tool %}
-        <section class="pickup-tool-shell mb-7">
+        <section id="web-tool" class="pickup-tool-shell mb-7">
             {% include "conversation/partials/reply_tool_block.html" with tool_config=tool_config chat_credits=chat_credits %}
         </section>
 
         {% endif %}
+        {% include "partials/android_app_card.html" %}
         <section class="pickup-lines-card mb-7">
             <h2 class="pickup-lines-title matte-headline font-bold">The "Direct &amp; Flirty" Openers</h2>
             <ol class="pickup-lines-list">

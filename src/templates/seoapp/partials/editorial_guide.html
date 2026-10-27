@@ -2,6 +2,7 @@
     <div class="guide-quick-answer">
         <p class="guide-eyebrow">Start here</p>
         <p>{{ guide.answer }}</p>
+        {% if not guide.hide_tool %}<p><a href="#web-tool" class="guide-tool-link">Get reply ideas for your own conversation &darr;</a></p>{% endif %}
     </div>
     <nav class="guide-contents" aria-label="On this page">
         <span>In this guide</span>
@@ -10,6 +11,11 @@
         {% endfor %}
     </nav>
     <p class="guide-example-note">Illustrative examples. Use details that are true for you and adapt the wording to your conversation.</p>
+    {% if editorial_metadata %}
+    <p class="guide-example-note">By <a href="{% url 'about' %}">{{ editorial_metadata.author.name }}</a> &middot;
+        Updated <time datetime="{{ editorial_metadata.date_modified }}">{{ editorial_metadata.date_modified }}</time>.
+        <a href="{% url 'about' %}#editorial">How these examples are prepared</a></p>
+    {% endif %}
     {% for section in guide.sections %}
     <section id="guide-section-{{ forloop.counter }}" class="guide-section">
         <h2>{{ section.heading }}</h2>
@@ -23,6 +29,9 @@
             </div>
             {% endfor %}
         </div>
+        {% if section.related_guide %}
+        <p class="guide-context-link">For the next step: <a href="{% url 'situation_landing' section.related_guide.slug %}">{{ section.related_guide.h1 }}</a>.</p>
+        {% endif %}
     </section>
     {% endfor %}
     {% if guide.source %}<p class="guide-example-note">Platform reference: <a href="{{ guide.source.url }}">{{ guide.source.label }}</a>.</p>{% endif %}

@@ -723,7 +723,8 @@ def get_situation_page(slug):
 
 
 def list_situation_pages():
-    return [SITUATION_PAGES[slug] for slug in SITUATION_PAGE_ORDER if slug in SITUATION_PAGES]
+    return [SITUATION_PAGES[slug] for slug in SITUATION_PAGE_ORDER
+            if slug in SITUATION_PAGES]
 
 
 def list_related_pages(page):
@@ -732,7 +733,7 @@ def list_related_pages(page):
 
     related = []
     for slug in page.get("related_slugs", []):
-        match = SITUATION_PAGES.get(slug)
+        match = get_situation_page(slug)
         if not match:
             continue
         related.append(match)
@@ -755,3 +756,32 @@ for _slug, _links in SITUATION_INCOMING_LINKS.items():
     SITUATION_PAGES[_slug]["related_slugs"] = list(dict.fromkeys(
         [*SITUATION_PAGES[_slug]["related_slugs"], *_links]
     ))
+
+from seoapp.organic_guides import (
+    NEW_GUIDES, INCOMING_LINKS, REDIRECTS, CLUSTERS, EXISTING_CLUSTERS,
+)
+from seoapp.organic_refresh import SITUATION_REFRESH
+
+for _slug, _fields in SITUATION_REFRESH.items():
+    SITUATION_PAGES[_slug].update(_fields)
+SITUATION_PAGES.update(NEW_GUIDES)
+SITUATION_PAGE_ORDER.extend(NEW_GUIDES)
+for _slug, _links in INCOMING_LINKS.items():
+    SITUATION_PAGES[_slug]["related_slugs"] = list(dict.fromkeys(
+        [*SITUATION_PAGES[_slug]["related_slugs"], *_links]))
+for _old, _replacement in REDIRECTS.items():
+    SITUATION_PAGES.pop(_old, None)
+    SITUATION_PAGE_ORDER.remove(_old)
+for _page_data in SITUATION_PAGES.values():
+    _page_data["related_slugs"] = list(dict.fromkeys(
+        REDIRECTS.get(slug, slug) for slug in _page_data["related_slugs"]))
+    if "cluster" not in _page_data:
+        _page_data["cluster"] = next((key for key, slugs in EXISTING_CLUSTERS.items()
+                                      if _page_data["slug"] in slugs), "dating")
+
+
+def grouped_situation_pages():
+    pages = list_situation_pages()
+    return [{"key": key, "title": title, "description": description,
+             "pages": [page for page in pages if page["cluster"] == key]}
+            for key, title, description in CLUSTERS]

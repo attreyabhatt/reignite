@@ -11,6 +11,9 @@ media/
 .env
 src/secrets/
 venv/
+node_modules/
+.seo-audit/
+playwright-report/
 env/
 
 # IDE-specific files (example for PyCharm)

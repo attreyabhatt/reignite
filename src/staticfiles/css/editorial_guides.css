@@ -22,3 +22,8 @@
 .guide-link-grid strong { color: #F4F2EE; font-size: 1rem; }
 .guide-link-grid span { color: #A7B1C7; font-size: .82rem; line-height: 1.6; }
 @media (max-width: 640px) { .guide-examples, .guide-link-grid { grid-template-columns: 1fr; } .guide-quick-answer { padding: 1rem; } }
+
+.guide-tool-link, .guide-context-link a, .editorial-guide a { color: #F2B4C7; text-decoration: underline; text-underline-offset: 3px; }
+.product-demo video { width: 100%; height: auto; border-radius: 12px; background: #101218; }
+.editorial-guide > p { margin-bottom: 1.25rem; line-height: 1.75; }
+.product-demo summary { cursor: pointer; color: #F2B4C7; }

@@ -23,7 +23,8 @@ from reignitehome.models import ContactMessage, MarketingClickEvent, TrialIP
 from reignitehome.seo import public_url
 from reignitehome.utils.ip_check import get_client_ip
 from seoapp.models import PickupCategory, PickupTopic
-from seoapp.situation_pages import SITUATION_PAGE_ORDER
+from seoapp.situation_pages import list_situation_pages
+from seoapp.organic_guides import editorial_metadata
 from seoapp.discovery import featured_topics, next_step_guides
 
 # Whitelists (match your <select> values in home.html)
@@ -350,6 +351,7 @@ def community_create(request):
 def sitemap_xml(request):
     absolute_urls = [
         public_url(reverse("home")),
+        public_url(reverse("about")),
         public_url(reverse("situation_index")),
         public_url(reverse("pickup_lines_index")),
         public_url(reverse("glossary")),
@@ -362,37 +364,23 @@ def sitemap_xml(request):
         public_url(reverse("screenclean_privacy_policy")),
     ]
 
-    for slug in SITUATION_PAGE_ORDER:
-        absolute_urls.append(
-            public_url(
-                reverse("situation_landing", kwargs={"slug": slug})
-            )
-        )
+    entries = [{"loc": url} for url in absolute_urls]
+    for page in list_situation_pages():
+        entries.append({"loc": public_url(reverse("situation_landing", args=[page["slug"]])),
+                        "lastmod": editorial_metadata(page).get("date_modified")})
 
     for cat in PickupCategory.objects.order_by("sort_order"):
-        absolute_urls.append(
-            public_url(
-                reverse("pickup_category_detail", kwargs={"category_slug": cat.slug})
-            )
-        )
+        if cat.topics.filter(is_active=True).exists():
+            entries.append({"loc": public_url(reverse("pickup_category_detail", args=[cat.slug]))})
 
     for topic in PickupTopic.objects.filter(is_active=True).select_related("category"):
-        absolute_urls.append(
-            public_url(
-                reverse(
-                    "pickup_line_detail",
-                    kwargs={
-                        "category_slug": topic.category.slug,
-                        "topic_slug": topic.slug,
-                    },
-                )
-            )
-        )
+        entries.append({"loc": public_url(reverse("pickup_line_detail", args=[topic.category.slug, topic.slug])),
+                        "lastmod": topic.guide_content.get("date_modified")})
 
     return render(
         request,
         "sitemap.xml",
-        {"urls": absolute_urls},
+        {"entries": entries},
         content_type="application/xml",
     )
 

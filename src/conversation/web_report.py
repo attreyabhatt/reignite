@@ -16,7 +16,8 @@ def web_conversion_report(days=28, now=None):
     since = now - timedelta(days=days)
     events = WebConversionEvent.objects.exclude(Q(user__is_staff=True) | Q(user__is_superuser=True))
     period = list(events.filter(created_at__gte=since, created_at__lte=now).values(
-        "kind", "created_at", "journey_id", "user_id", "origin_path", "situation", "was_guest"))
+        "kind", "created_at", "journey_id", "user_id", "origin_path", "situation", "was_guest",
+        "landing_path", "acquisition_source", "acquisition_medium"))
 
     def actor(row):
         return ("account", row["user_id"]) if row["user_id"] else ("guest", row["journey_id"])
@@ -72,7 +73,12 @@ def web_conversion_report(days=28, now=None):
     recent_first = [p for p in first_purchases.values() if p["timestamp"] >= since]
     matched_buyers = sum(c["purchased"] for c in cohorts.values())
     page_rows = {}
+    acquisition_rows = {}
     for row in period:
+        key = (row["landing_path"] or "Not recorded", row["acquisition_source"] or "Not recorded", row["acquisition_medium"] or "Not recorded")
+        group = acquisition_rows.setdefault(key, {"generated": 0, "copied": 0, "signup": 0})
+        if row["kind"] in group:
+            group[row["kind"]] += 1
         if row["kind"] != "generated":
             continue
         key = (row["origin_path"] or "Not recorded", row["situation"] or "Not recorded")
@@ -85,6 +91,8 @@ def web_conversion_report(days=28, now=None):
             "unmatched_buyers": len(recent_first) - matched_buyers,
             "pages": [{"path": k[0], "situation": k[1], "count": v}
                       for k, v in sorted(page_rows.items(), key=lambda item: -item[1])[:30]],
+            "acquisition_rows": [{"path": k[0], "source": k[1], "medium": k[2], **v}
+                for k, v in sorted(acquisition_rows.items(), key=lambda item: -item[1]["generated"])[:50]],
             "legacy_generations": GuestWebConversationAttempt.objects.filter(status="success",
                 created_at__gte=since, created_at__lte=now).count(),
             "legacy_copies": CopyEvent.objects.filter(created_at__gte=since, created_at__lte=now)

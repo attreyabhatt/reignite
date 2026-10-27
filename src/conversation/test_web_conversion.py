@@ -223,15 +223,15 @@ class PlatformLandingTests(TestCase):
             PickupTopic.objects.create(category=category, slug=slug, keyword=slug, h1=slug,
                                       witty_lines=["Existing guide example"])
 
-    def test_android_primary_action_and_web_fallback(self):
+    def test_android_gets_web_tool_before_secondary_app_promotion(self):
         paths = ["/", "/pickup-lines/professions/lawyer/", "/pickup-lines/dating-apps/instagram-dm-opener/",
                  "/situations/what-to-say-next-over-text/"]
         for path in paths:
             with self.subTest(path=path):
                 response = self.client.get(path, HTTP_USER_AGENT="Mozilla/5.0 (Linux; Android 14)")
-                self.assertContains(response, "Use the web version")
-                placement = b'data-app-promo-placement="hero"' if path == "/" else b'data-app-promo-placement="guide_primary"'
-                self.assertLess(response.content.index(placement), response.content.index(b'id="chatForm"'))
+                self.assertNotContains(response, 'data-app-promo-placement="hero"')
+                self.assertNotContains(response, 'data-app-promo-placement="guide_primary"')
+                self.assertLess(response.content.index(b'id="chatForm"'), response.content.index(b'data-app-promo-placement="inline_card"'))
                 self.assertIn("User-Agent", response["Vary"])
                 self.assertContains(response, 'id="chatForm"', count=1)
 
@@ -246,9 +246,10 @@ class PlatformLandingTests(TestCase):
                     self.assertLess(response.content.index(b'id="chatForm"'), response.content.index(b'data-app-promo-placement="inline_card"'))
                     self.assertContains(response, 'id="chatForm"', count=1)
 
-    def test_android_client_hint_selects_app_even_without_full_user_agent(self):
+    def test_android_client_hint_keeps_web_primary_without_full_user_agent(self):
         response = self.client.get("/", HTTP_SEC_CH_UA_PLATFORM='"Android"')
-        self.assertContains(response, 'data-app-promo-placement="hero"')
+        self.assertContains(response, 'Get my next reply')
+        self.assertNotContains(response, 'data-app-promo-placement="hero"')
 
 
 class ConversionReportTests(TestCase):
